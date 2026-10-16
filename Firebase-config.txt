@@ -1,0 +1,140 @@
+/* ============================================================
+   🔥 Firebase Configuration
+   ============================================================ */
+
+// تهيئة Firebase
+const firebaseConfig = {
+    apiKey: "AIzaSyBmob1xf1KYX3GD96WITFWeRN3kuVBBtis",
+    authDomain: "thier-decor.firebaseapp.com",
+    projectId: "thier-decor",
+    storageBucket: "thier-decor.firebasestorage.app",
+    messagingSenderId: "257928891637",
+    appId: "1:257928891637:web:6f28e77af2f7d569a809bc"
+};
+
+// متغيرات Firebase
+let db = null;
+let firebaseReady = false;
+
+// تهيئة Firebase عند تحميل الصفحة
+function initFirebase() {
+    return new Promise(function(resolve, reject) {
+        try {
+            // تهيئة التطبيق
+            if (!firebase.apps.length) {
+                firebase.initializeApp(firebaseConfig);
+            }
+            db = firebase.firestore();
+            
+            // تفعيل الكاش المحلي (للسرعة)
+            db.enablePersistence({ synchronizeTabs: true })
+                .catch(function(err) {
+                    console.warn('Persistence error:', err.code);
+                });
+            
+            firebaseReady = true;
+            console.log('✅ Firebase جاهز');
+            resolve(db);
+        } catch (e) {
+            console.error('❌ Firebase init error:', e);
+            reject(e);
+        }
+    });
+}
+
+// ============================================================
+// 💾 دوال الحفظ والقراءة من Firestore
+// ============================================================
+
+// حفظ مجموعة كاملة
+async function saveToCloud(collection, data) {
+    if (!firebaseReady) return;
+    try {
+        await db.collection('app').doc(collection).set({
+            data: data,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+    } catch (e) {
+        console.error('saveToCloud error:', e);
+    }
+}
+
+// قراءة مجموعة
+async function loadFromCloud(collection) {
+    if (!firebaseReady) return null;
+    try {
+        const doc = await db.collection('app').doc(collection).get();
+        if (doc.exists) {
+            return doc.data().data;
+        }
+        return null;
+    } catch (e) {
+        console.error('loadFromCloud error:', e);
+        return null;
+    }
+}
+
+// الاستماع للتغييرات في الوقت الحقيقي
+function watchCloud(collection, callback) {
+    if (!firebaseReady) return;
+    db.collection('app').doc(collection).onSnapshot(function(doc) {
+        if (doc.exists) {
+            callback(doc.data().data);
+        }
+    }, function(err) {
+        console.error('watchCloud error:', err);
+    });
+}
+
+// حفظ طلب جديد في collection منفصل
+async function addOrderToCloud(order) {
+    if (!firebaseReady) return null;
+    try {
+        const ref = await db.collection('orders').add({
+            ...order,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        return ref.id;
+    } catch (e) {
+        console.error('addOrderToCloud error:', e);
+        return null;
+    }
+}
+
+// الاستماع للطلبات الجديدة
+function watchOrders(callback) {
+    if (!firebaseReady) return;
+    db.collection('orders')
+        .orderBy('createdAt', 'desc')
+        .onSnapshot(function(snapshot) {
+            const orders = [];
+            snapshot.forEach(function(doc) {
+                orders.push({ id: doc.id, ...doc.data() });
+            });
+            callback(orders);
+        }, function(err) {
+            console.error('watchOrders error:', err);
+        });
+}
+
+// تحديث طلب في السحابة
+async function updateOrderInCloud(orderId, updates) {
+    if (!firebaseReady) return;
+    try {
+        await db.collection('orders').doc(orderId).update(updates);
+    } catch (e) {
+        console.error('updateOrderInCloud error:', e);
+    }
+}
+
+// حذف طلب
+async function deleteOrderFromCloud(orderId) {
+    if (!firebaseReady) return;
+    try {
+        await db.collection('orders').doc(orderId).delete();
+    } catch (e) {
+        console.error('deleteOrderFromCloud error:', e);
+    }
+}
+
+console.log('📦 firebase-config.js جاهز');

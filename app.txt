@@ -1,0 +1,2188 @@
+/* ============================================================
+   Thier Décor - app.js
+   الجزء 1: الأساسيات والثوابت
+   ============================================================ */
+
+const K = {
+    products: 'td_products',
+    customers: 'td_customers',
+    orders: 'td_orders',
+    expenses: 'td_expenses',
+    debts: 'td_debts',
+    settings: 'td_settings',
+    session: 'td_session'
+};
+
+const BACKUP_KEY = 'td_auto_backup';
+
+const WILAYAS = [
+    'أدرار','الشلف','الأغواط','أم البواقي','باتنة','بجاية','بسكرة','بشار','البليدة','البويرة',
+    'تمنراست','تبسة','تلمسان','تيارت','تيزي وزو','الجزائر','الجلفة','جيجل','سطيف','سعيدة',
+    'سكيكدة','سيدي بلعباس','عنابة','قالمة','قسنطينة','المدية','مستغانم','المسيلة','معسكر','ورقلة',
+    'وهران','البيض','إليزي','برج بوعريريج','بومرداس','الطارف','تندوف','تيسمسيلت','الوادي','خنشلة',
+    'سوق أهراس','تيبازة','ميلة','عين الدفلى','النعامة','عين تموشنت','غرداية','غليزان','تيميمون',
+    'برج باجي مختار','أولاد جلال','بني عباس','عين صالح','عين قزام','تقرت','جانت','المغير','المنيعة'
+];
+
+const DELIVERY_FEES = {
+    yalidine: {
+        home: {1:1200,2:500,3:600,4:500,5:500,6:400,7:650,8:950,9:400,10:350,11:1400,12:650,13:650,14:600,15:350,16:400,17:500,18:500,19:450,20:650,21:500,22:650,23:550,24:550,25:500,26:400,27:600,28:450,29:600,30:850,31:600,32:700,33:1300,34:400,35:400,36:600,37:1400,38:600,39:850,40:600,41:600,42:500,43:500,44:500,45:700,46:650,47:700,48:600,49:1050,50:1400,51:650,52:1050,53:1200,54:1400,55:900,56:1400,57:900,58:950},
+        stopdesk: {1:900,2:350,3:450,4:350,5:350,6:250,7:450,8:700,9:250,10:250,11:1000,12:450,13:450,14:400,15:250,16:250,17:350,18:350,19:300,20:450,21:350,22:450,23:400,24:400,25:350,26:250,27:400,28:300,29:400,30:600,31:400,32:500,33:1000,34:250,35:250,36:400,37:1100,38:400,39:600,40:400,41:400,42:300,43:350,44:300,45:500,46:450,47:500,48:400,49:750,50:1100,51:450,52:750,53:900,54:1100,55:650,56:1100,57:650,58:700}
+    },
+    noest: {
+        home: {1:1150,2:450,3:550,4:450,5:450,6:350,7:600,8:900,9:350,10:300,11:1350,12:600,13:600,14:550,15:300,16:350,17:450,18:450,19:400,20:600,21:450,22:600,23:500,24:500,25:450,26:350,27:550,28:400,29:550,30:800,31:550,32:650,33:1250,34:350,35:350,36:550,37:1350,38:550,39:800,40:550,41:550,42:450,43:450,44:450,45:650,46:600,47:650,48:550,49:1000,50:1350,51:600,52:1000,53:1150,54:1350,55:850,56:1350,57:850,58:900},
+        stopdesk: {1:850,2:300,3:400,4:300,5:300,6:200,7:400,8:650,9:200,10:200,11:950,12:400,13:400,14:350,15:200,16:200,17:300,18:300,19:250,20:400,21:300,22:400,23:350,24:350,25:300,26:200,27:350,28:250,29:350,30:550,31:350,32:450,33:950,34:200,35:200,36:350,37:1050,38:350,39:550,40:350,41:350,42:250,43:300,44:250,45:450,46:400,47:450,48:350,49:700,50:1050,51:400,52:700,53:850,54:1050,55:600,56:1050,57:600,58:650}
+    }
+};
+
+function getDeliveryFee(courier, type, wilayaCode) {
+    if (!courier || !type || !wilayaCode) return 0;
+    const t = DELIVERY_FEES[courier];
+    if (!t) return 0;
+    const s = t[type];
+    if (!s) return 0;
+    return s[parseInt(wilayaCode)] || 0;
+}
+window.getDeliveryFee = getDeliveryFee;
+
+let state = {
+    products: [],
+    customers: [],
+    orders: [],
+    expenses: [],
+    debts: [],
+    settings: {
+        shopName: 'Thier Décor',
+        tagline: 'مرحباً بكم • Bienvenue',
+        shopAddress: 'البويرة، الجزائر',
+        adminPass: '1234',
+        lowStock: 5,
+        phone: '0550000000',
+        logo: null
+    },
+    session: null,
+    cart: [],
+    orderFilter: 'pending',
+    stockFilter: 'all',
+    editingImages: [],
+    viewingProduct: null,
+    viewingQty: 1,
+    authType: 'customer',
+    authMode: 'login',
+    isGuest: false
+};
+
+function load() {
+    try {
+        state.products = JSON.parse(localStorage.getItem(K.products) || '[]');
+        state.customers = JSON.parse(localStorage.getItem(K.customers) || '[]');
+        state.orders = JSON.parse(localStorage.getItem(K.orders) || '[]');
+        state.expenses = JSON.parse(localStorage.getItem(K.expenses) || '[]');
+        state.debts = JSON.parse(localStorage.getItem(K.debts) || '[]');
+        state.settings = Object.assign({}, state.settings, JSON.parse(localStorage.getItem(K.settings) || '{}'));
+        state.session = JSON.parse(localStorage.getItem(K.session) || 'null');
+    } catch (e) { console.error(e); }
+}
+window.load = load;
+
+function save(key, data) {
+    try {
+        localStorage.setItem(key, JSON.stringify(data));
+        if (typeof autoBackupOnChange === 'function') autoBackupOnChange();
+        
+        // ☁️ حفظ في السحابة
+        if (typeof firebaseReady !== 'undefined' && firebaseReady) {
+            const map = {
+                'td_products': 'products',
+                'td_customers': 'customers',
+                'td_expenses': 'expenses',
+                'td_debts': 'debts',
+                'td_settings': 'settings'
+            };
+            const coll = map[key];
+            if (coll && typeof saveToCloud === 'function') {
+                saveToCloud(coll, data);
+            }
+        }
+    } catch (e) { console.error(e); }
+}
+window.save = save;
+
+function esc(s) {
+    const d = document.createElement('div');
+    d.textContent = s == null ? '' : s;
+    return d.innerHTML;
+}
+window.esc = esc;
+
+function empty(emoji, text) {
+    return '<div class="empty"><span class="emoji">' + emoji + '</span><p>' + text + '</p></div>';
+}
+window.empty = empty;
+
+function toast(msg, type) {
+    type = type || 'success';
+    const t = document.getElementById('toast');
+    if (!t) return;
+    t.textContent = msg;
+    t.className = 'toast ' + type + ' show';
+    clearTimeout(t._timer);
+    t._timer = setTimeout(function () { t.classList.remove('show'); }, 2000);
+}
+window.toast = toast;
+
+function formatMoney(n) {
+    return Number(n || 0).toLocaleString('fr-DZ') + ' دج';
+}
+window.formatMoney = formatMoney;
+
+function formatDate(d) {
+    try { return new Date(d).toLocaleDateString('fr-DZ'); } catch (e) { return '-'; }
+}
+window.formatDate = formatDate;
+
+function formatDateTime(d) {
+    try { return new Date(d).toLocaleString('fr-DZ'); } catch (e) { return '-'; }
+}
+window.formatDateTime = formatDateTime;
+/* ============================================================
+   الجزء 2: العلامة التجارية + التنقل
+   ============================================================ */
+
+function applyBranding() {
+    document.querySelectorAll('.shop-name-display').forEach(function (el) {
+        el.textContent = state.settings.shopName;
+    });
+    const hn = document.getElementById('home-shop-name');
+    if (hn) hn.textContent = state.settings.shopName;
+    const ht = document.getElementById('home-tagline');
+    if (ht) ht.textContent = state.settings.tagline || 'مرحباً بكم';
+
+    ['home-logo', 'admin-logo', 'shop-logo', 'logo-preview', 'inv-logo', 'welcome-logo', 'login-admin-logo'].forEach(function (id) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        if (state.settings.logo) {
+            el.style.backgroundImage = 'url(' + state.settings.logo + ')';
+            el.classList.add('has-image');
+            el.textContent = '';
+        } else {
+            el.style.backgroundImage = '';
+            el.classList.remove('has-image');
+            el.textContent = (state.settings.shopName || 'TD').substring(0, 2).toUpperCase();
+        }
+    });
+}
+window.applyBranding = applyBranding;
+
+function goScreen(id) {
+    document.querySelectorAll('.screen').forEach(function (s) { s.classList.remove('active'); });
+    const target = document.getElementById(id);
+    if (target) target.classList.add('active');
+    window.scrollTo(0, 0);
+}
+window.goScreen = goScreen;
+
+function adminGo(page) {
+    document.querySelectorAll('#screen-admin .page').forEach(function (p) { p.classList.remove('active'); });
+    const target = document.getElementById('a-' + page);
+    if (target) target.classList.add('active');
+    document.querySelectorAll('#screen-admin .nav-item').forEach(function (n) {
+        n.classList.toggle('active', n.dataset.page === page);
+    });
+    window.scrollTo(0, 0);
+    const r = {
+        home: renderAdminHome, products: renderAdminProducts, stock: renderStock,
+        orders: renderOrders, invoices: renderInvoices, debts: renderDebts,
+        expenses: renderExpenses, customers: renderCustomers, settings: renderSettings
+    };
+    if (r[page]) r[page]();
+}
+window.adminGo = adminGo;
+
+function shopGo(page) {
+    document.querySelectorAll('#screen-shop .page').forEach(function (p) { p.classList.remove('active'); });
+    const target = document.getElementById('s-' + page);
+    if (target) target.classList.add('active');
+    document.querySelectorAll('#screen-shop .nav-item').forEach(function (n) {
+        n.classList.toggle('active', n.dataset.page === page);
+    });
+    window.scrollTo(0, 0);
+    const r = { shop: renderShop, cart: renderCart, orders: renderMyOrders, profile: renderProfile };
+    if (r[page]) r[page]();
+}
+window.shopGo = shopGo;
+
+function openModal(id) {
+    const m = document.getElementById(id);
+    if (m) { m.classList.add('active'); document.body.style.overflow = 'hidden'; }
+}
+window.openModal = openModal;
+
+function closeModal(id) {
+    const m = document.getElementById(id);
+    if (m) { m.classList.remove('active'); document.body.style.overflow = ''; }
+}
+window.closeModal = closeModal;
+/* ============================================================
+   الجزء 3: المصادقة
+   ============================================================ */
+
+function openLogin(type) {
+    state.authType = type;
+    state.authMode = 'login';
+    document.getElementById('auth-type').value = type;
+    document.getElementById('auth-mode').value = 'login';
+    document.getElementById('auth-form').reset();
+    updateAuthUI();
+    goScreen('screen-auth');
+}
+window.openLogin = openLogin;
+
+function openRegister() {
+    state.authType = 'customer';
+    state.authMode = 'register';
+    document.getElementById('auth-type').value = 'customer';
+    document.getElementById('auth-mode').value = 'register';
+    document.getElementById('auth-form').reset();
+    updateAuthUI();
+    goScreen('screen-auth');
+}
+window.openRegister = openRegister;
+
+function adminLogin() {
+    state.authType = 'admin';
+    state.authMode = 'login';
+    const t = document.getElementById('auth-type');
+    const m = document.getElementById('auth-mode');
+    if (t) t.value = 'admin';
+    if (m) m.value = 'login';
+    const f = document.getElementById('auth-form');
+    if (f) f.reset();
+    updateAuthUI();
+    goScreen('screen-auth');
+}
+window.adminLogin = adminLogin;
+
+function updateAuthUI() {
+    const titleEl = document.getElementById('auth-title');
+    const submitEl = document.getElementById('auth-submit');
+    const nameG = document.getElementById('auth-name-group');
+    const phoneG = document.getElementById('auth-phone-group');
+    const addrG = document.getElementById('auth-address-group');
+    const passL = document.getElementById('auth-pass-label');
+    const box = document.getElementById('auth-switch-box');
+    const forgotBox = document.getElementById('forgot-box');
+    if (!titleEl) return;
+
+    const t = state.authType, m = state.authMode;
+
+    titleEl.textContent = t === 'admin'
+        ? '🔐 دخول المسؤول'
+        : (m === 'login' ? 'تسجيل الدخول' : 'إنشاء حساب');
+    submitEl.textContent = m === 'login' ? 'دخول' : 'إنشاء الحساب';
+
+    if (nameG) nameG.style.display = (t === 'customer' && m === 'register') ? 'block' : 'none';
+    if (phoneG) phoneG.style.display = t === 'customer' ? 'block' : 'none';
+    if (addrG) addrG.style.display = (t === 'customer' && m === 'register') ? 'block' : 'none';
+    if (passL) passL.textContent = t === 'admin' ? 'كلمة سر المسؤول' : 'كلمة السر';
+
+    if (box) {
+        if (t === 'admin') {
+            box.style.display = 'none';
+        } else {
+            box.style.display = 'block';
+            document.getElementById('auth-switch-text').textContent =
+                m === 'login' ? 'ليس لديك حساب؟' : 'لديك حساب؟';
+            document.getElementById('auth-switch-link').textContent =
+                m === 'login' ? 'إنشاء حساب' : 'تسجيل الدخول';
+        }
+    }
+
+    if (forgotBox) {
+        forgotBox.style.display = (t === 'customer' && m === 'login') ? 'block' : 'none';
+    }
+}
+window.updateAuthUI = updateAuthUI;
+
+function toggleAuthMode() {
+    state.authMode = state.authMode === 'login' ? 'register' : 'login';
+    updateAuthUI();
+}
+window.toggleAuthMode = toggleAuthMode;
+
+/* ====== نسيت كلمة المرور ====== */
+let forgotUserId = null;
+
+function openForgotPassword() {
+    document.getElementById('forgot-step1').style.display = 'block';
+    document.getElementById('forgot-step2').style.display = 'none';
+    document.getElementById('forgot-phone').value = '';
+    document.getElementById('forgot-new-pass').value = '';
+    document.getElementById('forgot-confirm-pass').value = '';
+    forgotUserId = null;
+    openModal('m-forgot');
+}
+window.openForgotPassword = openForgotPassword;
+
+function verifyForgotPhone() {
+    const phone = document.getElementById('forgot-phone').value.trim();
+    if (!phone) { toast('أدخل رقم الهاتف', 'error'); return; }
+
+    const c = state.customers.find(function (x) { return x.phone === phone; });
+    if (!c) { toast('رقم الهاتف غير مسجل', 'error'); return; }
+
+    forgotUserId = c.id;
+    document.getElementById('forgot-user-info').textContent = '👤 ' + c.name + ' • 📞 ' + c.phone;
+    document.getElementById('forgot-step1').style.display = 'none';
+    document.getElementById('forgot-step2').style.display = 'block';
+}
+window.verifyForgotPhone = verifyForgotPhone;
+
+function resetForgotPassword() {
+    const pass = document.getElementById('forgot-new-pass').value.trim();
+    const confirm = document.getElementById('forgot-confirm-pass').value.trim();
+
+    if (!pass || pass.length < 4) { toast('كلمة السر قصيرة (4 أحرف على الأقل)', 'error'); return; }
+    if (pass !== confirm) { toast('كلمتا السر غير متطابقتين', 'error'); return; }
+
+    const c = state.customers.find(function (x) { return x.id === forgotUserId; });
+    if (!c) { toast('خطأ، حاول مرة أخرى', 'error'); return; }
+
+    c.password = pass;
+    save(K.customers, state.customers);
+    closeModal('m-forgot');
+    toast('✅ تم تغيير كلمة السر!');
+
+    document.getElementById('auth-phone').value = c.phone;
+    document.getElementById('auth-pass').value = '';
+    document.getElementById('auth-pass').focus();
+}
+window.resetForgotPassword = resetForgotPassword;
+
+function backToForgotStep1() {
+    document.getElementById('forgot-step1').style.display = 'block';
+    document.getElementById('forgot-step2').style.display = 'none';
+    forgotUserId = null;
+}
+window.backToForgotStep1 = backToForgotStep1;
+
+/* ====== enterAdmin / enterShop / logout ====== */
+function enterAdmin() {
+    goScreen('screen-admin');
+    applyBranding();
+    renderSettings();
+    renderAdminHome();
+    if (typeof updateNotifBadge === 'function') updateNotifBadge();
+}
+window.enterAdmin = enterAdmin;
+
+function enterShop() {
+    const c = state.customers.find(function (x) { return x.id === state.session.id; });
+    if (!c) { logout(); return; }
+    document.getElementById('cust-greeting').textContent = 'مرحباً ' + c.name;
+    goScreen('screen-shop');
+    applyBranding();
+    renderShop();
+    updateCartBadge();
+    if (typeof updateNotifBadge === 'function') updateNotifBadge();
+}
+window.enterShop = enterShop;
+
+function logout() {
+    if (!confirm('تسجيل الخروج؟')) return;
+    state.session = null;
+    state.cart = [];
+    state.isGuest = false;
+    localStorage.removeItem(K.session);
+    const f = document.getElementById('auth-form');
+    if (f) f.reset();
+    document.querySelectorAll('.modal-overlay').forEach(function (m) { m.classList.remove('active'); });
+    document.body.style.overflow = '';
+    if (typeof closeNotifPanel === 'function') closeNotifPanel();
+    updateCartBadge();
+    goScreen('screen-welcome');
+}
+window.logout = logout;
+/* ============================================================
+   الجزء 4: المنتجات والصور والمخزون
+   ============================================================ */
+
+function openProductModal(product) {
+    product = product || null;
+    document.getElementById('prod-title').textContent = product ? 'تعديل منتج' : 'منتج جديد';
+    document.getElementById('prod-id').value = product ? product.id : '';
+    document.getElementById('prod-name').value = product ? product.name : '';
+    document.getElementById('prod-price').value = product ? product.price : '';
+    document.getElementById('prod-cost').value = product ? product.cost : '';
+    document.getElementById('prod-qty').value = product && product.qty !== undefined ? product.qty : '';
+    document.getElementById('prod-cat').value = product ? product.category : '';
+    document.getElementById('prod-desc').value = product ? product.desc : '';
+    state.editingImages = product && product.images ? product.images.slice() : [];
+    renderEditingImages();
+    openModal('m-product');
+}
+window.openProductModal = openProductModal;
+
+function renderEditingImages() {
+    const c = document.getElementById('prod-images-preview');
+    if (!c) return;
+    if (state.editingImages.length === 0) {
+        c.innerHTML = '<p style="grid-column:1/-1;text-align:center;color:var(--text-light);font-size:.75rem">لا توجد صور بعد</p>';
+        return;
+    }
+    let html = '';
+    state.editingImages.forEach(function (img, i) {
+        html += '<div class="image-item">';
+        html += '<img src="' + img + '" alt="">';
+        if (i === 0) html += '<span class="main-star">⭐ رئيسية</span>';
+        html += '<button type="button" class="remove-img" onclick="removeProductImage(' + i + ')">✕</button>';
+        html += '</div>';
+    });
+    c.innerHTML = html;
+}
+window.renderEditingImages = renderEditingImages;
+
+function removeProductImage(i) {
+    state.editingImages.splice(i, 1);
+    renderEditingImages();
+}
+window.removeProductImage = removeProductImage;
+
+function compressImage(dataUrl, maxSize, callback) {
+    const img = new Image();
+    img.onload = function () {
+        const canvas = document.createElement('canvas');
+        let w = img.width, h = img.height;
+        if (w > h) { if (w > maxSize) { h = h * maxSize / w; w = maxSize; } }
+        else { if (h > maxSize) { w = w * maxSize / h; h = maxSize; } }
+        canvas.width = w;
+        canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        callback(canvas.toDataURL('image/jpeg', 0.7));
+    };
+    img.src = dataUrl;
+}
+window.compressImage = compressImage;
+
+function deleteProduct(id) {
+    if (!confirm('حذف هذا المنتج؟')) return;
+    state.products = state.products.filter(function (p) { return p.id !== id; });
+    save(K.products, state.products);
+    renderAdminProducts();
+    renderAdminHome();
+    toast('تم الحذف ✓');
+}
+window.deleteProduct = deleteProduct;
+
+function getStockStatus(p) {
+    if (p.qty === 0) return { cls: 'out', label: 'نفد' };
+    if (p.qty <= state.settings.lowStock) return { cls: 'low', label: 'منخفض' };
+    return { cls: 'in', label: 'متوفر' };
+}
+window.getStockStatus = getStockStatus;
+
+function renderAdminProducts() {
+    const c = document.getElementById('a-products-list');
+    if (!c) return;
+    const s = document.getElementById('prod-search');
+    const q = s ? s.value.toLowerCase().trim() : '';
+    let list = state.products.slice();
+    if (q) {
+        list = list.filter(function (p) {
+            return p.name.toLowerCase().indexOf(q) !== -1 ||
+                (p.category && p.category.toLowerCase().indexOf(q) !== -1);
+        });
+    }
+    if (list.length === 0) {
+        c.innerHTML = empty('📦', q ? 'لا توجد نتائج' : 'لا توجد منتجات');
+        return;
+    }
+    let html = '';
+    list.forEach(function (p) {
+        const st = getStockStatus(p);
+        const img = p.images && p.images[0];
+        const style = img ? 'background-image:url(' + img + ')' : '';
+        const cnt = p.images && p.images.length > 1 ? ' • 📸 ' + p.images.length : '';
+
+        let stockLabel = '';
+        if (p.qty === 0) stockLabel = '❌ نفد';
+        else if (p.qty <= state.settings.lowStock) stockLabel = '⚠️ ' + p.qty;
+        else stockLabel = '📦 ' + p.qty;
+
+        html += '<div class="item-card">';
+        html += '<div style="display:flex;gap:10px">';
+        html += '<div style="width:80px;height:80px;border-radius:12px;overflow:hidden;flex-shrink:0;background:var(--primary-light);display:flex;align-items:center;justify-content:center;font-size:1.8rem;background-size:cover;background-position:center;position:relative;' + style + '">';
+        if (!img) html += '🖼️';
+        html += '<div class="stock-badge-overlay ' + st.cls + '">' + stockLabel + '</div>';
+        html += '</div>';
+        html += '<div style="flex:1;min-width:0">';
+        html += '<div class="card-top"><div style="flex:1;min-width:0"><h4>' + esc(p.name) + '</h4>';
+        html += '<span class="subtitle">' + esc(p.category || '') + cnt + '</span></div>';
+        html += '<span class="badge ' + st.cls + '">' + st.label + '</span></div>';
+        html += '<div class="card-info">';
+        html += '<span class="stock-tag-big ' + st.cls + '">📦 المخزون: ' + p.qty + '</span>';
+        html += '<span class="info-tag">💰 ' + formatMoney(p.price) + '</span>';
+        html += '</div></div></div>';
+        html += '<div class="card-actions" style="margin-top:8px">';
+        html += '<button class="btn-mini edit" onclick="quickRestock(' + p.id + ')">📥 + كمية</button>';
+        html += '<button class="btn-mini edit" onclick="editProd(' + p.id + ')">✏️ تعديل</button>';
+        html += '<button class="btn-mini delete" onclick="deleteProduct(' + p.id + ')">🗑️ حذف</button>';
+        html += '</div></div>';
+    });
+    c.innerHTML = html;
+}
+window.renderAdminProducts = renderAdminProducts;
+
+function editProd(id) {
+    const p = state.products.find(function (x) { return x.id === id; });
+    if (p) openProductModal(p);
+}
+window.editProd = editProd;
+
+/* ====== المخزون ====== */
+function setStockFilter(f, el) {
+    state.stockFilter = f;
+    document.querySelectorAll('#a-stock .filter-chip').forEach(function (c) { c.classList.remove('active'); });
+    if (el) el.classList.add('active');
+    renderStock();
+}
+window.setStockFilter = setStockFilter;
+
+function renderStock() {
+    const c = document.getElementById('a-stock-list');
+    if (!c) return;
+    let list = state.products.slice();
+    if (state.stockFilter === 'low') list = list.filter(function (p) { return p.qty > 0 && p.qty <= state.settings.lowStock; });
+    if (state.stockFilter === 'out') list = list.filter(function (p) { return p.qty === 0; });
+    if (list.length === 0) { c.innerHTML = empty('📊', 'لا توجد نتائج'); return; }
+    list.sort(function (a, b) { return a.qty - b.qty; });
+    let html = '';
+    list.forEach(function (p) {
+        const st = getStockStatus(p);
+        const color = p.qty === 0 ? 'var(--danger)' : (p.qty <= state.settings.lowStock ? 'var(--warning)' : 'var(--primary)');
+        html += '<div class="item-card">';
+        html += '<div class="card-top"><div style="flex:1;min-width:0"><h4>' + esc(p.name) + '</h4><span class="subtitle">' + esc(p.category || '') + '</span></div>';
+        html += '<span class="badge ' + st.cls + '">' + st.label + '</span></div>';
+        html += '<div class="card-info"><span class="info-tag" style="font-weight:800;color:' + color + '">📦 ' + p.qty + '</span><span class="info-tag">💰 ' + formatMoney(p.price) + '</span></div>';
+        html += '<div class="card-actions">';
+        html += '<button class="btn-mini edit" onclick="quickRestock(' + p.id + ')">📥 إضافة كمية</button>';
+        html += '<button class="btn-mini edit" onclick="editProd(' + p.id + ')">✏️ تعديل</button>';
+        html += '</div></div>';
+    });
+    c.innerHTML = html;
+}
+window.renderStock = renderStock;
+
+function quickRestock(id) {
+    const p = state.products.find(function (x) { return x.id === id; });
+    if (!p) return;
+    const add = prompt('إضافة كمية إلى "' + p.name + '"\nالكمية الحالية: ' + p.qty, '10');
+    if (add === null) return;
+    const num = parseInt(add);
+    if (isNaN(num) || num <= 0) { toast('كمية غير صحيحة', 'error'); return; }
+    p.qty += num;
+    save(K.products, state.products);
+    renderStock();
+    renderAdminHome();
+    renderAdminProducts();
+    toast('تمت إضافة ' + num + ' ✓');
+}
+window.quickRestock = quickRestock;
+/* ============================================================
+   الجزء 5: الرئيسية + الطلبيات + الفواتير
+   ============================================================ */
+
+function renderAdminHome() {
+    const today = new Date().toDateString();
+    const valid = state.orders.filter(function (o) { return o.status !== 'cancelled'; });
+    const todayOrders = valid.filter(function (o) { return new Date(o.createdAt).toDateString() === today; });
+    const todayTotal = todayOrders.reduce(function (s, o) { return s + o.total; }, 0);
+    const totalAll = valid.reduce(function (s, o) { return s + o.total; }, 0);
+    const pending = state.orders.filter(function (o) { return o.status === 'pending'; }).length;
+    const debts = state.debts.filter(function (d) { return !d.paid; }).reduce(function (s, d) { return s + d.amount; }, 0);
+
+    document.getElementById('a-today').textContent = formatMoney(todayTotal);
+    document.getElementById('a-total').textContent = formatMoney(totalAll);
+    document.getElementById('a-pending').textContent = pending;
+    document.getElementById('a-debts').textContent = formatMoney(debts);
+
+    const recent = state.orders.slice(0, 4);
+    const rc = document.getElementById('a-recent-orders');
+    if (!rc) return;
+    if (recent.length === 0) { rc.innerHTML = empty('🧾', 'لا توجد طلبيات'); return; }
+    const labels = { pending: '🕐 جديدة', confirmed: '✅ مؤكدة', shipped: '🚚 مرسلة', delivered: '📦 مسلّمة', cancelled: '❌ ملغاة' };
+    let html = '';
+    recent.forEach(function (o) {
+        html += '<div class="item-card" onclick="viewOrder(' + o.id + ')">';
+        html += '<div class="card-top"><div style="flex:1;min-width:0"><h4>' + esc(o.customerName) + '</h4><span class="subtitle">' + formatDateTime(o.createdAt) + '</span></div>';
+        html += '<span class="badge ' + o.status + '">' + labels[o.status] + '</span></div>';
+        html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px">';
+        html += '<span class="info-tag">🚚 ' + (o.courier === 'yalidine' ? 'Yalidine' : 'Noest') + '</span>';
+        html += '<strong style="color:var(--primary);font-size:.95rem">' + formatMoney(o.total) + '</strong>';
+        html += '</div></div>';
+    });
+    rc.innerHTML = html;
+    if (typeof renderStockAlerts === 'function') renderStockAlerts();
+}
+window.renderAdminHome = renderAdminHome;
+
+/* ====== الطلبيات ====== */
+function setOrderFilter(f, el) {
+    state.orderFilter = f;
+    document.querySelectorAll('#a-orders .filter-chip').forEach(function (c) { c.classList.remove('active'); });
+    if (el) el.classList.add('active');
+    renderOrders();
+}
+window.setOrderFilter = setOrderFilter;
+
+function renderOrders() {
+    const c = document.getElementById('a-orders-list');
+    if (!c) return;
+    let list = state.orders.slice();
+    if (state.orderFilter !== 'all') list = list.filter(function (o) { return o.status === state.orderFilter; });
+    if (list.length === 0) { c.innerHTML = empty('📋', 'لا توجد طلبيات'); return; }
+    const L = { pending: '🕐 جديدة', confirmed: '✅ مؤكدة', shipped: '🚚 مرسلة', delivered: '📦 مسلّمة', cancelled: '❌ ملغاة' };
+    let html = '';
+    list.forEach(function (o) {
+        html += '<div class="item-card" onclick="viewOrder(' + o.id + ')">';
+        html += '<div class="card-top"><div style="flex:1;min-width:0"><h4>' + esc(o.customerName) + '</h4>';
+        html += '<span class="subtitle">📞 ' + esc(o.customerPhone) + ' • ' + formatDate(o.createdAt) + '</span></div>';
+        html += '<span class="badge ' + o.status + '">' + L[o.status] + '</span></div>';
+        html += '<div class="card-info">';
+        html += '<span class="info-tag">🚚 ' + (o.courier === 'yalidine' ? 'Yalidine' : 'Noest') + '</span>';
+        html += '<span class="info-tag">📦 ' + (o.deliveryType === 'home' ? 'منزل' : 'مكتب') + '</span>';
+        html += '<span class="info-tag">📍 ' + esc(o.wilaya) + '</span>';
+        html += '</div>';
+        html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px">';
+        html += '<strong style="color:var(--primary);font-size:1rem">' + formatMoney(o.total) + '</strong>';
+        html += '<span style="font-size:.72rem;color:var(--text-mid)">' + o.items.length + ' منتج</span>';
+        html += '</div></div>';
+    });
+    c.innerHTML = html;
+}
+window.renderOrders = renderOrders;
+
+function viewOrder(id) {
+    const o = state.orders.find(function (x) { return x.id === id; });
+    if (!o) return;
+    const L = { pending: '🕐 جديدة', confirmed: '✅ مؤكدة', shipped: '🚚 مرسلة', delivered: '📦 مسلّمة', cancelled: '❌ ملغاة' };
+    let items = '';
+    o.items.forEach(function (i) {
+        items += '<div class="order-detail-row"><span>' + esc(i.name) + ' × ' + i.qty + '</span><span>' + formatMoney(i.price * i.qty) + '</span></div>';
+    });
+    const dRow = o.deliveryFee ? '<div class="order-detail-row" style="background:var(--primary-light);padding:10px;border-radius:8px;margin-top:6px"><span>🚚 التوصيل</span><span style="color:var(--primary)">' + formatMoney(o.deliveryFee) + '</span></div>' : '';
+    let actions = '';
+    if (o.status === 'pending') {
+        actions = '<div class="card-actions" style="margin-top:14px;justify-content:center;flex-wrap:wrap">' +
+            '<a class="btn-mini call" href="tel:' + o.customerPhone + '">📞 اتصال</a>' +
+            '<button class="btn-mini confirm" onclick="setOrderStatus(' + o.id + ',\'confirmed\')">✅ تأكيد</button>' +
+            '<button class="btn-mini delete" onclick="setOrderStatus(' + o.id + ',\'cancelled\')">❌ إلغاء</button></div>';
+    } else if (o.status === 'confirmed') {
+        actions = '<div class="card-actions" style="margin-top:14px;justify-content:center;flex-wrap:wrap">' +
+            '<a class="btn-mini call" href="tel:' + o.customerPhone + '">📞 اتصال</a>' +
+            '<button class="btn-mini ship" onclick="setOrderStatus(' + o.id + ',\'shipped\')">🚚 تم الإرسال</button></div>';
+    } else if (o.status === 'shipped') {
+        actions = '<div class="card-actions" style="margin-top:14px;justify-content:center">' +
+            '<button class="btn-mini deliver" onclick="setOrderStatus(' + o.id + ',\'delivered\')">📦 تم التسليم</button></div>';
+    }
+
+    document.getElementById('order-details').innerHTML =
+        '<div class="order-detail-row"><span>الحالة</span><span class="badge ' + o.status + '">' + L[o.status] + '</span></div>' +
+        '<div class="order-detail-row"><span>الزبون</span><span>' + esc(o.customerName) + '</span></div>' +
+        '<div class="order-detail-row"><span>الهاتف</span><span><a href="tel:' + o.customerPhone + '">' + esc(o.customerPhone) + '</a></span></div>' +
+        '<div class="order-detail-row"><span>الولاية</span><span>' + esc(o.wilaya) + '</span></div>' +
+        '<div class="order-detail-row"><span>البلدية</span><span>' + esc(o.commune) + '</span></div>' +
+        '<div class="order-detail-row"><span>العنوان</span><span>' + esc(o.address) + '</span></div>' +
+        '<div class="order-detail-row"><span>الشركة</span><span>' + (o.courier === 'yalidine' ? 'Yalidine' : 'Noest') + '</span></div>' +
+        '<div class="order-detail-row"><span>النوع</span><span>' + (o.deliveryType === 'home' ? '🏠 للمنزل' : '🏢 مكتب') + '</span></div>' +
+        (o.note ? '<div class="order-detail-row"><span>ملاحظة</span><span>' + esc(o.note) + '</span></div>' : '') +
+        '<hr style="margin:14px 0;border:none;border-top:1px dashed var(--border)">' +
+        '<h4 style="font-size:.9rem;margin-bottom:8px;font-weight:800">🛒 المنتجات</h4>' + items + dRow +
+        '<div class="order-detail-row" style="font-weight:800;font-size:1.05rem;padding-top:12px;margin-top:6px;border-top:2px solid var(--border)"><span>المجموع الكلي</span><span style="color:var(--primary)">' + formatMoney(o.total) + '</span></div>' +
+        '<div style="margin-top:14px"><button class="btn-primary" style="margin:0" onclick="closeModal(\'m-order\');setTimeout(function(){showInvoice(' + o.id + ')},250)">🧾 عرض الفاتورة</button></div>' +
+        actions;
+    openModal('m-order');
+}
+window.viewOrder = viewOrder;
+
+function setOrderStatus(id, status) {
+    const o = state.orders.find(function (x) { return x.id === id; });
+    if (!o) return;
+    if (status === 'cancelled' && o.status !== 'cancelled') {
+        o.items.forEach(function (i) {
+            const p = state.products.find(function (x) { return x.id === i.id; });
+            if (p) p.qty += i.qty;
+        });
+        save(K.products, state.products);
+    }
+    o.status = status;
+    o.updatedAt = new Date().toISOString();
+    save(K.orders, state.orders);
+    closeModal('m-order');
+    renderOrders();
+    renderAdminHome();
+    if (typeof updateNotifBadge === 'function') updateNotifBadge();
+    toast('تم التحديث ✓');
+}
+window.setOrderStatus = setOrderStatus;
+
+/* ====== الفواتير ====== */
+function renderInvoices() {
+    const c = document.getElementById('a-invoices-list');
+    if (!c) return;
+    const list = state.orders.filter(function (o) { return ['confirmed', 'shipped', 'delivered'].indexOf(o.status) !== -1; });
+    if (list.length === 0) { c.innerHTML = empty('🧾', 'لا توجد فواتير'); return; }
+    let html = '';
+    list.forEach(function (o) {
+        html += '<div class="item-card">';
+        html += '<div class="card-top"><div style="flex:1;min-width:0"><h4>فاتورة #' + o.id.toString().slice(-6) + '</h4>';
+        html += '<span class="subtitle">' + esc(o.customerName) + ' • ' + formatDate(o.createdAt) + '</span></div>';
+        html += '<span class="badge confirmed">' + formatMoney(o.total) + '</span></div>';
+        html += '<div class="card-actions"><button class="btn-mini edit" onclick="showInvoice(' + o.id + ')">🧾 عرض</button></div>';
+        html += '</div>';
+    });
+    c.innerHTML = html;
+}
+window.renderInvoices = renderInvoices;
+
+function showInvoice(orderId) {
+    const o = state.orders.find(function (x) { return x.id === orderId; });
+    if (!o) { toast('الطلبية غير موجودة', 'error'); return; }
+    document.getElementById('inv-shop-name').textContent = state.settings.shopName;
+    document.getElementById('inv-shop-address').textContent = '📍 ' + (state.settings.shopAddress || '');
+    document.getElementById('inv-shop-phone').textContent = '📞 ' + (state.settings.phone || '');
+    applyBranding();
+    document.getElementById('inv-num').textContent = o.id.toString().slice(-8);
+    document.getElementById('inv-date').textContent = formatDateTime(o.createdAt);
+    document.getElementById('inv-cust-name').textContent = o.customerName;
+    document.getElementById('inv-cust-phone').textContent = o.customerPhone;
+    document.getElementById('inv-cust-wilaya').textContent = o.wilaya;
+    document.getElementById('inv-cust-commune').textContent = o.commune;
+    document.getElementById('inv-cust-address').textContent = o.address;
+    document.getElementById('inv-courier').textContent = o.courier === 'yalidine' ? 'Yalidine' : 'Noest';
+    document.getElementById('inv-type').textContent = o.deliveryType === 'home' ? '🏠 للمنزل' : '🏢 مكتب';
+    const L = { pending: 'جديدة', confirmed: 'مؤكدة', shipped: 'مرسلة', delivered: 'مسلّمة', cancelled: 'ملغاة' };
+    document.getElementById('inv-status').textContent = L[o.status] || o.status;
+    let rows = '';
+    o.items.forEach(function (i, idx) {
+        rows += '<tr><td>' + (idx + 1) + '</td><td style="text-align:right;padding-right:10px">' + esc(i.name) + '</td>';
+        rows += '<td>' + formatMoney(i.price) + '</td><td>' + i.qty + '</td>';
+        rows += '<td style="font-weight:800;color:var(--primary)">' + formatMoney(i.price * i.qty) + '</td></tr>';
+    });
+    if (o.deliveryFee) {
+        rows += '<tr style="background:#f0fdfa"><td>🚚</td><td style="text-align:right;padding-right:10px;font-weight:700">التوصيل</td>';
+        rows += '<td>' + formatMoney(o.deliveryFee) + '</td><td>1</td>';
+        rows += '<td style="font-weight:800;color:var(--primary)">' + formatMoney(o.deliveryFee) + '</td></tr>';
+    }
+    document.getElementById('inv-items').innerHTML = rows;
+    document.getElementById('inv-total').textContent = formatMoney(o.total);
+    openModal('m-invoice');
+}
+window.showInvoice = showInvoice;
+
+function printInvoice() { window.print(); }
+window.printInvoice = printInvoice;
+
+function downloadPDF() {
+    const el = document.getElementById('invoice-printable');
+    if (!el) return;
+    if (typeof html2canvas === 'undefined' || typeof window.jspdf === 'undefined') {
+        toast('المكتبات لم تُحمّل بعد', 'error');
+        return;
+    }
+    toast('⏳ جاري تحضير PDF...');
+    html2canvas(el, { scale: 2, backgroundColor: '#ffffff', useCORS: true, logging: false })
+        .then(function (canvas) {
+            const imgData = canvas.toDataURL('image/png');
+            const jsPDF = window.jspdf.jsPDF;
+            const pdf = new jsPDF('p', 'mm', 'a4');
+            const pw = pdf.internal.pageSize.getWidth();
+            const ph = pdf.internal.pageSize.getHeight();
+            const m = 10, iw = pw - m * 2;
+            const ih = (canvas.height * iw) / canvas.width;
+            let left = ih, pos = m;
+            pdf.addImage(imgData, 'PNG', m, pos, iw, ih);
+            left -= (ph - m * 2);
+            while (left > 0) {
+                pos = m - (ih - left);
+                pdf.addPage();
+                pdf.addImage(imgData, 'PNG', m, pos, iw, ih);
+                left -= (ph - m * 2);
+            }
+            pdf.save('Facture-' + document.getElementById('inv-num').textContent + '.pdf');
+            toast('✅ تم التحميل');
+        })
+        .catch(function (err) { console.error(err); toast('خطأ في PDF', 'error'); });
+}
+window.downloadPDF = downloadPDF;
+/* ============================================================
+   الجزء 6: الديون + المصروفات + الزبائن + الإعدادات
+   ============================================================ */
+
+/* ====== الديون ====== */
+function openDebtModal() {
+    document.getElementById('debt-form').reset();
+    openModal('m-debt');
+}
+window.openDebtModal = openDebtModal;
+
+function renderDebts() {
+    const c = document.getElementById('a-debts-list');
+    if (!c) return;
+    if (state.debts.length === 0) { c.innerHTML = empty('💳', 'لا توجد ديون'); return; }
+    let html = '';
+    state.debts.forEach(function (d) {
+        html += '<div class="item-card">';
+        html += '<div class="card-top"><div style="flex:1;min-width:0"><h4>' + esc(d.name) + '</h4>';
+        if (d.phone) html += '<span class="subtitle">📞 ' + esc(d.phone) + '</span>';
+        html += '</div><span class="badge ' + (d.paid ? 'in' : 'out') + '">' + (d.paid ? 'مسدد' : 'غير مسدد') + '</span></div>';
+        html += '<div class="card-info">';
+        html += '<span class="info-tag" style="background:var(--primary-light);color:var(--primary-dark);font-weight:800">💰 ' + formatMoney(d.amount) + '</span>';
+        html += '<span class="info-tag">📅 ' + formatDate(d.date) + '</span></div>';
+        if (d.note) html += '<p style="font-size:.78rem;color:var(--text-mid);margin-bottom:8px">📝 ' + esc(d.note) + '</p>';
+        html += '<div class="card-actions">';
+        if (!d.paid) html += '<button class="btn-mini confirm" onclick="payDebt(' + d.id + ')">✓ تسديد</button>';
+        if (d.phone) html += '<a class="btn-mini call" href="tel:' + d.phone + '">📞 اتصال</a>';
+        html += '<button class="btn-mini delete" onclick="deleteDebt(' + d.id + ')">🗑️ حذف</button>';
+        html += '</div></div>';
+    });
+    c.innerHTML = html;
+}
+window.renderDebts = renderDebts;
+
+function payDebt(id) {
+    const d = state.debts.find(function (x) { return x.id === id; });
+    if (!d) return;
+    if (!confirm('تسديد ' + d.amount + ' دج لـ ' + d.name + '؟')) return;
+    d.paid = true;
+    d.paidAt = new Date().toISOString();
+    save(K.debts, state.debts);
+    renderDebts();
+    renderAdminHome();
+    toast('تم التسديد ✓');
+}
+window.payDebt = payDebt;
+
+function deleteDebt(id) {
+    if (!confirm('حذف هذا الدين؟')) return;
+    state.debts = state.debts.filter(function (d) { return d.id !== id; });
+    save(K.debts, state.debts);
+    renderDebts();
+    renderAdminHome();
+    toast('تم الحذف ✓');
+}
+window.deleteDebt = deleteDebt;
+
+/* ====== المصروفات ====== */
+function openExpenseModal() {
+    document.getElementById('expense-form').reset();
+    openModal('m-expense');
+}
+window.openExpenseModal = openExpenseModal;
+
+function renderExpenses() {
+    const c = document.getElementById('a-expenses-list');
+    if (!c) return;
+    const totalEl = document.getElementById('a-expense-total');
+    const total = state.expenses.reduce(function (s, x) { return s + x.amount; }, 0);
+    if (totalEl) totalEl.textContent = '💸 الإجمالي: ' + formatMoney(total);
+    if (state.expenses.length === 0) { c.innerHTML = empty('💸', 'لا توجد مصروفات'); return; }
+    let html = '';
+    state.expenses.forEach(function (x) {
+        html += '<div class="item-card">';
+        html += '<div class="card-top"><div style="flex:1;min-width:0"><h4>' + esc(x.desc) + '</h4>';
+        html += '<span class="subtitle">' + esc(x.category) + ' • ' + formatDate(x.date) + '</span></div>';
+        html += '<span class="badge out">' + formatMoney(x.amount) + '</span></div>';
+        html += '<div class="card-actions"><button class="btn-mini delete" onclick="deleteExpense(' + x.id + ')">🗑️ حذف</button></div>';
+        html += '</div>';
+    });
+    c.innerHTML = html;
+}
+window.renderExpenses = renderExpenses;
+
+function deleteExpense(id) {
+    if (!confirm('حذف هذا المصروف؟')) return;
+    state.expenses = state.expenses.filter(function (x) { return x.id !== id; });
+    save(K.expenses, state.expenses);
+    renderExpenses();
+    toast('تم الحذف ✓');
+}
+window.deleteExpense = deleteExpense;
+
+/* ====== الزبائن ====== */
+function renderCustomers() {
+    const c = document.getElementById('a-customers-list');
+    if (!c) return;
+    if (state.customers.length === 0) { c.innerHTML = empty('👥', 'لا يوجد زبائن'); return; }
+    let html = '';
+    state.customers.forEach(function (x) {
+        const co = state.orders.filter(function (o) { return o.customerId === x.id && o.status !== 'cancelled'; });
+        const spent = co.reduce(function (s, o) { return s + o.total; }, 0);
+        html += '<div class="item-card">';
+        html += '<div class="card-top"><div style="flex:1;min-width:0"><h4>' + esc(x.name) + '</h4>';
+        html += '<span class="subtitle">📞 ' + esc(x.phone) + '</span></div></div>';
+        html += '<div class="card-info">';
+        html += '<span class="info-tag">📋 ' + co.length + ' طلبية</span>';
+        html += '<span class="info-tag" style="background:var(--primary-light);color:var(--primary-dark);font-weight:800">💰 ' + formatMoney(spent) + '</span></div>';
+        if (x.address) html += '<p style="font-size:.76rem;color:var(--text-mid)">📍 ' + esc(x.address) + '</p>';
+        html += '<div class="card-actions"><a class="btn-mini call" href="tel:' + x.phone + '">📞 اتصال</a></div>';
+        html += '</div>';
+    });
+    c.innerHTML = html;
+}
+window.renderCustomers = renderCustomers;
+
+/* ====== الإعدادات ====== */
+function renderSettings() {
+    const map = {
+        'set-shop': state.settings.shopName || '',
+        'set-tagline': state.settings.tagline || '',
+        'set-address': state.settings.shopAddress || '',
+        'set-pass': state.settings.adminPass || '1234',
+        'set-low': state.settings.lowStock || 5,
+        'set-phone': state.settings.phone || ''
+    };
+    Object.keys(map).forEach(function (id) {
+        const el = document.getElementById(id);
+        if (el) el.value = map[id];
+    });
+    const prev = document.getElementById('logo-preview');
+    if (prev) {
+        if (state.settings.logo) {
+            prev.style.backgroundImage = 'url(' + state.settings.logo + ')';
+            prev.classList.add('has-image');
+            prev.textContent = '';
+        } else {
+            prev.style.backgroundImage = '';
+            prev.classList.remove('has-image');
+            prev.textContent = (state.settings.shopName || 'TD').substring(0, 2).toUpperCase();
+        }
+    }
+}
+window.renderSettings = renderSettings;
+
+function saveSettings() {
+    state.settings.shopName = document.getElementById('set-shop').value.trim() || 'Thier Décor';
+    state.settings.tagline = document.getElementById('set-tagline').value.trim() || 'مرحباً بكم';
+    state.settings.shopAddress = document.getElementById('set-address').value.trim();
+    state.settings.adminPass = document.getElementById('set-pass').value.trim() || '1234';
+    state.settings.lowStock = parseInt(document.getElementById('set-low').value) || 5;
+    state.settings.phone = document.getElementById('set-phone').value.trim();
+    save(K.settings, state.settings);
+    applyBranding();
+    renderAdminHome();
+    renderStock();
+    toast('تم الحفظ ✓');
+}
+window.saveSettings = saveSettings;
+
+function removeLogo() {
+    if (!confirm('حذف الشعار؟')) return;
+    state.settings.logo = null;
+    save(K.settings, state.settings);
+    applyBranding();
+    renderSettings();
+    toast('تم الحذف ✓');
+}
+window.removeLogo = removeLogo;
+
+function exportAll() {
+    const data = {
+        products: state.products, customers: state.customers, orders: state.orders,
+        expenses: state.expenses, debts: state.debts, settings: state.settings,
+        exportedAt: new Date().toISOString()
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'thier-decor-backup-' + new Date().toISOString().slice(0, 10) + '.json';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast('تم التصدير ✓');
+}
+window.exportAll = exportAll;
+
+function resetAll() {
+    if (!confirm('⚠️ سيتم حذف كل البيانات! متأكد؟')) return;
+    if (!confirm('تأكيد أخير؟')) return;
+    Object.keys(K).forEach(function (key) { localStorage.removeItem(K[key]); });
+    toast('جاري إعادة التشغيل...');
+    setTimeout(function () { location.reload(); }, 800);
+}
+window.resetAll = resetAll;
+
+/* ====== النسخ الاحتياطي ====== */
+function createAutoBackup() {
+    try {
+        const backup = {
+            products: state.products, customers: state.customers, orders: state.orders,
+            expenses: state.expenses, debts: state.debts, settings: state.settings,
+            timestamp: new Date().toISOString()
+        };
+        localStorage.setItem(BACKUP_KEY, JSON.stringify(backup));
+    } catch (e) { console.error(e); }
+}
+window.createAutoBackup = createAutoBackup;
+
+function autoBackupOnChange() {
+    clearTimeout(window._backupTimer);
+    window._backupTimer = setTimeout(createAutoBackup, 2000);
+}
+window.autoBackupOnChange = autoBackupOnChange;
+
+function hasBackup() { return !!localStorage.getItem(BACKUP_KEY); }
+window.hasBackup = hasBackup;
+
+function restoreFromBackup() {
+    try {
+        const data = localStorage.getItem(BACKUP_KEY);
+        if (!data) { toast('لا توجد نسخة احتياطية', 'error'); return; }
+        const backup = JSON.parse(data);
+        const date = formatDateTime(backup.timestamp);
+        if (!confirm('استعادة البيانات من نسخة ' + date + '؟')) return;
+        if (!confirm('سيتم استبدال البيانات الحالية. متأكد؟')) return;
+        if (backup.products) { state.products = backup.products; save(K.products, state.products); }
+        if (backup.customers) { state.customers = backup.customers; save(K.customers, state.customers); }
+        if (backup.orders) { state.orders = backup.orders; save(K.orders, state.orders); }
+        if (backup.expenses) { state.expenses = backup.expenses; save(K.expenses, state.expenses); }
+        if (backup.debts) { state.debts = backup.debts; save(K.debts, state.debts); }
+        if (backup.settings) { state.settings = backup.settings; save(K.settings, state.settings); }
+        toast('✅ تمت الاستعادة! جاري التحديث...');
+        setTimeout(function () { location.reload(); }, 1200);
+    } catch (e) { console.error(e); toast('خطأ في الاستعادة', 'error'); }
+}
+window.restoreFromBackup = restoreFromBackup;
+/* ============================================================
+   الجزء 7: متجر الزبون + معرض المنتج + السلة
+   ============================================================ */
+
+function renderShop() {
+    const c = document.getElementById('s-products');
+    if (!c) return;
+    const s = document.getElementById('shop-search');
+    const q = s ? s.value.toLowerCase().trim() : '';
+    let list = state.products.filter(function (p) { return p.qty > 0; });
+    if (q) {
+        list = list.filter(function (p) {
+            return p.name.toLowerCase().indexOf(q) !== -1 ||
+                (p.category && p.category.toLowerCase().indexOf(q) !== -1);
+        });
+    }
+    if (list.length === 0) {
+        c.innerHTML = '<div style="grid-column:1/-1">' + empty('🛍️', 'لا توجد منتجات متوفرة') + '</div>';
+        return;
+    }
+    let html = '';
+    list.forEach(function (p) {
+        const img = p.images && p.images[0];
+        const cnt = p.images ? p.images.length : 0;
+        const style = img ? 'background-image:url(' + img + ');font-size:0' : '';
+
+        let stockClass = 'in';
+        let stockLabel = '📦 ' + p.qty;
+        if (p.qty <= state.settings.lowStock) {
+            stockClass = 'low';
+            stockLabel = '⚠️ ' + p.qty;
+        }
+
+        html += '<div class="shop-card" onclick="showProductView(' + p.id + ')">';
+        html += '<div class="shop-img" style="position:relative;' + style + '">';
+        if (!img) html += '🖼️';
+        html += '<div class="stock-badge-overlay ' + stockClass + '">' + stockLabel + '</div>';
+        if (cnt > 1) html += '<span class="images-count">📸 ' + cnt + '</span>';
+        html += '</div>';
+        html += '<div class="shop-body">';
+        html += '<h4>' + esc(p.name) + '</h4>';
+        html += '<div class="price">' + formatMoney(p.price) + '</div>';
+        html += '<div class="stock-info">📦 متوفر: ' + p.qty + '</div>';
+        html += '<button class="btn-add-cart" onclick="event.stopPropagation();addToCart(' + p.id + ')">🛒 أضف للسلة</button>';
+        html += '</div></div>';
+    });
+    c.innerHTML = html;
+}
+window.renderShop = renderShop;
+
+function showProductView(id) {
+    const p = state.products.find(function (x) { return x.id === id; });
+    if (!p) return;
+    state.viewingProduct = p;
+    state.viewingQty = 1;
+
+    document.getElementById('pv-name').textContent = p.name;
+    document.getElementById('pv-price').textContent = formatMoney(p.price);
+    document.getElementById('pv-desc').textContent = p.desc || 'لا يوجد وصف';
+    document.getElementById('pv-cat').textContent = '📁 ' + (p.category || 'عام');
+    document.getElementById('pv-stock').textContent = '📦 متوفر: ' + p.qty;
+    document.getElementById('pv-qty').textContent = '1';
+
+    const mainImg = document.getElementById('pv-main-image');
+    const thumbs = document.getElementById('pv-thumbnails');
+
+    if (p.images && p.images.length > 0) {
+        mainImg.style.backgroundImage = 'url(' + p.images[0] + ')';
+        mainImg.textContent = '';
+        if (p.images.length > 1) {
+            let th = '';
+            p.images.forEach(function (img, i) {
+                th += '<div class="pv-thumb ' + (i === 0 ? 'active' : '') + '" style="background-image:url(' + img + ')" onclick="switchProductImage(' + i + ', this)"></div>';
+            });
+            thumbs.innerHTML = th;
+        } else {
+            thumbs.innerHTML = '';
+        }
+    } else {
+        mainImg.style.backgroundImage = '';
+        mainImg.textContent = '🖼️';
+        thumbs.innerHTML = '';
+    }
+    openModal('m-product-view');
+}
+window.showProductView = showProductView;
+
+function switchProductImage(index, el) {
+    const p = state.viewingProduct;
+    if (!p || !p.images || !p.images[index]) return;
+    const mainImg = document.getElementById('pv-main-image');
+    mainImg.style.backgroundImage = 'url(' + p.images[index] + ')';
+    mainImg.textContent = '';
+    document.querySelectorAll('.pv-thumb').forEach(function (t) { t.classList.remove('active'); });
+    if (el) el.classList.add('active');
+}
+window.switchProductImage = switchProductImage;
+
+function pvChangeQty(delta) {
+    const p = state.viewingProduct;
+    if (!p) return;
+    const newQty = state.viewingQty + delta;
+    if (newQty < 1) return;
+    if (newQty > p.qty) { toast('الكمية غير متوفرة', 'error'); return; }
+    state.viewingQty = newQty;
+    document.getElementById('pv-qty').textContent = newQty;
+}
+window.pvChangeQty = pvChangeQty;
+
+function addToCart(id) {
+    const p = state.products.find(function (x) { return x.id === id; });
+    if (!p) return;
+    const item = state.cart.find(function (c) { return c.id === id; });
+    if (item) {
+        if (item.qty >= p.qty) { toast('الكمية غير كافية', 'error'); return; }
+        item.qty++;
+    } else {
+        state.cart.push({ id: p.id, name: p.name, price: p.price, qty: 1 });
+    }
+    updateCartBadge();
+    toast('✓ أضيف للسلة');
+}
+window.addToCart = addToCart;
+
+function updateCartBadge() {
+    const badge = document.getElementById('cart-badge');
+    if (!badge) return;
+    const total = state.cart.reduce(function (s, c) { return s + c.qty; }, 0);
+    badge.textContent = total;
+    badge.style.display = total > 0 ? 'block' : 'none';
+}
+window.updateCartBadge = updateCartBadge;
+
+function renderCart() {
+    const c = document.getElementById('s-cart-items');
+    const summary = document.getElementById('s-cart-summary');
+    const btn = document.getElementById('s-checkout-btn');
+    if (!c) return;
+    if (state.cart.length === 0) {
+        c.innerHTML = empty('🛒', 'السلة فارغة');
+        if (summary) summary.innerHTML = '';
+        if (btn) btn.disabled = true;
+        return;
+    }
+    if (btn) btn.disabled = false;
+    let html = '';
+    state.cart.forEach(function (item) {
+        html += '<div class="cart-item">';
+        html += '<div style="flex:1;min-width:0"><strong style="font-size:.85rem">' + esc(item.name) + '</strong>';
+        html += '<br><small style="color:var(--text-mid);font-size:.72rem">' + formatMoney(item.price) + '</small></div>';
+        html += '<div class="qty-controls">';
+        html += '<button class="qty-btn" onclick="changeQty(' + item.id + ',-1)">−</button>';
+        html += '<span class="qty-num">' + item.qty + '</span>';
+        html += '<button class="qty-btn" onclick="changeQty(' + item.id + ',1)">+</button>';
+        html += '</div>';
+        html += '<strong style="color:var(--primary);font-size:.85rem;min-width:60px;text-align:left">' + formatMoney(item.price * item.qty) + '</strong>';
+        html += '</div>';
+    });
+    c.innerHTML = html;
+    const total = state.cart.reduce(function (s, x) { return s + x.price * x.qty; }, 0);
+    if (summary) {
+        summary.innerHTML =
+            '<div class="row"><span>عدد المنتجات</span><span>' + state.cart.length + '</span></div>' +
+            '<div class="row total"><span>المجموع</span><span>' + formatMoney(total) + '</span></div>' +
+            '<div class="row" style="font-size:.72rem;color:var(--text-mid)"><span>ℹ️ يُضاف سعر التوصيل عند الطلب</span></div>';
+    }
+}
+window.renderCart = renderCart;
+
+function changeQty(id, delta) {
+    const item = state.cart.find(function (c) { return c.id === id; });
+    if (!item) return;
+    const p = state.products.find(function (x) { return x.id === id; });
+    const newQty = item.qty + delta;
+    if (newQty <= 0) {
+        state.cart = state.cart.filter(function (c) { return c.id !== id; });
+    } else if (p && newQty <= p.qty) {
+        item.qty = newQty;
+    } else {
+        toast('الكمية غير متوفرة', 'error');
+        return;
+    }
+    updateCartBadge();
+    renderCart();
+}
+window.changeQty = changeQty;
+/* ============================================================
+   الجزء 8: إتمام الطلب + طلباتي + حسابي
+   ============================================================ */
+
+function openShopCheckout() {
+    if (!state.session) {
+        toast('يجب إنشاء حساب لإتمام الطلب', 'info');
+        setTimeout(function () { openRegister(); }, 800);
+        return;
+    }
+    if (state.cart.length === 0) { toast('السلة فارغة', 'error'); return; }
+
+    const sel = document.getElementById('chk-wilaya');
+    let html = '<option value="">-- اختر --</option>';
+    WILAYAS.forEach(function (w, i) {
+        html += '<option value="' + (i + 1) + '">' + w + '</option>';
+    });
+    sel.innerHTML = html;
+
+    const c = state.customers.find(function (x) { return x.id === state.session.id; });
+    if (c) {
+        document.getElementById('chk-address').value = c.address || '';
+        if (c.wilaya) sel.value = c.wilaya;
+        if (c.commune) document.getElementById('chk-commune').value = c.commune;
+    }
+    ['chk-courier', 'chk-type', 'chk-wilaya'].forEach(function (id) {
+        const el = document.getElementById(id);
+        if (el) el.onchange = updateCheckoutSummary;
+    });
+    updateCheckoutSummary();
+    openModal('m-checkout');
+}
+window.openShopCheckout = openShopCheckout;
+
+function updateCheckoutSummary() {
+    const courier = document.getElementById('chk-courier').value;
+    const type = document.getElementById('chk-type').value;
+    const wilaya = document.getElementById('chk-wilaya').value;
+    const pTotal = state.cart.reduce(function (s, c) { return s + c.price * c.qty; }, 0);
+    const fee = getDeliveryFee(courier, type, wilaya);
+    const final = pTotal + fee;
+    const wName = wilaya ? WILAYAS[parseInt(wilaya) - 1] : '--';
+    const cName = courier === 'yalidine' ? 'Yalidine' : 'Noest';
+    const tName = type === 'home' ? '🏠 للمنزل' : '🏢 مكتب';
+    document.getElementById('checkout-summary').innerHTML =
+        '<div class="row"><span>عدد المنتجات</span><span>' + state.cart.length + '</span></div>' +
+        '<div class="row"><span>سعر المنتجات</span><span>' + formatMoney(pTotal) + '</span></div>' +
+        '<div class="row"><span>🚚 ' + cName + ' - ' + tName + '</span><span>' + (wilaya ? formatMoney(fee) : '-- اختر الولاية --') + '</span></div>' +
+        (wilaya ? '<div class="row" style="font-size:.72rem"><span>📍 ' + wName + '</span><span></span></div>' : '') +
+        '<div class="row total"><span>المجموع الكلي</span><span>' + formatMoney(final) + '</span></div>';
+}
+window.updateCheckoutSummary = updateCheckoutSummary;
+
+function confirmShopOrder() {
+    if (!state.session) {
+        toast('يجب إنشاء حساب أولاً', 'error');
+        closeModal('m-checkout');
+        setTimeout(function () { openRegister(); }, 500);
+        return;
+    }
+
+    const courier = document.getElementById('chk-courier').value;
+    const deliveryType = document.getElementById('chk-type').value;
+    const wilaya = document.getElementById('chk-wilaya').value;
+    const commune = document.getElementById('chk-commune').value.trim();
+    const address = document.getElementById('chk-address').value.trim();
+    const note = document.getElementById('chk-note').value.trim();
+
+    if (!wilaya || !commune || !address) { toast('املأ الحقول المطلوبة', 'error'); return; }
+    const c = state.customers.find(function (x) { return x.id === state.session.id; });
+    if (!c) { toast('الزبون غير موجود', 'error'); return; }
+
+    const pTotal = state.cart.reduce(function (s, i) { return s + i.price * i.qty; }, 0);
+    const fee = getDeliveryFee(courier, deliveryType, wilaya);
+    const finalTotal = pTotal + fee;
+
+    c.wilaya = wilaya;
+    c.commune = commune;
+    c.address = address;
+    c.lastOrder = new Date().toISOString();
+    save(K.customers, state.customers);
+
+    state.cart.forEach(function (item) {
+        const p = state.products.find(function (x) { return x.id === item.id; });
+        if (p) p.qty -= item.qty;
+    });
+    save(K.products, state.products);
+
+    const order = {
+        id: Date.now(),
+        customerId: c.id,
+        customerName: c.name,
+        customerPhone: c.phone,
+        items: state.cart.slice(),
+        productsTotal: pTotal,
+        deliveryFee: fee,
+        total: finalTotal,
+        courier: courier,
+        deliveryType: deliveryType,
+        wilaya: wilaya,
+        commune: commune,
+        address: address,
+        note: note,
+        status: 'pending',
+        createdAt: new Date().toISOString()
+    };
+
+    state.orders.unshift(order);
+save(K.orders, state.orders);
+
+// ☁️ حفظ الطلب في Firebase
+if (typeof firebaseReady !== 'undefined' && firebaseReady && typeof addOrderToCloud === 'function') {
+    addOrderToCloud(order).then(function(cloudId) {
+        if (cloudId) {
+            order.cloudId = cloudId;
+            console.log('✅ تم حفظ الطلب في السحابة:', cloudId);
+        }
+    });
+}
+
+state.cart = [];
+    updateCartBadge();
+    closeModal('m-checkout');
+    document.getElementById('chk-note').value = '';
+  // ☁️ إشعار السحابة
+if (typeof notifyCloudChange === 'function') {
+    notifyCloudChange('orders');
+}
+    if (typeof updateNotifBadge === 'function') updateNotifBadge();
+    toast('✅ تم إرسال طلبك! المجموع: ' + formatMoney(finalTotal));
+    setTimeout(function () { shopGo('orders'); }, 800);
+}
+window.confirmShopOrder = confirmShopOrder;
+
+/* ====== طلباتي ====== */
+function renderMyOrders() {
+    const c = document.getElementById('s-orders-list');
+    if (!c) return;
+
+    if (!state.session || !state.session.id) {
+        c.innerHTML = empty('👤', 'سجل دخولك لعرض طلباتك');
+        return;
+    }
+
+    const my = state.orders.filter(function (o) { return o.customerId === state.session.id; });
+    if (my.length === 0) { c.innerHTML = empty('📋', 'لا توجد طلبات بعد'); return; }
+    const L = { pending: '🕐 قيد المراجعة', confirmed: '✅ تم التأكيد', shipped: '🚚 في الطريق', delivered: '📦 تم التسليم', cancelled: '❌ ملغاة' };
+    let html = '';
+    my.forEach(function (o) {
+        html += '<div class="item-card">';
+        html += '<div class="card-top"><div style="flex:1;min-width:0"><h4>طلب #' + o.id.toString().slice(-6) + '</h4>';
+        html += '<span class="subtitle">' + formatDateTime(o.createdAt) + '</span></div>';
+        html += '<span class="badge ' + o.status + '">' + (L[o.status] || o.status) + '</span></div>';
+        html += '<div class="card-info">';
+        html += '<span class="info-tag">🚚 ' + (o.courier === 'yalidine' ? 'Yalidine' : 'Noest') + '</span>';
+        html += '<span class="info-tag">📍 ' + esc(o.wilaya) + '</span>';
+        html += '<span class="info-tag">📦 ' + o.items.length + ' منتج</span></div>';
+        if (o.deliveryFee) html += '<div style="font-size:.72rem;color:var(--text-mid);margin-bottom:6px">💵 منتجات: ' + formatMoney(o.productsTotal) + ' + 🚚 توصيل: ' + formatMoney(o.deliveryFee) + '</div>';
+        html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;gap:8px">';
+        html += '<strong style="color:var(--primary);font-size:1rem">' + formatMoney(o.total) + '</strong>';
+        html += '<button class="btn-mini edit" onclick="showInvoice(' + o.id + ')">🧾 فاتورة</button>';
+        html += '</div></div>';
+    });
+    c.innerHTML = html;
+    if (typeof updateNotifBadge === 'function') updateNotifBadge();
+}
+window.renderMyOrders = renderMyOrders;
+
+/* ====== حسابي ====== */
+function renderProfile() {
+    const c = state.customers.find(function (x) { return x.id === state.session.id; });
+    if (!c) return;
+    document.getElementById('p-name').value = c.name || '';
+    document.getElementById('p-phone').value = c.phone || '';
+    document.getElementById('p-address').value = c.address || '';
+}
+window.renderProfile = renderProfile;
+/* ============================================================
+   الجزء 9: الإشعارات + المخزون + الساعة + الضغط المطول
+   ============================================================ */
+
+/* ====== نظام الإشعارات ====== */
+function getNotifications() {
+    const notifs = [];
+    const role = state.session ? state.session.role : null;
+
+    if (role === 'admin') {
+        const outStock = state.products.filter(function (p) { return p.qty === 0; });
+        const lowStock = state.products.filter(function (p) { return p.qty > 0 && p.qty <= state.settings.lowStock; });
+
+        outStock.forEach(function (p) {
+            notifs.push({
+                id: 'out-' + p.id, type: 'danger',
+                title: '❌ المنتج نفد',
+                desc: '"' + p.name + '" غير متوفر حالياً',
+                time: 'الآن'
+            });
+        });
+
+        lowStock.forEach(function (p) {
+            notifs.push({
+                id: 'low-' + p.id, type: 'warning',
+                title: '⚠️ مخزون منخفض',
+                desc: '"' + p.name + '" — بقي ' + p.qty + ' فقط',
+                time: 'الآن'
+            });
+        });
+
+        const pendingOrders = state.orders.filter(function (o) { return o.status === 'pending'; });
+        pendingOrders.forEach(function (o) {
+            notifs.push({
+                id: 'order-' + o.id, type: 'info',
+                title: '🛒 طلبية جديدة',
+                desc: o.customerName + ' • ' + formatMoney(o.total),
+                time: formatDateTime(o.createdAt),
+                onClick: 'viewOrder(' + o.id + ')'
+            });
+        });
+
+        const unpaidDebts = state.debts.filter(function (d) { return !d.paid; });
+        unpaidDebts.forEach(function (d) {
+            notifs.push({
+                id: 'debt-' + d.id, type: 'warning',
+                title: '💳 دين غير مسدد',
+                desc: d.name + ' — ' + formatMoney(d.amount),
+                time: formatDate(d.date)
+            });
+        });
+    }
+
+    if (role === 'customer') {
+        const myOrders = state.orders.filter(function (o) { return o.customerId === state.session.id; });
+        myOrders.forEach(function (o) {
+            let type = 'info', title = '', desc = '';
+            if (o.status === 'confirmed') {
+                type = 'success'; title = '✅ تم تأكيد طلبك';
+                desc = 'طلب #' + o.id.toString().slice(-6) + ' — ' + formatMoney(o.total);
+            } else if (o.status === 'shipped') {
+                type = 'info'; title = '🚚 طلبك في الطريق';
+                desc = 'طلب #' + o.id.toString().slice(-6) + ' — سيصلك قريباً';
+            } else if (o.status === 'delivered') {
+                type = 'success'; title = '📦 تم التسليم';
+                desc = 'طلب #' + o.id.toString().slice(-6) + ' — شكراً لثقتك';
+            } else if (o.status === 'cancelled') {
+                type = 'danger'; title = '❌ تم إلغاء طلبك';
+                desc = 'طلب #' + o.id.toString().slice(-6);
+            } else if (o.status === 'pending') {
+                type = 'warning'; title = '🕐 طلب قيد المراجعة';
+                desc = 'طلب #' + o.id.toString().slice(-6) + ' — سيتم التواصل معك';
+            }
+            if (title) {
+                notifs.push({
+                    id: 'cust-order-' + o.id, type: type,
+                    title: title, desc: desc,
+                    time: formatDateTime(o.updatedAt || o.createdAt)
+                });
+            }
+        });
+    }
+
+    return notifs;
+}
+window.getNotifications = getNotifications;
+
+function updateNotifBadge() {
+    const notifs = getNotifications();
+    const badgeId = state.session && state.session.role === 'admin' ? 'admin-notif-badge' : 'cust-notif-badge';
+    const badge = document.getElementById(badgeId);
+    if (!badge) return;
+    const count = notifs.length;
+    if (count === 0) {
+        badge.style.display = 'none';
+    } else {
+        badge.style.display = 'flex';
+        badge.textContent = count > 99 ? '99+' : count;
+    }
+}
+window.updateNotifBadge = updateNotifBadge;
+
+function openNotifPanel() {
+    const panel = document.getElementById('notif-panel');
+    const overlay = document.getElementById('notif-overlay');
+    if (!panel) return;
+    renderNotifList();
+    panel.classList.add('active');
+    overlay.classList.add('active');
+}
+window.openNotifPanel = openNotifPanel;
+
+function closeNotifPanel() {
+    const panel = document.getElementById('notif-panel');
+    const overlay = document.getElementById('notif-overlay');
+    if (!panel) return;
+    panel.classList.remove('active');
+    overlay.classList.remove('active');
+}
+window.closeNotifPanel = closeNotifPanel;
+
+function renderNotifList() {
+    const c = document.getElementById('notif-list');
+    if (!c) return;
+    const notifs = getNotifications();
+    if (notifs.length === 0) {
+        c.innerHTML = '<div class="notif-empty"><span class="emoji">🎉</span><p>لا توجد إشعارات</p><p style="font-size:.75rem;margin-top:6px">كل شيء على ما يرام!</p></div>';
+        return;
+    }
+    let html = '';
+    notifs.forEach(function (n) {
+        const onclick = n.onClick ? 'onclick="closeNotifPanel();setTimeout(function(){' + n.onClick + '},200)"' : '';
+        html += '<div class="notif-item ' + n.type + '" ' + onclick + '>';
+        html += '<div class="notif-title">' + n.title + '</div>';
+        html += '<div class="notif-desc">' + n.desc + '</div>';
+        html += '<div class="notif-time">🕐 ' + n.time + '</div>';
+        html += '</div>';
+    });
+    c.innerHTML = html;
+}
+window.renderNotifList = renderNotifList;
+
+/* ====== تنبيهات المخزون ====== */
+function renderStockAlerts() {
+    const home = document.getElementById('a-home');
+    if (!home) return;
+    const old = home.querySelector('.stock-alert-block');
+    if (old) old.remove();
+
+    const outStock = state.products.filter(function (p) { return p.qty === 0; });
+    const lowStock = state.products.filter(function (p) { return p.qty > 0 && p.qty <= state.settings.lowStock; });
+
+    if (outStock.length === 0 && lowStock.length === 0 && hasBackup()) return;
+
+    const block = document.createElement('div');
+    block.className = 'stock-alert-block';
+
+    if (outStock.length > 0) {
+        const names = outStock.slice(0, 3).map(function (p) { return p.name; }).join('، ');
+        const more = outStock.length > 3 ? ' و ' + (outStock.length - 3) + ' آخر' : '';
+        const div = document.createElement('div');
+        div.className = 'stock-alert danger';
+        div.onclick = function () { adminGo('stock'); };
+        div.innerHTML = '<span style="font-size:1.5rem">❌</span><div><strong>' + outStock.length + ' منتج نفد</strong><br><span style="font-size:.75rem;font-weight:500">' + names + more + '</span></div>';
+        block.appendChild(div);
+    }
+
+    if (lowStock.length > 0) {
+        const names = lowStock.slice(0, 3).map(function (p) { return p.name; }).join('، ');
+        const more = lowStock.length > 3 ? ' و ' + (lowStock.length - 3) + ' آخر' : '';
+        const div = document.createElement('div');
+        div.className = 'stock-alert';
+        div.onclick = function () { adminGo('stock'); };
+        div.innerHTML = '<span style="font-size:1.5rem">⚠️</span><div><strong>' + lowStock.length + ' منتج منخفض</strong><br><span style="font-size:.75rem;font-weight:500">' + names + more + '</span></div>';
+        block.appendChild(div);
+    }
+
+    if (!hasBackup() && (state.products.length > 0 || state.orders.length > 0)) {
+        const div = document.createElement('div');
+        div.className = 'backup-alert';
+        div.innerHTML = '<span style="font-size:1.4rem">💾</span><div><strong>لم تُنشئ نسخة احتياطية بعد!</strong><br><span style="font-size:.72rem;font-weight:500">اضغط لحفظ البيانات الآن</span></div>';
+        div.onclick = function () {
+            createAutoBackup();
+            toast('✅ تم إنشاء نسخة احتياطية');
+            renderStockAlerts();
+        };
+        block.appendChild(div);
+    }
+
+    home.insertBefore(block, home.firstChild);
+}
+window.renderStockAlerts = renderStockAlerts;
+
+/* ============================================================
+   🕐 الساعة والتاريخ المباشر
+   ============================================================ */
+function setupClock() {
+    function updateClock() {
+        const now = new Date();
+        const h = String(now.getHours()).padStart(2, '0');
+        const m = String(now.getMinutes()).padStart(2, '0');
+        const s = String(now.getSeconds()).padStart(2, '0');
+        const time = h + ':' + m + ':' + s;
+        const day = String(now.getDate()).padStart(2, '0');
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const year = now.getFullYear();
+        const date = day + '/' + month + '/' + year;
+
+        const wc = document.getElementById('top-clock');
+        const wd = document.getElementById('top-date');
+        if (wc) wc.textContent = time;
+        if (wd) wd.textContent = date;
+
+        const sc = document.getElementById('shop-clock');
+        const sd = document.getElementById('shop-date');
+        if (sc) sc.textContent = time;
+        if (sd) sd.textContent = date;
+    }
+    updateClock();
+    setInterval(updateClock, 1000);
+}
+window.setupClock = setupClock;
+
+/* ============================================================
+   🏬 الانتقال من شاشة الترحيب إلى المتجر
+   ============================================================ */
+function goToShop() {
+    if (navigator.vibrate) navigator.vibrate(20);
+
+    if (state.session && state.session.role === 'customer') {
+        enterShop();
+        return;
+    }
+
+    goScreen('screen-shop');
+    applyBranding();
+
+    document.querySelectorAll('#screen-shop .page').forEach(function (p) { p.classList.remove('active'); });
+    const shopPage = document.getElementById('s-shop');
+    if (shopPage) shopPage.classList.add('active');
+
+    document.querySelectorAll('#screen-shop .nav-item').forEach(function (n) {
+        n.classList.toggle('active', n.dataset.page === 'shop');
+    });
+
+    if (!state.session) {
+        const greet = document.getElementById('cust-greeting');
+        if (greet) greet.textContent = 'مرحباً زائر';
+        state.isGuest = true;
+    }
+
+    renderShop();
+    updateCartBadge();
+    if (typeof updateNotifBadge === 'function') updateNotifBadge();
+
+    window.scrollTo(0, 0);
+}
+window.goToShop = goToShop;
+
+/* ============================================================
+   🔐 الضغط المطول على الساعة للدخول كمسؤول
+   ============================================================ */
+function setupAdminClockPress() {
+    const clock = document.getElementById('shop-clock');
+    if (!clock) { console.warn('shop-clock غير موجود'); return; }
+
+    const LONG_PRESS = 2000;
+    let pressTimer = null;
+    let isPressing = false;
+
+    function goToAdmin() {
+        console.log('🚀 الانتقال لصفحة المسؤول...');
+        // جرّب عدة مسارات
+        try {
+            window.location.href = 'admin.html';
+        } catch (e) {
+            console.error(e);
+        }
+        // إذا لم يعمل، جرّب بعد 300ms
+        setTimeout(function () {
+            if (window.location.pathname.indexOf('admin') === -1) {
+                window.location.replace('./admin.html');
+            }
+        }, 300);
+    }
+
+    function startPress(e) {
+        if (e.type === 'mousedown' && e.button !== 0) return;
+        isPressing = true;
+        clock.classList.add('pressing');
+        if (navigator.vibrate) navigator.vibrate(20);
+
+        clearTimeout(pressTimer);
+        pressTimer = setTimeout(function () {
+            if (!isPressing) return;
+            isPressing = false;
+            clock.classList.remove('pressing');
+            clock.classList.add('success');
+            if (navigator.vibrate) navigator.vibrate([80, 50, 80, 50, 150]);
+            console.log('✅ نجح الضغط المطول - الانتقال...');
+            setTimeout(goToAdmin, 300);
+        }, LONG_PRESS);
+    }
+
+    function cancelPress() {
+        isPressing = false;
+        clearTimeout(pressTimer);
+        clock.classList.remove('pressing');
+    }
+
+    clock.addEventListener('touchstart', startPress, { passive: true });
+    clock.addEventListener('touchend', cancelPress);
+    clock.addEventListener('touchcancel', cancelPress);
+    clock.addEventListener('mousedown', startPress);
+    clock.addEventListener('mouseup', cancelPress);
+    clock.addEventListener('mouseleave', cancelPress);
+    clock.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+
+    console.log('✅ الضغط المطول جاهز');
+}
+window.setupAdminClockPress = setupAdminClockPress;
+/* ============================================================
+   الجزء 10: التهيئة النهائية عند بدء التطبيق
+   ============================================================ */
+
+/* ====== كشف الصفحة (زبون / مسؤول) ====== */
+const PAGE_TYPE = (function() {
+    const path = window.location.pathname.toLowerCase();
+    if (path.indexOf('admin') !== -1) return 'admin';
+    return 'customer';
+})();
+console.log('📄 نوع الصفحة:', PAGE_TYPE);
+/* ====== زر طوارئ للوصول للمسؤول (5 ضغطات سريعة) ====== */
+function setupEmergencyAdminButton() {
+    const btn = document.getElementById('admin-emergency');
+    if (!btn) { console.log('⚠️ زر الطوارئ غير موجود'); return; }
+
+    let clickCount = 0;
+    let clickTimer = null;
+
+    function goToAdminPage() {
+        console.log('🚀 الانتقال إلى admin.html...');
+        // ثلاث طرق - جرّب واحدة بعد الأخرى
+        try { window.location.href = 'admin.html'; } catch (e) { console.error(e); }
+        setTimeout(function() { 
+            if (window.location.pathname.indexOf('admin') === -1) {
+                try { window.location.assign('./admin.html'); } catch (e) { console.error(e); }
+            }
+        }, 200);
+        setTimeout(function() {
+            if (window.location.pathname.indexOf('admin') === -1) {
+                try { window.location.replace('admin.html'); } catch (e) { console.error(e); }
+            }
+        }, 500);
+    }
+
+    function handleClick(e) {
+        e.preventDefault();
+        clickCount++;
+        if (navigator.vibrate) navigator.vibrate(15);
+
+        clearTimeout(clickTimer);
+        clickTimer = setTimeout(function () {
+            clickCount = 0;
+        }, 2000);
+
+        if (clickCount >= 5) {
+            clickCount = 0;
+            if (navigator.vibrate) navigator.vibrate([50, 30, 50, 30, 100]);
+            goToAdminPage();
+        }
+    }
+
+    btn.addEventListener('click', handleClick);
+    btn.addEventListener('touchend', handleClick);
+    console.log('✅ زر الطوارئ جاهز - اضغط 5 مرات على الزاوية السفلية اليسرى');
+}
+window.setupEmergencyAdminButton = setupEmergencyAdminButton;
+
+/* ============================================================
+   🔥 Firebase - المزامنة مع السحابة
+   ============================================================ */
+
+function notifyCloudChange(coll) {
+    // تُستدعى عند تغيير شيء لتنبيه باقي الأجهزة
+    if (typeof saveToCloud === 'function' && coll === 'orders') {
+        saveToCloud('orders_notify', { t: Date.now() });
+    }
+}
+window.notifyCloudChange = notifyCloudChange;
+
+async function initCloudSync() {
+    if (typeof initFirebase !== 'function') {
+        console.warn('⚠️ firebase-config.js غير محمل');
+        return;
+    }
+    
+    try {
+        await initFirebase();
+        
+        // 1. تحميل البيانات من السحابة (إن وُجدت)
+        const cols = ['products', 'customers', 'expenses', 'debts', 'settings'];
+        for (const col of cols) {
+            const cloudData = await loadFromCloud(col);
+            if (cloudData && Array.isArray(cloudData) && cloudData.length >= 0) {
+                // دمج: نأخذ الأحدث من السحابة
+                if (col === 'products') { state.products = cloudData; localStorage.setItem(K.products, JSON.stringify(cloudData)); }
+                else if (col === 'customers') { state.customers = cloudData; localStorage.setItem(K.customers, JSON.stringify(cloudData)); }
+                else if (col === 'expenses') { state.expenses = cloudData; localStorage.setItem(K.expenses, JSON.stringify(cloudData)); }
+                else if (col === 'debts') { state.debts = cloudData; localStorage.setItem(K.debts, JSON.stringify(cloudData)); }
+                else if (col === 'settings') { state.settings = Object.assign({}, state.settings, cloudData); localStorage.setItem(K.settings, JSON.stringify(state.settings)); }
+            } else {
+                // لم تكن في السحابة → ارفعها الآن
+                if (col === 'products') saveToCloud('products', state.products);
+                else if (col === 'customers') saveToCloud('customers', state.customers);
+                else if (col === 'expenses') saveToCloud('expenses', state.expenses);
+                else if (col === 'debts') saveToCloud('debts', state.debts);
+                else if (col === 'settings') saveToCloud('settings', state.settings);
+            }
+        }
+        
+        // 2. مراقبة التغييرات في الوقت الحقيقي
+        watchCloud('products', function(data) {
+            if (Array.isArray(data)) {
+                state.products = data;
+                localStorage.setItem(K.products, JSON.stringify(data));
+                if (typeof renderShop === 'function' && document.getElementById('s-products')) renderShop();
+                if (typeof renderAdminProducts === 'function' && document.getElementById('a-products-list')) renderAdminProducts();
+                if (typeof renderAdminHome === 'function' && document.getElementById('a-recent-orders')) renderAdminHome();
+            }
+        });
+        
+        watchCloud('customers', function(data) {
+            if (Array.isArray(data)) {
+                state.customers = data;
+                localStorage.setItem(K.customers, JSON.stringify(data));
+            }
+        });
+        
+        watchCloud('settings', function(data) {
+            if (data && typeof data === 'object') {
+                state.settings = Object.assign({}, state.settings, data);
+                localStorage.setItem(K.settings, JSON.stringify(state.settings));
+                if (typeof applyBranding === 'function') applyBranding();
+            }
+        });
+        
+        // 3. مراقبة الطلبات (المهم!)
+        if (typeof watchOrders === 'function') {
+            watchOrders(function(cloudOrders) {
+                console.log('📥 استلمت', cloudOrders.length, 'طلبية من السحابة');
+                
+                // دمج الطلبات السحابية مع المحلية
+                const localIds = new Set(state.orders.map(function(o) { return o.id; }));
+                cloudOrders.forEach(function(co) {
+                    if (!localIds.has(co.id)) {
+                        // طلب جديد من السحابة → أضفه
+                        state.orders.push(co);
+                    } else {
+                        // تحديث الطلب الموجود
+                        const idx = state.orders.findIndex(function(o) { return o.id === co.id; });
+                        if (idx !== -1) {
+                            state.orders[idx] = Object.assign({}, state.orders[idx], co);
+                        }
+                    }
+                });
+                
+                // ترتيب حسب التاريخ
+                state.orders.sort(function(a, b) {
+                    return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
+                });
+                
+                localStorage.setItem(K.orders, JSON.stringify(state.orders));
+                
+                // تحديث الواجهات
+                if (typeof renderOrders === 'function' && document.getElementById('a-orders-list')) renderOrders();
+                if (typeof renderAdminHome === 'function' && document.getElementById('a-recent-orders')) renderAdminHome();
+                if (typeof renderMyOrders === 'function' && document.getElementById('s-orders-list')) renderMyOrders();
+                if (typeof updateNotifBadge === 'function') updateNotifBadge();
+            });
+        }
+        
+        console.log('✅ Firebase sync جاهز');
+        
+    } catch (e) {
+        console.error('❌ Firebase sync error:', e);
+    }
+}
+window.initCloudSync = initCloudSync;
+document.addEventListener('DOMContentLoaded', function () {
+
+    // 1. تحميل البيانات
+    load();
+
+    // 2. تطبيق العلامة التجارية
+    applyBranding();
+
+    // 3. تشغيل الساعة والتاريخ
+    setupClock();
+
+    // 4. الضغط المطول على الساعة (يظهر فقط في صفحة المتجر)
+    setupAdminClockPress();
+
+    // 5. نموذج المصادقة (للزبون)
+    const authForm = document.getElementById('auth-form');
+    if (authForm) {
+        authForm.addEventListener('submit', function (e) {
+            e.preventDefault();
+            const pass = document.getElementById('auth-pass').value.trim();
+            const phone = document.getElementById('auth-phone').value.trim();
+
+            if (!phone || !pass) { toast('املأ جميع الحقول', 'error'); return; }
+
+            if (state.authMode === 'login') {
+                const c = state.customers.find(function (x) { return x.phone === phone && x.password === pass; });
+                if (!c) { toast('بيانات خاطئة', 'error'); return; }
+                state.session = { role: 'customer', id: c.id };
+                state.isGuest = false;
+                save(K.session, state.session);
+                toast('مرحباً ' + c.name + ' ✓');
+                setTimeout(function () { enterShop(); }, 400);
+            } else {
+                const name = document.getElementById('auth-name').value.trim();
+                const address = document.getElementById('auth-address').value.trim();
+                if (!name || !address) { toast('املأ جميع الحقول', 'error'); return; }
+                if (state.customers.find(function (x) { return x.phone === phone; })) {
+                    toast('الهاتف مستعمل', 'error');
+                    return;
+                }
+                const c = {
+                    id: Date.now(),
+                    name: name,
+                    phone: phone,
+                    password: pass,
+                    address: address,
+                    createdAt: new Date().toISOString()
+                };
+                state.customers.push(c);
+                save(K.customers, state.customers);
+                state.session = { role: 'customer', id: c.id };
+                state.isGuest = false;
+                save(K.session, state.session);
+                toast('✅ تم إنشاء الحساب!');
+                setTimeout(function () {
+    clock.classList.remove('success');
+    console.log('🚀 محاولة فتح admin.html...');
+    try { window.location.href = 'admin.html'; } catch (e) { console.error(e); }
+    setTimeout(function() {
+        if (window.location.pathname.indexOf('admin') === -1) {
+            try { window.location.replace('./admin.html'); } catch (e) { console.error(e); }
+        }
+    }, 300);
+}, 500);
+            }
+        });
+    }
+
+    // 6. نموذج دخول المسؤول (للـ admin.html)
+    const adminForm = document.getElementById('admin-login-form');
+    if (adminForm) {
+        adminForm.addEventListener('submit', function (e) {
+            e.preventDefault();
+            const pass = document.getElementById('admin-login-pass').value.trim();
+            if (pass !== state.settings.adminPass) {
+                toast('كلمة السر خطأ', 'error');
+                return;
+            }
+            state.session = { role: 'admin' };
+            save(K.session, state.session);
+            document.getElementById('admin-login-pass').value = '';
+            toast('مرحباً بك ✓');
+            setTimeout(function () { enterAdmin(); }, 400);
+        });
+    }
+
+    // 7. نموذج المنتج (للمسؤول)
+    const productForm = document.getElementById('product-form');
+    if (productForm) {
+        productForm.addEventListener('submit', function (e) {
+            e.preventDefault();
+            const id = document.getElementById('prod-id').value;
+            const data = {
+                id: id ? parseInt(id) : Date.now(),
+                name: document.getElementById('prod-name').value.trim(),
+                price: parseFloat(document.getElementById('prod-price').value) || 0,
+                cost: parseFloat(document.getElementById('prod-cost').value) || 0,
+                qty: parseInt(document.getElementById('prod-qty').value) || 0,
+                category: document.getElementById('prod-cat').value.trim() || 'عام',
+                desc: document.getElementById('prod-desc').value.trim(),
+                images: state.editingImages.slice(),
+                createdAt: new Date().toISOString()
+            };
+            if (!data.name) { toast('اسم المنتج مطلوب', 'error'); return; }
+            if (id) {
+                const i = state.products.findIndex(function (p) { return p.id === parseInt(id); });
+                if (i !== -1) { data.createdAt = state.products[i].createdAt; state.products[i] = data; }
+                toast('تم التعديل ✓');
+            } else {
+                state.products.push(data);
+                toast('تمت الإضافة ✓');
+            }
+            save(K.products, state.products);
+            closeModal('m-product');
+            productForm.reset();
+            state.editingImages = [];
+            renderAdminProducts();
+            renderAdminHome();
+        });
+    }
+
+    // 8. رفع صور المنتج
+    const imagesInput = document.getElementById('prod-images-input');
+    if (imagesInput) {
+        imagesInput.addEventListener('change', function (e) {
+            const files = Array.from(e.target.files);
+            if (!files.length) return;
+            const remaining = 6 - state.editingImages.length;
+            if (remaining <= 0) { toast('الحد الأقصى 6 صور', 'error'); return; }
+            files.slice(0, remaining).forEach(function (file) {
+                if (!file.type.startsWith('image/')) return;
+                const reader = new FileReader();
+                reader.onload = function (ev) {
+                    compressImage(ev.target.result, 600, function (compressed) {
+                        state.editingImages.push(compressed);
+                        renderEditingImages();
+                    });
+                };
+                reader.readAsDataURL(file);
+            });
+            e.target.value = '';
+        });
+    }
+
+    // 9. نموذج المصروف
+    const expenseForm = document.getElementById('expense-form');
+    if (expenseForm) {
+        expenseForm.addEventListener('submit', function (e) {
+            e.preventDefault();
+            const exp = {
+                id: Date.now(),
+                desc: document.getElementById('exp-desc').value.trim(),
+                amount: parseFloat(document.getElementById('exp-amount').value) || 0,
+                category: document.getElementById('exp-cat').value,
+                date: new Date().toISOString()
+            };
+            if (!exp.desc || !exp.amount) { toast('املأ الحقول المطلوبة', 'error'); return; }
+            state.expenses.unshift(exp);
+            save(K.expenses, state.expenses);
+            closeModal('m-expense');
+            expenseForm.reset();
+            renderExpenses();
+            toast('تمت الإضافة ✓');
+        });
+    }
+
+    // 10. نموذج الدين
+    const debtForm = document.getElementById('debt-form');
+    if (debtForm) {
+        debtForm.addEventListener('submit', function (e) {
+            e.preventDefault();
+            const debt = {
+                id: Date.now(),
+                name: document.getElementById('debt-name').value.trim(),
+                phone: document.getElementById('debt-phone').value.trim(),
+                amount: parseFloat(document.getElementById('debt-amount').value) || 0,
+                note: document.getElementById('debt-note').value.trim(),
+                paid: false,
+                date: new Date().toISOString()
+            };
+            if (!debt.name || !debt.amount) { toast('املأ الحقول المطلوبة', 'error'); return; }
+            state.debts.unshift(debt);
+            save(K.debts, state.debts);
+            closeModal('m-debt');
+            debtForm.reset();
+            renderDebts();
+            renderAdminHome();
+            toast('تمت الإضافة ✓');
+        });
+    }
+
+    // 11. رفع الشعار
+    const logoFile = document.getElementById('logo-file');
+    if (logoFile) {
+        logoFile.addEventListener('change', function (e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            if (!file.type.startsWith('image/')) { toast('اختر صورة', 'error'); return; }
+            const reader = new FileReader();
+            reader.onload = function (ev) {
+                compressImage(ev.target.result, 400, function (compressed) {
+                    state.settings.logo = compressed;
+                    save(K.settings, state.settings);
+                    applyBranding();
+                    renderSettings();
+                    toast('تم رفع الشعار ✓');
+                });
+            };
+            reader.readAsDataURL(file);
+        });
+    }
+
+    // 12. زر أضف للسلة في نافذة عرض المنتج
+    const pvBtn = document.getElementById('pv-add-to-cart');
+    if (pvBtn) {
+        pvBtn.addEventListener('click', function () {
+            const p = state.viewingProduct;
+            if (!p) return;
+            const item = state.cart.find(function (c) { return c.id === p.id; });
+            if (item) {
+                if (item.qty + state.viewingQty > p.qty) { toast('الكمية غير كافية', 'error'); return; }
+                item.qty += state.viewingQty;
+            } else {
+                state.cart.push({ id: p.id, name: p.name, price: p.price, qty: state.viewingQty });
+            }
+            updateCartBadge();
+            closeModal('m-product-view');
+            toast('✓ أضيف ' + state.viewingQty + ' للسلة');
+        });
+    }
+
+    // 13. البحث
+    const prodSearch = document.getElementById('prod-search');
+    if (prodSearch) prodSearch.addEventListener('input', renderAdminProducts);
+    const shopSearch = document.getElementById('shop-search');
+    if (shopSearch) shopSearch.addEventListener('input', renderShop);
+
+    // 14. إغلاق النوافذ بالخلفية
+    document.querySelectorAll('.modal-overlay').forEach(function (overlay) {
+        overlay.addEventListener('click', function (e) {
+            if (e.target === overlay) {
+                overlay.classList.remove('active');
+                document.body.style.overflow = '';
+            }
+        });
+    });
+
+    // 15. استئناف الجلسة (حسب نوع الصفحة)
+    if (PAGE_TYPE === 'admin') {
+        if (state.session && state.session.role === 'admin') {
+            enterAdmin();
+        } else {
+            if (state.session && state.session.role === 'customer') {
+                state.session = null;
+                localStorage.removeItem(K.session);
+            }
+            goScreen('screen-admin');
+        }
+    } else {
+        // صفحة الزبون
+        if (state.session && state.session.role === 'customer') {
+            enterShop();
+        } else if (state.session && state.session.role === 'admin') {
+            state.session = null;
+            localStorage.removeItem(K.session);
+            goScreen('screen-welcome');
+        } else {
+            goScreen('screen-welcome');
+        }
+    }
+
+    // 16. تحديث شارة السلة
+    updateCartBadge();
+
+    // 17. تحديث الإشعارات
+    updateNotifBadge();
+  // 🔥 تهيئة Firebase
+initCloudSync();
+
+    console.log('✅ Thier Décor جاهز - الصفحة:', PAGE_TYPE);
+});
