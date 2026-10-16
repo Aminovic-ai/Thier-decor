@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Thier Décor - متجر</title>
+<link rel="stylesheet" href="style.css">
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+</head>
+<body>
+
+<!-- ==================== شاشة الترحيب ==================== -->
+<div class="screen active" id="screen-welcome">
+    <div class="welcome-wrap">
+
+        <!-- شريط التاريخ والساعة -->
+        <div class="top-bar">
+            <div class="clock-display" id="top-clock">00:00:00</div>
+            <div class="date-display" id="top-date">--/--/----</div>
+        </div>
+
+        <!-- المحتوى المركزي -->
+        <div class="welcome-content">
+            <div class="welcome-logo-box" onclick="goToShop()">
+                <div class="welcome-logo" id="welcome-logo">TD</div>
+                <div class="welcome-click-hint">👆 اضغط هنا</div>
+            </div>
+            <h1 class="welcome-shop-name" id="welcome-shop-name">Thier Décor</h1>
+            <p class="welcome-tagline" id="welcome-tagline">مرحباً بكم • Bienvenue</p>
+        </div>
+
+    </div>
+</div>
+
+<!-- ==================== شاشة المصادقة ==================== -->
+<div class="screen" id="screen-auth">
+    <div class="auth-wrap">
+        <button class="back-btn" onclick="goScreen('screen-welcome')">← رجوع</button>
+        <h2 id="auth-title">تسجيل الدخول</h2>
+        <form id="auth-form">
+            <input type="hidden" id="auth-type" value="customer">
+            <input type="hidden" id="auth-mode" value="login">
+
+            <div class="form-group" id="auth-name-group" style="display:none">
+                <label>الاسم الكامل</label>
+                <input type="text" id="auth-name" placeholder="محمد بن علي">
+            </div>
+
+            <div class="form-group" id="auth-phone-group">
+                <label>رقم الهاتف</label>
+                <input type="tel" id="auth-phone" placeholder="0550000000">
+            </div>
+
+            <div class="form-group">
+                <label id="auth-pass-label">كلمة السر</label>
+                <input type="password" id="auth-pass" placeholder="••••••">
+            </div>
+
+            <div class="form-group" id="auth-address-group" style="display:none">
+                <label>العنوان</label>
+                <input type="text" id="auth-address" placeholder="الشارع، الحي...">
+            </div>
+
+            <button type="submit" class="btn-primary" id="auth-submit">دخول</button>
+        </form>
+        <p class="auth-switch" id="auth-switch-box">
+            <span id="auth-switch-text">ليس لديك حساب؟</span>
+            <a href="#" onclick="toggleAuthMode();return false" id="auth-switch-link">إنشاء حساب</a>
+        </p>
+        <p class="forgot-link" id="forgot-box" style="display:none">
+            <a href="#" onclick="openForgotPassword();return false">🔑 نسيت كلمة المرور؟</a>
+        </p>
+    </div>
+</div>
+<!-- ==================== واجهة الزبون (المتجر) ==================== -->
+<div class="screen" id="screen-shop">
+    <header class="app-header">
+        <!-- شريط التاريخ والساعة -->
+        <div class="top-bar-shop">
+            <div class="clock-display admin-trigger" id="shop-clock" title="اضغط مطولاً 3 ثوانٍ">00:00:00</div>
+            <div class="date-display" id="shop-date">--/--/----</div>
+        </div>
+
+        <div class="header-top">
+            <div class="brand">
+                <div class="logo" id="shop-logo">TD</div>
+                <div>
+                    <span class="greeting" id="cust-greeting">مرحباً</span>
+                    <h1 class="shop-name-display">Thier Décor</h1>
+                </div>
+            </div>
+            <div style="display:flex;gap:6px">
+                <button class="icon-btn notif-btn" onclick="openNotifPanel()" title="إشعارات">
+                    🔔<span class="notif-badge" id="cust-notif-badge" style="display:none">0</span>
+                </button>
+                <button class="icon-btn" onclick="logout()" title="خروج">🚪</button>
+                <button class="icon-btn cart-icon" onclick="shopGo('cart')">🛒<span class="cart-badge" id="cart-badge">0</span></button>
+            </div>
+        </div>
+        <div class="search-bar"><span class="search-icon">🔍</span><input type="text" id="shop-search" placeholder="ابحث..."></div>
+    </header>
+
+    <main class="app-main">
+        <section class="page active" id="s-shop">
+            <h2 class="page-title">🛍️ المنتجات</h2>
+            <div id="s-products" class="shop-grid"></div>
+        </section>
+
+        <section class="page" id="s-cart">
+            <h2 class="page-title">🛒 السلة</h2>
+            <div id="s-cart-items"></div>
+            <div class="cart-summary" id="s-cart-summary"></div>
+            <button class="btn-primary" id="s-checkout-btn" onclick="openShopCheckout()">متابعة الطلب →</button>
+        </section>
+
+        <section class="page" id="s-orders">
+            <h2 class="page-title">📋 طلباتي</h2>
+            <div id="s-orders-list"></div>
+        </section>
+
+        <section class="page" id="s-profile">
+            <h2 class="page-title">👤 حسابي</h2>
+            <div class="settings-box">
+                <div class="form-group"><label>الاسم</label><input type="text" id="p-name" readonly></div>
+                <div class="form-group"><label>الهاتف</label><input type="text" id="p-phone" readonly></div>
+                <div class="form-group"><label>العنوان</label><input type="text" id="p-address" readonly></div>
+                <button class="btn-danger" onclick="logout()">🚪 تسجيل الخروج</button>
+            </div>
+        </section>
+    </main>
+
+    <nav class="bottom-nav">
+        <button class="nav-item active" data-page="shop" onclick="shopGo('shop')"><span class="nav-icon">🛍️</span><span>المتجر</span></button>
+        <button class="nav-item" data-page="cart" onclick="shopGo('cart')"><span class="nav-icon">🛒</span><span>السلة</span></button>
+        <button class="nav-item" data-page="orders" onclick="shopGo('orders')"><span class="nav-icon">📋</span><span>طلباتي</span></button>
+        <button class="nav-item" data-page="profile" onclick="shopGo('profile')"><span class="nav-icon">👤</span><span>حسابي</span></button>
+    </nav>
+</div>
+<!-- نافذة عرض المنتج -->
+<div class="modal-overlay" id="m-product-view">
+    <div class="modal-content">
+        <div class="modal-header"><h3 id="pv-name">-</h3><button class="close-modal" onclick="closeModal('m-product-view')">✕</button></div>
+        <div class="modal-body">
+            <div class="pv-gallery">
+                <div class="pv-main-image" id="pv-main-image">🖼️</div>
+                <div class="pv-thumbnails" id="pv-thumbnails"></div>
+            </div>
+            <div class="pv-info">
+                <div class="pv-price" id="pv-price">0 دج</div>
+                <p class="pv-desc" id="pv-desc"></p>
+                <div class="pv-meta">
+                    <span class="info-tag" id="pv-cat">📁 عام</span>
+                    <span class="info-tag" id="pv-stock">📦 متوفر: 0</span>
+                </div>
+            </div>
+            <div class="pv-qty">
+                <label>الكمية:</label>
+                <div class="qty-controls">
+                    <button class="qty-btn" onclick="pvChangeQty(-1)">−</button>
+                    <span class="qty-num" id="pv-qty">1</span>
+                    <button class="qty-btn" onclick="pvChangeQty(1)">+</button>
+                </div>
+            </div>
+            <button class="btn-primary" id="pv-add-to-cart">🛒 أضف للسلة</button>
+        </div>
+    </div>
+</div>
+
+<!-- نافذة إتمام الطلب -->
+<div class="modal-overlay" id="m-checkout">
+    <div class="modal-content">
+        <div class="modal-header"><h3>إتمام الطلب</h3><button class="close-modal" onclick="closeModal('m-checkout')">✕</button></div>
+        <div class="modal-body">
+            <div class="checkout-summary" id="checkout-summary"></div>
+            <div class="form-group"><label>شركة التوصيل *</label>
+                <select id="chk-courier">
+                    <option value="yalidine">Yalidine - ياليدين</option>
+                    <option value="noest">Noest - نوست</option>
+                </select>
+            </div>
+            <div class="form-group"><label>نوع التوصيل *</label>
+                <select id="chk-type">
+                    <option value="home">🏠 للمنزل</option>
+                    <option value="stopdesk">🏢 مكتب</option>
+                </select>
+            </div>
+            <div class="form-group"><label>الولاية *</label><select id="chk-wilaya" required></select></div>
+            <div class="form-group"><label>البلدية *</label><input type="text" id="chk-commune" required></div>
+            <div class="form-group"><label>العنوان *</label><textarea id="chk-address" rows="2" required></textarea></div>
+            <div class="form-group"><label>ملاحظة</label><input type="text" id="chk-note"></div>
+            <button class="btn-primary" onclick="confirmShopOrder()">تأكيد الطلب ✓</button>
+        </div>
+    </div>
+</div>
+
+<!-- نافذة نسيت كلمة المرور -->
+<div class="modal-overlay" id="m-forgot">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>🔑 إعادة تعيين كلمة المرور</h3>
+            <button class="close-modal" onclick="closeModal('m-forgot')">✕</button>
+        </div>
+        <div class="modal-body">
+            <div id="forgot-step1">
+                <p style="font-size:.85rem;color:var(--text-mid);margin-bottom:14px">أدخل رقم هاتفك المسجل.</p>
+                <div class="form-group">
+                    <label>رقم الهاتف</label>
+                    <input type="tel" id="forgot-phone" placeholder="0550000000">
+                </div>
+                <button class="btn-primary" onclick="verifyForgotPhone()">تحقق</button>
+            </div>
+            <div id="forgot-step2" style="display:none">
+                <div class="customer-badge" id="forgot-user-info" style="margin-bottom:14px"></div>
+                <div class="form-group">
+                    <label>كلمة السر الجديدة</label>
+                    <input type="password" id="forgot-new-pass" placeholder="••••••">
+                </div>
+                <div class="form-group">
+                    <label>تأكيد كلمة السر</label>
+                    <input type="password" id="forgot-confirm-pass" placeholder="••••••">
+                </div>
+                <button class="btn-primary" onclick="resetForgotPassword()">حفظ ✓</button>
+                <button class="btn-secondary-outline" style="width:100%;margin-top:8px" onclick="backToForgotStep1()">← رجوع</button>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- نافذة الفاتورة -->
+<div class="modal-overlay" id="m-invoice">
+    <div class="modal-content modal-invoice">
+        <div class="modal-header no-print">
+            <h3>🧾 الفاتورة</h3>
+            <button class="close-modal" onclick="closeModal('m-invoice')">✕</button>
+        </div>
+        <div id="invoice-printable" class="invoice-wrap">
+            <div class="invoice-header">
+                <div class="invoice-shop">
+                    <div class="invoice-logo" id="inv-logo">TD</div>
+                    <div>
+                        <h1 id="inv-shop-name">Thier Décor</h1>
+                        <p id="inv-shop-address">📍</p>
+                        <p id="inv-shop-phone">📞</p>
+                    </div>
+                </div>
+                <div class="invoice-meta">
+                    <div class="invoice-title">فاتورة • FACTURE</div>
+                    <div class="invoice-num">رقم: <span id="inv-num">-</span></div>
+                    <div class="invoice-date" id="inv-date">-</div>
+                </div>
+            </div>
+            <div class="invoice-info">
+                <div class="info-block">
+                    <h4>معلومات الزبون</h4>
+                    <p><strong>الاسم:</strong> <span id="inv-cust-name">-</span></p>
+                    <p><strong>الهاتف:</strong> <span id="inv-cust-phone">-</span></p>
+                    <p><strong>الولاية:</strong> <span id="inv-cust-wilaya">-</span></p>
+                    <p><strong>البلدية:</strong> <span id="inv-cust-commune">-</span></p>
+                    <p><strong>العنوان:</strong> <span id="inv-cust-address">-</span></p>
+                </div>
+                <div class="info-block">
+                    <h4>معلومات التوصيل</h4>
+                    <p><strong>الشركة:</strong> <span id="inv-courier">-</span></p>
+                    <p><strong>النوع:</strong> <span id="inv-type">-</span></p>
+                    <p><strong>الحالة:</strong> <span id="inv-status">-</span></p>
+                </div>
+            </div>
+            <table class="invoice-table">
+                <thead><tr><th>#</th><th>المنتج</th><th>السعر</th><th>الكمية</th><th>المجموع</th></tr></thead>
+                <tbody id="inv-items"></tbody>
+                <tfoot><tr class="total-row"><td colspan="4" style="text-align:left;padding-left:20px">المجموع:</td><td id="inv-total">0 دج</td></tr></tfoot>
+            </table>
+            <div class="invoice-footer">
+                <p>شكراً لثقتكم بنا 🌿</p>
+                <p class="invoice-sign">الدفع عند الاستلام • COD</p>
+            </div>
+        </div>
+        <div class="invoice-actions no-print">
+            <button class="btn-primary" onclick="printInvoice()">🖨️ طباعة</button>
+            <button class="btn-secondary-outline" onclick="downloadPDF()">📥 PDF</button>
+        </div>
+    </div>
+</div>
+
+<!-- خلفية لوحة الإشعارات -->
+<div class="notif-overlay" id="notif-overlay" onclick="closeNotifPanel()"></div>
+
+<!-- لوحة الإشعارات -->
+<div class="notif-panel" id="notif-panel">
+    <div class="notif-header">
+        <h3>🔔 الإشعارات</h3>
+        <button class="close-modal" onclick="closeNotifPanel()">✕</button>
+    </div>
+    <div class="notif-list" id="notif-list"></div>
+</div>
+
+<!-- Toast -->
+<div id="toast" class="toast"></div>
+<!-- زر طوارئ للوصول لصفحة المسؤول (اضغط 5 مرات على النقطة) -->
+<div id="admin-emergency" style="position:fixed;bottom:5px;left:5px;width:20px;height:20px;opacity:0.01;z-index:99999;cursor:pointer;border-radius:50%;background:#000"></div>
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore-compat.js"></script>
+<script src="firebase-config.js"></script>
+
+<script src="app.js"></script>
+</body>
+</html>
