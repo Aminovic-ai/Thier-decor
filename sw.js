@@ -1,6 +1,6 @@
-const CACHE_NAME = 'thier-decor-v29-pack-stock-cache';
+const CACHE_NAME = 'thier-decor-v30';
 const ASSETS_TO_CACHE = [
-    './', './index.html', './style.css', './app.js',
+    './', './index.html', './style.css', './custom.css', './app.js',
     './analytics-notifications.js', './supabase-config.js',
     './firebase-config.js', './manifest.json', './icon.png', './icon-192.png', './favicon.png'
 ];
@@ -23,22 +23,33 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => {
     const request = event.request;
     const url = new URL(request.url);
-    // Never cache Supabase/Firebase/API requests here: private data and live order/stock changes
-    // must follow application-level rules and database permissions.
     if (url.origin !== self.location.origin || /supabase\.co|firebaseio\.com|googleapis\.com|gstatic\.com/i.test(url.hostname)) return;
     if (request.method !== 'GET') return;
 
-    // Static assets: cache-first. HTML is network-first so published updates are discovered.
     const isPage = request.mode === 'navigate' || url.pathname.endsWith('.html') || url.pathname.endsWith('/');
+    
     if (isPage) {
-        event.respondWith(fetch(request).then(response => {
-            if (response && response.ok) caches.open(CACHE_NAME).then(cache => cache.put(request, response.clone()));
-            return response;
-        }).catch(() => caches.match(request).then(cached => cached || caches.match('./index.html'))));
+        event.respondWith(
+            fetch(request).then(response => {
+                if (response && response.ok) {
+                    const responseToCache = response.clone();
+                    caches.open(CACHE_NAME).then(cache => cache.put(request, responseToCache));
+                }
+                return response;
+            }).catch(() => caches.match(request).then(cached => cached || caches.match('./index.html')))
+        );
     } else {
-        event.respondWith(caches.match(request).then(cached => cached || fetch(request).then(response => {
-            if (response && response.ok) caches.open(CACHE_NAME).then(cache => cache.put(request, response.clone()));
-            return response;
-        }).catch(() => new Response('Offline', { status: 503, statusText: 'Offline' }))));
+        event.respondWith(
+            caches.match(request).then(cached => {
+                if (cached) return cached;
+                return fetch(request).then(response => {
+                    if (response && response.ok) {
+                        const responseToCache = response.clone();
+                        caches.open(CACHE_NAME).then(cache => cache.put(request, responseToCache));
+                    }
+                    return response;
+                });
+            }).catch(() => new Response('Offline', { status: 503, statusText: 'Offline' }))
+        );
     }
 });
