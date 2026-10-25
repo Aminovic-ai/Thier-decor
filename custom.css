@@ -1,0 +1,18 @@
+.product-admin-toolbar .btn-primary {
+    background-color: #ffffff !important;
+    color: #0f172a !important;
+    border: 1px solid #cbd5e1 !important;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05) !important;
+}
+.product-admin-toolbar .btn-primary:hover {
+    background-color: #f8fafc !important;
+    border-color: #94a3b8 !important;
+}
+.product-admin-toolbar .promo-admin-button {
+    background-color: #fff1f2 !important;
+    color: #be123c !important;
+    border: 1px solid #fecdd3 !important;
+}
+.product-admin-toolbar .promo-admin-button:hover {
+    background-color: #ffe4e6 !important;
+}
