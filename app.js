@@ -1288,6 +1288,7 @@ document.addEventListener('DOMContentLoaded', () => {
         firebase.auth().onAuthStateChanged((user) => {
             if (!user && document.getElementById('screen-admin')?.classList.contains('active')) { goScreen('screen-shop'); }
             if (typeof window.supabaseClient === 'undefined' || !window.supabaseClient) return;
+            setupRealtimeListeners();
             Promise.resolve(loadOrdersListener()).catch((error) => console.error('loadOrdersListener failed after auth change:', error));
         });
     }
