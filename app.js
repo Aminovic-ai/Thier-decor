@@ -1184,6 +1184,22 @@ async function loadOrdersListener(options = {}) {
     return true;
 }
 window.loadOrdersListener = loadOrdersListener;
+let realtimeChannel = null;
+
+function setupRealtimeListeners() {
+    if (!window.supabaseClient) return;
+    if (realtimeChannel) {
+        window.supabaseClient.removeChannel(realtimeChannel);
+        realtimeChannel = null;
+    }
+    const isAdmin = Boolean(window.firebaseReady && typeof firebase !== 'undefined' && firebase.auth && firebase.auth().currentUser);
+    if (!isAdmin) return;
+    realtimeChannel = window.supabaseClient.channel('custom-all-channel')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => { loadOrdersListener(); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, () => { lastProductsFetchAt = 0; loadOrdersListener({ forceProducts: true }); })
+      .subscribe();
+}
+window.setupRealtimeListeners = setupRealtimeListeners;
 
 // Manual admin refresh: fetch the current catalog/settings and admin data on demand.
 let adminRefreshRunning = false;
