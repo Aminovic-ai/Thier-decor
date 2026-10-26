@@ -430,3 +430,107 @@ html[dir="ltr"] #screen-admin .ad-management-heading{direction:ltr}
     height: auto !important; 
     min-height: 280px;
 }
+/* =========================================
+   تصميم كروت المنتجات (نظيف واحترافي)
+   ========================================= */
+.store-products-grid { 
+    display: grid !important; 
+    grid-template-columns: repeat(2, 1fr) !important; /* كرتان في الصف للهاتف */
+    gap: 12px !important; 
+    padding: 10px 0 !important;
+}
+
+.product-card { 
+    display: flex !important;
+    flex-direction: column !important;
+    background: #ffffff !important; 
+    border-radius: 14px !important;
+    border: 1px solid #f1f5f9 !important; 
+    overflow: hidden !important; 
+    box-shadow: 0 4px 12px rgba(0,0,0,0.03) !important;
+    transition: transform 0.2s ease, box-shadow 0.2s ease !important;
+}
+
+.product-card:active { transform: scale(0.98) !important; }
+
+/* صندوق الصورة */
+.product-img { 
+    width: 100% !important;
+    height: 150px !important; 
+    background: #f8fafc !important; 
+    display: flex !important; 
+    align-items: center !important; 
+    justify-content: center !important; 
+    padding: 10px !important;
+}
+
+.product-img img { 
+    width: 100% !important; 
+    height: 100% !important; 
+    object-fit: contain !important; /* يمنع تمطيط الصورة */
+}
+
+/* معلومات المنتج */
+.product-info { 
+    padding: 12px !important; 
+    display: flex !important; 
+    flex-direction: column !important; 
+    flex: 1 !important;
+}
+
+.product-info h3 { 
+    font-size: 0.8rem !important; 
+    font-weight: 700 !important; 
+    color: #1e293b !important; 
+    margin: 0 0 8px 0 !important; 
+    line-height: 1.4 !important;
+    display: -webkit-box !important;
+    -webkit-line-clamp: 2 !important; /* يجعل الاسم في سطرين كحد أقصى */
+    -webkit-box-orient: vertical !important;
+    overflow: hidden !important;
+}
+
+.product-price-box { 
+    margin-top: auto !important; 
+    margin-bottom: 10px !important;
+    font-weight: 900 !important; 
+    font-size: 1rem !important; 
+    color: var(--primary) !important;
+}
+
+.product-price-box del { 
+    font-size: 0.75rem !important; 
+    color: #94a3b8 !important; 
+    font-weight: normal !important; 
+    margin-inline-end: 6px !important; 
+}
+
+/* الأزرار */
+.product-actions-under-image { 
+    display: flex !important; 
+    justify-content: space-between !important; 
+    align-items: center !important; 
+    gap: 8px !important;
+}
+
+.product-mini-action { 
+    flex: 1 !important;
+    height: 36px !important; 
+    border-radius: 8px !important; 
+    border: 1px solid #e2e8f0 !important; 
+    background: #f8fafc !important; 
+    color: #64748b !important; 
+    display: flex !important; 
+    align-items: center !important; 
+    justify-content: center !important; 
+    font-size: 0.9rem !important;
+    transition: 0.2s !important;
+}
+
+.product-mini-action.is-favorite { color: #ef4444 !important; border-color: #fecaca !important; background: #fff1f2 !important; }
+
+.product-mini-cart { 
+    background: var(--primary) !important; 
+    color: #fff !important; 
+    border: none !important;
+}
