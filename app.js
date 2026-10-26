@@ -1700,7 +1700,19 @@ async function confirmCustomerAuth() {
     try {
         const hashedPass = CryptoJS.SHA256(pass).toString();
         let c = null;
-        if (window.supabaseClient) { const { data, error } = await window.supabaseClient.from('customers').select('*').eq('phone', phone).limit(1).maybeSingle(); if (error) throw new Error(error.message); if (data) c = data; }
+                if (window.supabaseClient) { 
+            const { error } = await window.supabaseClient.from('customers').insert([newCustomer]); 
+            if (error) {
+                // التحقق من خطأ تكرار رقم الهاتف (كود 23505 في PostgreSQL)
+                if (error.code === '23505' || error.message.includes('duplicate key')) {
+                    throw new Error(state.currentLang === 'fr' 
+                        ? '❌ Ce numéro de téléphone est déjà enregistré. Veuillez vous connecter.' 
+                        : '❌ رقم الهاتف هذا مسجل مسبقاً! يرجى تسجيل الدخول بدلاً من إنشاء حساب جديد.');
+                }
+                // إذا كان هناك خطأ آخر، يظهر كما هو
+                throw new Error(error.message); 
+            } 
+        }
         
         if (currentAuthMode === 'login') {
             if (!c) throw new Error('رقم الهاتف غير مسجل');
