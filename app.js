@@ -2002,6 +2002,7 @@ async function updateOrderStatus(id, status) {
         for(const x of restored.reverse()) { try{await window.supabaseClient.from('products').update({qty:x.oldQty}).eq('id',x.prod.id);}catch(_){} }
         order.status=previousStatus; save(K.orders,state.orders); save(K.products,state.products); console.error('Order status update failed:',error); toast((state.currentLang==='ar'?'تعذر تحديث الطلبية: ':'Impossible de mettre à jour : ')+(error.message||''),'error');
     }
+        if (typeof loadOrdersListener === 'function') loadOrdersListener();
     renderAdminOrdersList(); renderAdminHome(); renderShop(); updateAdminBadges();
 }
 window.updateOrderStatus = updateOrderStatus;
