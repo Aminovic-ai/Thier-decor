@@ -1,17 +1,17 @@
 :root { 
-    --primary: #38bdf8; 
-    --primary-hover: #0ea5e9; 
-    --accent: #0284c7; 
-    --primary-light: #f0f9ff; 
-    --bg-light: #f8fafc; 
+        --primary: #db2777; /* وردي داكن (Pink) */
+    --primary-hover: #be185d; 
+    --accent: #9d174d; 
+    --primary-light: #fdf2f8; 
+    --bg-light: #fff1f2; 
     --bg-white: #ffffff; 
-    --text-dark: #0f172a; 
-    --text-mid: #64748b; 
-    --border: #bae6fd; 
+    --text-dark: #1f2937; 
+    --text-mid: #6b7280; 
+    --border: #fce7f3; 
     --danger: #ef4444; 
     --success: #10b981; 
-    --sidebar-bg: #e0f2fe; 
-    --sidebar-text: #075985; 
+    --sidebar-bg: #fdf2f8; 
+    --sidebar-text: #9d174d; 
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Cairo', 'Tajawal', sans-serif; }
