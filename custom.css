@@ -1,36 +1,19 @@
-.product-admin-toolbar .btn-primary {
-    background-color: #ffffff !important;
-    color: #0f172a !important;
-    border: 1px solid #cbd5e1 !important;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.05) !important;
-}
-.product-admin-toolbar .btn-primary:hover {
-    background-color: #f8fafc !important;
-    border-color: #94a3b8 !important;
-}
-.product-admin-toolbar .promo-admin-button {
-    background-color: #fff1f2 !important;
-    color: #be123c !important;
-    border: 1px solid #fecdd3 !important;
-}
-.product-admin-toolbar .promo-admin-button:hover {
-    background-color: #ffe4e6 !important;
-}
-/* إصلاح جذري لبطاقات المنتجات في واجهة المتجر */
+/* إصلاح إجباري لبطاقات المنتجات */
 .product-card {
     display: flex !important;
     flex-direction: column !important;
-    height: 100% !important;
+    height: auto !important;
+    min-height: 330px !important;
     background: #ffffff !important;
     border-radius: 10px !important;
     border: 1px solid #e2e8f0 !important;
-    overflow: hidden !important;
+    overflow: visible !important;
     position: relative !important;
 }
 
-/* تحديد ارتفاع ثابت للصورة حتى لا تدفع باقي العناصر */
-.product-img {
-    height: 180px !important;
+.product-img, .product-card > div:first-child {
+    height: 140px !important;
+    max-height: 140px !important;
     width: 100% !important;
     flex-shrink: 0 !important;
     display: flex !important;
@@ -40,41 +23,40 @@
     overflow: hidden !important;
 }
 
-/* جعل الصورة تملأ المساحة بشكل متناسق */
-.product-img img {
+.product-img img, .product-card > div:first-child img {
     width: 100% !important;
     height: 100% !important;
     object-fit: cover !important;
     display: block !important;
 }
 
-/* إظهار أزرار السلة والمفضلة بشكل صحيح */
-.product-actions-under-image {
+.product-actions-under-image, .product-card > div:nth-child(2) {
     display: flex !important;
     justify-content: center !important;
-    gap: 15px !important;
-    padding: 8px 0 !important;
+    gap: 10px !important;
+    padding: 5px 0 !important;
     background: #ffffff !important;
-    z-index: 5 !important;
 }
 
-/* إجبار قسم النصوص على الظهور */
 .product-info {
     display: flex !important;
     flex-direction: column !important;
     padding: 10px !important;
     flex-grow: 1 !important;
     background: #ffffff !important;
-    z-index: 5 !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    z-index: 10 !important;
 }
 
-/* التأكد من أن اسم المنتج والسعر يظهران باللون الأسود */
 .product-info h3 {
     display: block !important;
     color: #000000 !important;
     margin-bottom: 8px !important;
+    font-size: 0.9rem !important;
 }
 
 .product-info div {
     color: #000000 !important;
+    font-weight: 900 !important;
 }
