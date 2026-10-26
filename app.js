@@ -1756,7 +1756,15 @@ async function confirmCustomerAuth() {
             toast(`✅ ${i18n[state.currentLang].welcome_new}`);
         }
         
-        // 4. حفظ الجلسة
+                // 4. حفظ الجلسة وحفظ بيانات الزبون في الذاكرة ليعمل الطلب
+        const existingCustIndex = state.customers.findIndex(x => String(x.id) === String(c.id));
+        if (existingCustIndex >= 0) {
+            state.customers[existingCustIndex] = c; // تحديث بيانات الزبون إذا كان موجوداً
+        } else {
+            state.customers.push(c); // إضافة الزبون إذا كان جديداً
+        }
+        save(K.customers, state.customers); // حفظ في المتصفح
+
         state.session = { id: c.id, role: 'customer' }; 
         save(K.session, state.session); 
         state.wishlist = c.wishlist || []; 
