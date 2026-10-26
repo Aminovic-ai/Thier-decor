@@ -1366,27 +1366,30 @@ function renderShopHTML(list) {
         const lowStock = p.qty <= 3 ? `<div style="position:absolute; bottom:60px; left:10px; background:#ef4444; color:#fff; padding:2px 6px; border-radius:4px; font-size:0.65rem; font-weight:bold; z-index:10;">${p.qty} ${i18n[state.currentLang].max_stock}</div>` : '';
         const isWish = state.wishlist.includes(p.id);
         
-        return `<div class="product-card" onclick="showProductView(${p.id})" style="display:flex; flex-direction:column; background:#fff; border-radius:10px; border:1px solid #e2e8f0; overflow:hidden; position:relative; cursor:pointer;">
+        return `<div class="product-card" onclick="showProductView(${p.id})" style="display:flex; flex-direction:column; background:#fff; border-radius:10px; border:1px solid #e2e8f0; overflow:hidden; position:relative; cursor:pointer; height:100%;">
             ${packBadge}${promoBadge}${specialBadge}${lowStock}
             <div style="height:160px; width:100%; display:flex; align-items:center; justify-content:center; background:#f8fafc; overflow:hidden; flex-shrink:0;">
                 ${p.images && p.images[0] ? `<img src="${esc(p.images[0])}" loading="lazy" style="width:100%; height:100%; object-fit:cover; display:block;">` : '<div style="font-size:3rem;">📦</div>'}
             </div>
-            <div style="display:flex; justify-content:center; gap:10px; padding:8px 0; background:#fff; border-bottom:1px solid #e2e8f0;">
-                <button class="product-mini-action ${isWish ? 'is-favorite' : ''}" onclick="event.stopPropagation();toggleWishlist(${p.id})" style="background:#f1f5f9; border:none; width:32px; height:32px; border-radius:50%; display:flex; align-items:center; justify-content:center; color:${isWish ? '#ef4444' : '#64748b'}; cursor:pointer;"><i class="fas fa-heart"></i></button>
-                <button class="product-mini-action product-mini-cart" onclick="event.stopPropagation();addToCart(${p.id})" style="background:#0284c7; border:none; width:32px; height:32px; border-radius:50%; display:flex; align-items:center; justify-content:center; color:#fff; cursor:pointer;"><i class="fas fa-shopping-basket"></i></button>
+            
+            <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 12px; background:#fff; border-bottom:1px solid #e2e8f0;">
+                <button class="product-mini-action ${isWish ? 'is-favorite' : ''}" onclick="event.stopPropagation();toggleWishlist(${p.id})" style="background:#f1f5f9; border:none; width:36px; height:36px; border-radius:50%; display:flex; align-items:center; justify-content:center; color:${isWish ? '#ef4444' : '#64748b'}; cursor:pointer;"><i class="fas fa-heart"></i></button>
+                
+                <div style="font-weight:900; font-size:1.1rem; color:#000;">
+                    ${(effectiveProductPrice(p)<Number(p.price))?`<del style="font-size:0.75rem; color:#94a3b8; margin-inline-end:4px;">${fmtMoney(p.price)}</del>`:''}${fmtMoney(effectiveProductPrice(p))}
+                </div>
+
+                <button class="product-mini-action product-mini-cart" onclick="event.stopPropagation();addToCart(${p.id})" style="background:#0284c7; border:none; width:36px; height:36px; border-radius:50%; display:flex; align-items:center; justify-content:center; color:#fff; cursor:pointer;"><i class="fas fa-shopping-basket"></i></button>
             </div>
+
             <div style="padding:10px; display:flex; flex-direction:column; flex-grow:1; background:#fff;">
                 <div style="background:#e0f2fe; color:#0284c7; font-size:0.7rem; font-weight:bold; padding:2px 8px; border-radius:4px; display:inline-block; margin-bottom:6px; width:fit-content;">${esc(p.category || i18n[state.currentLang].all)}</div>
-                <h3 style="font-size:0.9rem; margin-bottom:8px; color:#000; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${esc(p.name)}</h3>
-                <div style="display:flex; justify-content:flex-start; align-items:center; margin-top:auto; padding-top:8px; border-top:1px dashed #cbd5e1;">
-                    <div style="font-weight:900; font-size:1.1rem; color:#000;">
-                        ${(effectiveProductPrice(p)<Number(p.price))?`<del style="font-size:0.78rem; color:#94a3b8; margin-inline-end:6px;">${fmtMoney(p.price)}</del>`:''}${fmtMoney(effectiveProductPrice(p))}
-                    </div>
-                </div>
+                <h3 style="font-size:0.9rem; margin-bottom:0; color:#000; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${esc(p.name)}</h3>
             </div>
         </div>`;
     }).join('');
 }
+
 
 function renderNewProducts() {
     const box = document.getElementById('new-products-box'); const list = document.getElementById('new-products-list'); if (!box || !list) return;
