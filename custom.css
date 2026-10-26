@@ -1,62 +1,87 @@
-/* إصلاح إجباري لبطاقات المنتجات */
+/* 1. إعداد البطاقة الأساسية */
 .product-card {
     display: flex !important;
     flex-direction: column !important;
-    height: auto !important;
-    min-height: 330px !important;
     background: #ffffff !important;
     border-radius: 10px !important;
     border: 1px solid #e2e8f0 !important;
-    overflow: visible !important;
+    overflow: hidden !important;
     position: relative !important;
+    height: 100% !important;
+    min-height: 320px !important;
 }
 
-.product-img, .product-card > div:first-child {
-    height: 140px !important;
-    max-height: 140px !important;
+/* 2. إظهار الصورة وإجبارها على الارتفاع المناسب */
+.product-img {
+    display: flex !important;
+    height: 160px !important;
     width: 100% !important;
     flex-shrink: 0 !important;
-    display: flex !important;
     align-items: center !important;
     justify-content: center !important;
     background: #f8fafc !important;
     overflow: hidden !important;
 }
 
-.product-img img, .product-card > div:first-child img {
+.product-img img {
     width: 100% !important;
     height: 100% !important;
     object-fit: cover !important;
     display: block !important;
 }
 
-.product-actions-under-image, .product-card > div:nth-child(2) {
+/* 3. إظهار أزرار السلة والمفضلة */
+.product-actions-under-image {
     display: flex !important;
     justify-content: center !important;
     gap: 10px !important;
-    padding: 5px 0 !important;
+    padding: 8px 0 !important;
     background: #ffffff !important;
+    border-bottom: 1px solid #e2e8f0 !important;
+    z-index: 5 !important;
 }
 
+/* 4. إظهار النصوص (الاسم، الصنف، السعر) */
 .product-info {
     display: flex !important;
     flex-direction: column !important;
     padding: 10px !important;
     flex-grow: 1 !important;
     background: #ffffff !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-    z-index: 10 !important;
+    z-index: 5 !important;
 }
 
 .product-info h3 {
     display: block !important;
     color: #000000 !important;
-    margin-bottom: 8px !important;
-    font-size: 0.9rem !important;
+    font-size: 14px !important;
+    font-weight: 700 !important;
+    margin: 5px 0 8px 0 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
 }
 
-.product-info div {
+.product-info > div {
+    display: block !important;
     color: #000000 !important;
+}
+
+.product-info > div:first-child {
+    background: #e0f2fe !important;
+    color: #0284c7 !important;
+    font-size: 11px !important;
+    font-weight: bold !important;
+    padding: 2px 8px !important;
+    border-radius: 4px !important;
+    width: fit-content !important;
+    margin-bottom: 6px !important;
+}
+
+.product-info > div:last-child {
     font-weight: 900 !important;
+    font-size: 16px !important;
+    margin-top: auto !important;
+    padding-top: 8px !important;
+    border-top: 1px dashed #cbd5e1 !important;
 }
