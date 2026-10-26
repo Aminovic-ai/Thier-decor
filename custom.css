@@ -1,99 +1,18 @@
-/* 1. إعداد البطاقة الأساسية */
-.product-card {
-    display: flex !important;
-    flex-direction: column !important;
-    background: #ffffff !important;
-    border-radius: 10px !important;
-    border: 1px solid #e2e8f0 !important;
-    overflow: hidden !important;
-    position: relative !important;
-    height: 100% !important;
-    min-height: 320px !important;
+.product-admin-toolbar .btn-primary {
+    background-color: #ffffff !important;
+    color: #0f172a !important;
+    border: 1px solid #cbd5e1 !important;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05) !important;
 }
-
-/* 2. إظهار الصورة وإجبارها على الارتفاع المناسب */
-.product-img {
-    display: flex !important;
-    height: 160px !important;
-    width: 100% !important;
-    flex-shrink: 0 !important;
-    align-items: center !important;
-    justify-content: center !important;
-    background: #f8fafc !important;
-    overflow: hidden !important;
+.product-admin-toolbar .btn-primary:hover {
+    background-color: #f8fafc !important;
+    border-color: #94a3b8 !important;
 }
-
-.product-img img {
-    width: 100% !important;
-    height: 100% !important;
-    object-fit: cover !important;
-    display: block !important;
+.product-admin-toolbar .promo-admin-button {
+    background-color: #fff1f2 !important;
+    color: #be123c !important;
+    border: 1px solid #fecdd3 !important;
 }
-
-/* 3. إظهار أزرار السلة والمفضلة */
-.product-actions-under-image {
-    display: flex !important;
-    justify-content: center !important;
-    gap: 10px !important;
-    padding: 8px 0 !important;
-    background: #ffffff !important;
-    border-bottom: 1px solid #e2e8f0 !important;
-    z-index: 5 !important;
-}
-
-/* 4. إظهار النصوص (الاسم، الصنف، السعر) */
-.product-info {
-    display: flex !important;
-    flex-direction: column !important;
-    padding: 10px !important;
-    flex-grow: 1 !important;
-    background: #ffffff !important;
-    z-index: 5 !important;
-}
-
-.product-info h3 {
-    display: block !important;
-    color: #000000 !important;
-    font-size: 14px !important;
-    font-weight: 700 !important;
-    margin: 5px 0 8px 0 !important;
-    white-space: nowrap !important;
-    overflow: hidden !important;
-    text-overflow: ellipsis !important;
-}
-
-.product-info > div {
-    display: block !important;
-    color: #000000 !important;
-}
-
-.product-info > div:first-child {
-    background: #e0f2fe !important;
-    color: #0284c7 !important;
-    font-size: 11px !important;
-    font-weight: bold !important;
-    padding: 2px 8px !important;
-    border-radius: 4px !important;
-    width: fit-content !important;
-    margin-bottom: 6px !important;
-}
-
-.product-info > div:last-child {
-    font-weight: 900 !important;
-    font-size: 16px !important;
-    margin-top: auto !important;
-    padding-top: 8px !important;
-    border-top: 1px dashed #cbd5e1 !important;
-}
-/* إجبار الهاتف على عرض منتجين في نفس السطر */
-#s-products {
-    display: grid !important;
-    grid-template-columns: repeat(2, 1fr) !important;
-    gap: 10px !important;
-}
-
-@media (max-width: 480px) {
-    #s-products {
-        grid-template-columns: repeat(2, 1fr) !important;
-    }
+.product-admin-toolbar .promo-admin-button:hover {
+    background-color: #ffe4e6 !important;
 }
