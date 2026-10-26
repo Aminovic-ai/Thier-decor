@@ -16,3 +16,65 @@
 .product-admin-toolbar .promo-admin-button:hover {
     background-color: #ffe4e6 !important;
 }
+/* إصلاح جذري لبطاقات المنتجات في واجهة المتجر */
+.product-card {
+    display: flex !important;
+    flex-direction: column !important;
+    height: 100% !important;
+    background: #ffffff !important;
+    border-radius: 10px !important;
+    border: 1px solid #e2e8f0 !important;
+    overflow: hidden !important;
+    position: relative !important;
+}
+
+/* تحديد ارتفاع ثابت للصورة حتى لا تدفع باقي العناصر */
+.product-img {
+    height: 180px !important;
+    width: 100% !important;
+    flex-shrink: 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    background: #f8fafc !important;
+    overflow: hidden !important;
+}
+
+/* جعل الصورة تملأ المساحة بشكل متناسق */
+.product-img img {
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: cover !important;
+    display: block !important;
+}
+
+/* إظهار أزرار السلة والمفضلة بشكل صحيح */
+.product-actions-under-image {
+    display: flex !important;
+    justify-content: center !important;
+    gap: 15px !important;
+    padding: 8px 0 !important;
+    background: #ffffff !important;
+    z-index: 5 !important;
+}
+
+/* إجبار قسم النصوص على الظهور */
+.product-info {
+    display: flex !important;
+    flex-direction: column !important;
+    padding: 10px !important;
+    flex-grow: 1 !important;
+    background: #ffffff !important;
+    z-index: 5 !important;
+}
+
+/* التأكد من أن اسم المنتج والسعر يظهران باللون الأسود */
+.product-info h3 {
+    display: block !important;
+    color: #000000 !important;
+    margin-bottom: 8px !important;
+}
+
+.product-info div {
+    color: #000000 !important;
+}
