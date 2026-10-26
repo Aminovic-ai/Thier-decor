@@ -1361,35 +1361,26 @@ function renderShopHTML(list) {
     if (list.length === 0) { c.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:40px;">${i18n[state.currentLang].no_products}</div>`; return; }
     
     c.innerHTML = list.map(p => {
-        const packBadge = p.isPack ? `<div style="position:absolute; top:8px; right:8px; background:#f59e0b; color:#fff; padding:2px 8px; border-radius:10px; font-size:0.7rem; font-weight:bold; z-index:10;"><i class="fas fa-gift"></i> ${i18n[state.currentLang].pack_badge}</div>` : ''; 
-        const promoBadge = effectiveProductPrice(p) < Number(p.price) ? `<div style="position:absolute; top:8px; left:8px; background:#ef4444; color:#fff; padding:2px 8px; border-radius:10px; font-size:0.7rem; font-weight:bold; z-index:10;">${i18n[state.currentLang].promo_badge}</div>` : '';
-        const isWish = state.wishlist.includes(p.id);
-        
-        // التحقق من وجود الصورة وأنها رابط صالح
         const imageSrc = (p.images && p.images[0] && p.images[0].length > 10) ? esc(p.images[0]) : null;
-        
-        return `<div class="product-card" onclick="showProductView(${p.id})" style="display:flex; flex-direction:column; justify-content:space-between; padding:10px; border-radius:12px; border:1px solid var(--border); background:#fff; cursor:pointer; position:relative; overflow:hidden;">
-            ${packBadge}${promoBadge}
-            
-            <div style="height:140px; background:var(--bg-light); border-radius:8px; display:flex; align-items:center; justify-content:center; margin-bottom:10px; overflow:hidden;">
-                ${imageSrc ? `<img src="${imageSrc}" style="width:100%; height:100%; object-fit:contain;" onerror="this.style.display='none'; this.parentElement.innerHTML='<span style=\\'font-size:2rem;\\'>📦</span>';">` : '<span style="font-size:2rem;">📦</span>'}
+        const promoPrice = effectiveProductPrice(p);
+        const isPromo = promoPrice < Number(p.price);
+        const isWish = state.wishlist.includes(p.id);
+
+        return `<div class="product-card" onclick="showProductView(${p.id})">
+            <div class="product-img">
+                ${imageSrc ? `<img src="${imageSrc}" loading="lazy" alt="${esc(p.name)}" onerror="this.onerror=null; this.parentElement.innerHTML='<i class=\\'fas fa-image\\' style=\\'color:#cbd5e1;font-size:2rem;\\'></i>';">` : '<i class="fas fa-image" style="color:#cbd5e1;font-size:2rem;"></i>'}
             </div>
-            
-            <div style="text-align:center; flex:1; display:flex; flex-direction:column; justify-content:space-between;">
-                <div>
-                    <div style="background: #e0f2fe; color: #0284c7; font-size: 0.7rem; font-weight: bold; padding: 2px 8px; border-radius: 4px; display: inline-block; margin-bottom: 6px;">${esc(p.category || i18n[state.currentLang].all)}</div>
-                    <h3 style="font-size:0.85rem; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin:0 0 5px 0;">${esc(p.name)}</h3>
-                    <div style="font-weight:900; font-size:1rem; color:#000; margin-bottom:10px;">
-                        ${(effectiveProductPrice(p)<Number(p.price))?`<del style="font-size:.75rem;color:#94a3b8;margin-inline-end:4px;">${fmtMoney(p.price)}</del>`:''}
-                        ${fmtMoney(effectiveProductPrice(p))}
-                    </div>
+            <div class="product-info">
+                <h3>${esc(p.name)}</h3>
+                <div class="product-price-box">
+                    ${isPromo ? `<del>${fmtMoney(p.price)}</del>` : ''}
+                    <span>${fmtMoney(promoPrice)}</span>
                 </div>
-                
-                <div style="display:flex; justify-content:center; gap:10px;">
-                    <button onclick="event.stopPropagation();toggleWishlist(${p.id})" style="width:36px; height:36px; border-radius:8px; border:1px solid #e2e8f0; background:${isWish ? '#fff1f2' : '#f8fafc'}; display:flex; align-items:center; justify-content:center; color:${isWish ? '#ef4444' : '#64748b'}; transition:0.2s;">
+                <div class="product-actions-under-image">
+                    <button class="product-mini-action ${isWish ? 'is-favorite' : ''}" onclick="event.stopPropagation();toggleWishlist(${p.id})">
                         <i class="fas fa-heart"></i>
                     </button>
-                    <button onclick="event.stopPropagation();addToCart(${p.id})" style="width:36px; height:36px; border-radius:8px; border:none; background:var(--primary); color:#fff; display:flex; align-items:center; justify-content:center; transition:0.2s;">
+                    <button class="product-mini-action product-mini-cart" onclick="event.stopPropagation();addToCart(${p.id})">
                         <i class="fas fa-shopping-basket"></i>
                     </button>
                 </div>
