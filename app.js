@@ -1568,7 +1568,7 @@ window.updateDeliveryPrice = updateDeliveryPrice;
 
 async function confirmShopOrder() {
     if (!state.session || state.session.role !== 'customer') return toast(i18n[state.currentLang].login_first, 'error');
-    const c = state.customers.find(x => x.id === state.session.id); if (!c) return toast('حساب الزبون غير موجود', 'error');
+    const c = state.customers.find(x => String(x.id) === String(state.session.id)); if (!c) return toast('حساب الزبون غير موجود، يرجى تحديث الصفحة', 'error');
     const wilayaCode = parseInt(document.getElementById('chk-wilaya').value); const type = document.getElementById('chk-type').value; const courier = document.getElementById('chk-courier').value;
     const commune = document.getElementById('chk-commune').value.trim(); const address = document.getElementById('chk-address').value.trim();
     const stationSelect = document.getElementById('chk-station'); const stationCode = type === 'stopdesk' ? stationSelect.value : '';
