@@ -85,3 +85,15 @@
     padding-top: 8px !important;
     border-top: 1px dashed #cbd5e1 !important;
 }
+/* إجبار الهاتف على عرض منتجين في نفس السطر */
+#s-products {
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 10px !important;
+}
+
+@media (max-width: 480px) {
+    #s-products {
+        grid-template-columns: repeat(2, 1fr) !important;
+    }
+}
