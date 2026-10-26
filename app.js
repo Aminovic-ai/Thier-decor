@@ -1165,7 +1165,7 @@ async function loadOrdersListener(options = {}) {
             state.orders = [];
         }
 
-        if (firebase.auth().currentUser) {
+       if (state.session && state.session.role === 'admin') {
             const { data: customers, error: customersError } = await window.supabaseClient.from('customers').select('*');
             if (customersError) console.error('Supabase customers read failed:', customersError.message);
             if (customers) { state.customers = customers; save(K.customers, customers); renderAdminCustomers(document.getElementById('admin-customer-search')?.value || ''); }
