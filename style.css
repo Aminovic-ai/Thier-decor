@@ -424,3 +424,9 @@ html[dir="ltr"] #screen-admin .ad-management-heading{direction:ltr}
 @media(max-width:700px){ .product-admin-toolbar { display:grid; grid-template-columns:1fr 1fr; } .product-admin-toolbar .btn-primary { justify-content:center; padding:9px 7px; font-size:.8rem; } .pack-product-choice { grid-template-columns:auto 1fr 62px; } }
 .promo-pill { display:inline-flex; align-items:center; background:#fff0f5; color:#be185d; border:1px solid #fbcfe8; padding:2px 7px; border-radius:999px; font-size:.68rem; font-weight:900; vertical-align:middle; }
 .shop-promo-pill { position:absolute; top:10px; right:10px; z-index:12; padding:4px 9px; }
+/* إصلاح كرت المنتج */
+.product-card { 
+    aspect-ratio: auto !important; 
+    height: auto !important; 
+    min-height: 280px;
+}
