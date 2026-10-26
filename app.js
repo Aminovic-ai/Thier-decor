@@ -1192,10 +1192,15 @@ function setupRealtimeListeners() {
         window.supabaseClient.removeChannel(realtimeChannel);
         realtimeChannel = null;
     }
-    const isAdmin = Boolean(window.firebaseReady && typeof firebase !== 'undefined' && firebase.auth && firebase.auth().currentUser);
-    if (!isAdmin) return;
+    
+    // هذا السطر هو التعديل: يسمح للمدير بالاتصال حتى لو لم يكن Firebase نشطاً
+    const isAdmin = Boolean(window.firebaseReady && typeof firebase !== 'undefined' && firebase.auth && firebase.auth().currentUser) || (state.session && state.session.role === 'admin');
+    
+    if (!isAdmin) return; 
+    
     realtimeChannel = window.supabaseClient.channel('custom-all-channel')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => { loadOrdersListener(); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, () => { loadOrdersListener(); }) // تمت إضافة الاستماع للرسائل
       .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, () => { lastProductsFetchAt = 0; loadOrdersListener({ forceProducts: true }); })
       .subscribe();
 }
