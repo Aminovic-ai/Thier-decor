@@ -1691,49 +1691,90 @@ function switchAuthMode(mode) {
 window.switchAuthMode = switchAuthMode;
 
 async function confirmCustomerAuth() {
-    const phone = document.getElementById('auth-phone').value.trim(); const pass = document.getElementById('auth-pass').value.trim();
-    const name = document.getElementById('auth-name').value.trim(); const recoveryPin = document.getElementById('auth-recovery-pin').value.trim();
+    const phone = document.getElementById('auth-phone').value.trim(); 
+    const pass = document.getElementById('auth-pass').value.trim();
+    const name = document.getElementById('auth-name').value.trim(); 
+    const recoveryPin = document.getElementById('auth-recovery-pin').value.trim();
     const submitBtn = document.getElementById('btn-auth-submit');
+    
     if (!phone || !pass) return toast(i18n[state.currentLang].login_first, 'error');
-    if (submitBtn.disabled) return; submitBtn.disabled = true; const originalText = submitBtn.textContent; submitBtn.textContent = '...';
+    if (submitBtn.disabled) return; 
+    submitBtn.disabled = true; 
+    const originalText = submitBtn.textContent; 
+    submitBtn.textContent = '...';
 
     try {
         const hashedPass = CryptoJS.SHA256(pass).toString();
         let c = null;
-                if (window.supabaseClient) { 
-            const { error } = await window.supabaseClient.from('customers').insert([newCustomer]); 
-            if (error) {
-                // التحقق من خطأ تكرار رقم الهاتف (كود 23505 في PostgreSQL)
-                if (error.code === '23505' || error.message.includes('duplicate key')) {
-                    throw new Error(state.currentLang === 'fr' 
-                        ? '❌ Ce numéro de téléphone est déjà enregistré. Veuillez vous connecter.' 
-                        : '❌ رقم الهاتف هذا مسجل مسبقاً! يرجى تسجيل الدخول بدلاً من إنشاء حساب جديد.');
-                }
-                // إذا كان هناك خطأ آخر، يظهر كما هو
-                throw new Error(error.message); 
-            } 
+        
+        // 1. جلب بيانات الزبون للتأكد من وجوده
+        if (window.supabaseClient) { 
+            const { data, error } = await window.supabaseClient.from('customers').select('*').eq('phone', phone).limit(1).maybeSingle(); 
+            if (error) throw new Error(error.message); 
+            if (data) c = data; 
         }
         
+        // 2. تسجيل الدخول
         if (currentAuthMode === 'login') {
             if (!c) throw new Error('رقم الهاتف غير مسجل');
             if (c.isBlocked) throw new Error('🚫 عذراً، هذا الحساب محظور.');
-            const isOldPlain = c.password === pass; const isNewHashed = c.password === hashedPass;
+            const isOldPlain = c.password === pass; 
+            const isNewHashed = c.password === hashedPass;
+            
             if (!isOldPlain && !isNewHashed) throw new Error(i18n[state.currentLang].wrong_pass);
-            if (isOldPlain) { c.password = hashedPass; save(K.customers, state.customers); if (window.supabaseClient) await window.supabaseClient.from('customers').update({ password: hashedPass }).eq('id', c.id); }
+            
+            if (isOldPlain) { 
+                c.password = hashedPass; 
+                save(K.customers, state.customers); 
+                if (window.supabaseClient) await window.supabaseClient.from('customers').update({ password: hashedPass }).eq('id', c.id); 
+            }
             toast(`✅ ${i18n[state.currentLang].welcome_back} ${c.name}`);
-        } else {
-            if (c) { if (c.isBlocked) throw new Error('🚫 هذا الحساب محظور'); throw new Error('❌ رقم الهاتف هذا مسجل مسبقاً!'); }
-            if (!name) throw new Error('أدخل الاسم'); if (!recoveryPin) throw new Error('أدخل الرقم السري');
+        } 
+        
+        // 3. إنشاء حساب جديد
+        else {
+            if (c) { 
+                if (c.isBlocked) throw new Error('🚫 هذا الحساب محظور'); 
+                throw new Error('❌ رقم الهاتف هذا مسجل مسبقاً! يرجى تسجيل الدخول.'); 
+            }
+            if (!name) throw new Error('أدخل الاسم'); 
+            if (!recoveryPin) throw new Error('أدخل الرقم السري');
+            
             const newCustomer = { id: Date.now(), name, phone, password: hashedPass, isVip: false, isTop: false, isBlocked: false, points: 0, recoveryPin: recoveryPin, wishlist: [] };
-            if (window.supabaseClient) { const { error } = await window.supabaseClient.from('customers').insert([newCustomer]); if (error) throw new Error(error.message); }
-            state.customers.push(newCustomer); c = newCustomer;
+            
+            if (window.supabaseClient) { 
+                const { error } = await window.supabaseClient.from('customers').insert([newCustomer]); 
+                if (error) {
+                    if (error.code === '23505' || error.message.includes('duplicate key')) {
+                        throw new Error('❌ رقم الهاتف مسجل مسبقاً! يرجى تسجيل الدخول بدلاً من إنشاء حساب جديد.');
+                    }
+                    throw new Error(error.message); 
+                } 
+            }
+            state.customers.push(newCustomer); 
+            c = newCustomer;
             toast(`✅ ${i18n[state.currentLang].welcome_new}`);
         }
         
-        state.session = { id: c.id, role: 'customer' }; save(K.session, state.session); state.wishlist = c.wishlist || []; save(K.wishlist, state.wishlist); updateWishlistBadge();
-        closeModal('m-customer-auth'); updateUIBasedOnSession(); loadOrdersListener();
+        // 4. حفظ الجلسة
+        state.session = { id: c.id, role: 'customer' }; 
+        save(K.session, state.session); 
+        state.wishlist = c.wishlist || []; 
+        save(K.wishlist, state.wishlist); 
+        updateWishlistBadge();
+        
+        closeModal('m-customer-auth'); 
+        updateUIBasedOnSession(); 
+        loadOrdersListener();
+        
         if (pendingCheckout) { pendingCheckout = false; openShopCheckout(); } else { shopGo('profile'); }
-    } catch (error) { toast(error.message, 'error'); } finally { submitBtn.disabled = false; submitBtn.textContent = originalText; }
+        
+    } catch (error) { 
+        toast(error.message, 'error'); 
+    } finally { 
+        submitBtn.disabled = false; 
+        submitBtn.textContent = originalText; 
+    }
 }
 window.confirmCustomerAuth = confirmCustomerAuth;
 
