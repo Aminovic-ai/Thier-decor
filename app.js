@@ -1,4 +1,46 @@
 const K = { products: 'td_prod', orders: 'td_ord', expenses: 'td_exp', settings: 'td_set', customers: 'td_cust', session: 'td_sess', cart: 'td_cart', lang: 'td_lang', messages: 'td_msg', requests: 'td_req', wishlist: 'td_wish' };
+
+// Admin-only orders are fetched through the authenticated Cloudflare Worker.
+const TD_ADMIN_API_URL = 'https://thier-decor-admin-api.amindrody.workers.dev/';
+const TD_ADMIN_UID = 'DNlHoogN8vMCsZN0hyIC6yPS64J2';
+
+async function callAdminWorker(action) {
+    if (!window.firebaseReady || typeof firebase === 'undefined' || !firebase.auth) {
+        throw new Error(state.currentLang === 'fr' ? 'La session Firebase administrateur est indisponible.' : 'جلسة Firebase الخاصة بالمسؤول غير متاحة.');
+    }
+    const user = firebase.auth().currentUser;
+    if (!user || user.uid !== TD_ADMIN_UID) {
+        throw new Error(state.currentLang === 'fr' ? 'Accès administrateur refusé.' : 'تم رفض صلاحية المسؤول.');
+    }
+    const idToken = await user.getIdToken();
+    const response = await fetch(TD_ADMIN_API_URL, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${idToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action }),
+        cache: 'no-store'
+    });
+    let result;
+    try { result = await response.json(); }
+    catch (_) { throw new Error(state.currentLang === 'fr' ? 'Réponse invalide du serveur administrateur.' : 'ردّ خادم الإدارة غير صالح.'); }
+    if (!response.ok || result?.success !== true) {
+        const message = result?.error || (state.currentLang === 'fr' ? 'La requête administrateur a échoué.' : 'فشل طلب الإدارة.');
+        throw new Error(message);
+    }
+    return result;
+}
+
+async function fetchAdminOrdersViaWorker() {
+    const result = await callAdminWorker('listOrders');
+    if (!Array.isArray(result.orders)) throw new Error(state.currentLang === 'fr' ? 'Réponse des commandes invalide.' : 'بيانات الطلبيات المستلمة غير صالحة.');
+    return result.orders;
+}
+
+async function fetchAdminDataViaWorker() {
+    const result = await callAdminWorker('listAdminData');
+    if (!result.data || typeof result.data !== 'object') throw new Error(state.currentLang === 'fr' ? 'Réponse des données administrateur invalide.' : 'بيانات الإدارة المستلمة غير صالحة.');
+    return result.data;
+}
+
 let state = { products: [], orders: [], expenses: [], customers: [], messages: [], requests: [], session: null, cart: [], wishlist: [], currentLang: 'ar', settings: { shopName: 'Thier Décor', shopPhone: '', promoText: '', promoActive: false, customPrices: {}, manualSalesAdjustment: 0, adActive: false, adImages: [], adText: '', adEndTime: '', coupons: [] } };
 window.state = state;
 let currentCategory = 'all'; let currentOrderFilter = 'all'; let tempUploadedImages = []; let currentAuthMode = 'login'; let pendingCheckout = false;
@@ -1071,7 +1113,17 @@ function updateUIBasedOnSession() {
 }
 window.updateUIBasedOnSession = updateUIBasedOnSession;
 
-function goScreen(id) { document.querySelectorAll('.screen').forEach(s => s.classList.remove('active')); document.getElementById(id).classList.add('active'); updateUIBasedOnSession(); window.scrollTo(0, 0); }
+function goScreen(id) {
+    // The package has a standalone admin.html as well as the combined index.html.
+    // Fall back safely when a screen is not present in the current document.
+    let target = document.getElementById(id);
+    if (!target) target = document.getElementById('screen-admin-login') || document.getElementById('screen-shop') || document.querySelector('.screen');
+    if (!target) return;
+    document.querySelectorAll('.screen').forEach(screen => screen.classList.remove('active'));
+    target.classList.add('active');
+    updateUIBasedOnSession();
+    window.scrollTo(0, 0);
+}
 window.goScreen = goScreen;
 
 function shopGo(id) {
@@ -1114,6 +1166,9 @@ window.updateProductRequestButton = updateProductRequestButton;
 
 const PRODUCT_CACHE_TTL_MS = 3 * 60 * 1000;
 const SETTINGS_CACHE_TTL_MS = 5 * 60 * 1000;
+// Admin-only tables change less often than orders; avoid re-reading every table on each refresh.
+const ADMIN_DATA_CACHE_TTL_MS = 2 * 60 * 1000;
+let lastAdminDataFetchAt = 0;
 let lastProductsFetchAt = 0;
 let lastSettingsFetchAt = 0;
 let loadRefreshInProgress = false;
@@ -1139,7 +1194,8 @@ async function loadOrdersListener(options = {}) {
         }
         
         let query = window.supabaseClient.from('orders').select('*').order('id', { ascending: false });
-        const isFirebaseAdmin = Boolean(window.firebaseReady && typeof firebase !== 'undefined' && firebase.auth && firebase.auth().currentUser);
+        const currentFirebaseUser = Boolean(window.firebaseReady && typeof firebase !== 'undefined' && firebase.auth && firebase.auth().currentUser);
+        const isFirebaseAdmin = currentFirebaseUser && firebase.auth().currentUser.uid === 'DNlHoogN8vMCsZN0hyIC6yPS64J2';
         if (state.session && state.session.role === 'customer' && !isFirebaseAdmin) {
             const cust = state.customers.find(x => String(x.id) === String(state.session.id));
             if (!cust || !cust.phone) {
@@ -1158,23 +1214,37 @@ async function loadOrdersListener(options = {}) {
                 else if (requestsError) console.warn('Customer requests are unavailable under current database policies:', requestsError.message);
             }
         } else if (isFirebaseAdmin) {
-            const { data: orders, error: ordersError } = await query;
-            if (!ordersError && orders) { state.orders = orders; save(K.orders, orders); }
+            // Private admin order reads go through Cloudflare; never query the private table from the browser.
+            try {
+                const orders = await fetchAdminOrdersViaWorker();
+                state.orders = orders;
+                save(K.orders, orders);
+            } catch (ordersError) {
+                console.error('Admin Worker orders read failed:', ordersError.message || ordersError);
+                // Keep last cached orders visible if the API is temporarily unavailable; do not treat cache as fresh data.
+            }
         } else {
             // Visitors must never fetch the private orders table.
             state.orders = [];
         }
 
-       if (state.session && state.session.role === 'admin') {
-            const { data: customers, error: customersError } = await window.supabaseClient.from('customers').select('*');
-            if (customersError) console.error('Supabase customers read failed:', customersError.message);
-            if (customers) { state.customers = customers; save(K.customers, customers); renderAdminCustomers(document.getElementById('admin-customer-search')?.value || ''); }
-            const { data: messages } = await window.supabaseClient.from('messages').select('*').order('id', { ascending: false });
-            if (messages) { state.messages = messages; save(K.messages, messages); }
-            const { data: requests } = await window.supabaseClient.from('requests').select('*').order('id', { ascending: false });
-            if (requests) { state.requests = requests; save(K.requests, requests); }
-            const { data: expenses } = await window.supabaseClient.from('expenses').select('*');
-            if (expenses) { state.expenses = expenses; save(K.expenses, expenses); }
+       if (isFirebaseAdmin || (state.session && state.session.role === 'admin')) {
+            // Keep admin-only datasets warm for a short period instead of downloading
+            // every table again whenever an order/message event triggers a refresh.
+            const shouldRefreshAdminData = options.forceAdminData || !lastAdminDataFetchAt || (now - lastAdminDataFetchAt) >= ADMIN_DATA_CACHE_TTL_MS;
+            if (shouldRefreshAdminData) {
+                try {
+                    const adminData = await fetchAdminDataViaWorker();
+                    if (Array.isArray(adminData.customers)) { state.customers = adminData.customers; save(K.customers, adminData.customers); renderAdminCustomers(document.getElementById('admin-customer-search')?.value || ''); }
+                    if (Array.isArray(adminData.messages)) { state.messages = adminData.messages; save(K.messages, adminData.messages); }
+                    if (Array.isArray(adminData.requests)) { state.requests = adminData.requests; save(K.requests, adminData.requests); }
+                    if (Array.isArray(adminData.expenses)) { state.expenses = adminData.expenses; save(K.expenses, adminData.expenses); }
+                    lastAdminDataFetchAt = now;
+                } catch (adminDataError) {
+                    console.error('Admin Worker data read failed:', adminDataError.message || adminDataError);
+                    // Keep the last local cache visible if the API is temporarily unavailable.
+                }
+            }
         }
 
         renderShop(); renderCategories(); renderMyOrders(); renderAdminOrdersList(); renderAdminHome(); updateAdminBadges();
@@ -1194,7 +1264,8 @@ function setupRealtimeListeners() {
     }
     
     // هذا السطر هو التعديل: يسمح للمدير بالاتصال حتى لو لم يكن Firebase نشطاً
-    const isAdmin = Boolean(window.firebaseReady && typeof firebase !== 'undefined' && firebase.auth && firebase.auth().currentUser) || (state.session && state.session.role === 'admin');
+    const firebaseUser = Boolean(window.firebaseReady && typeof firebase !== 'undefined' && firebase.auth && firebase.auth().currentUser);
+    const isAdmin = (firebaseUser && firebase.auth().currentUser.uid === 'DNlHoogN8vMCsZN0hyIC6yPS64J2') || (state.session && state.session.role === 'admin');
     
     if (!isAdmin) return; 
     
@@ -1222,7 +1293,7 @@ async function adminRefreshAll() {
     try {
         lastProductsFetchAt = 0;
         lastSettingsFetchAt = 0;
-        const refreshed = await loadOrdersListener({ forceProducts: true, forceSettings: true, forceWait: true });
+        const refreshed = await loadOrdersListener({ forceProducts: true, forceSettings: true, forceAdminData: true, forceWait: true });
         if (refreshed !== true) throw new Error('Refresh did not complete');
         const msg = state.currentLang === 'fr' ? 'Mise à jour terminée.' : 'تم التحديث بنجاح.';
         toast('✓ ' + msg);
@@ -1257,6 +1328,25 @@ function startCatalogFallbackRefresh() {
     }, 30 * 1000);
 }
 
+
+// Reduce image work on long product lists: defer off-screen images and decode asynchronously.
+(function enableLazyImageHints() {
+    const applyHints = root => {
+        if (!root || !root.querySelectorAll) return;
+        root.querySelectorAll('img').forEach(img => {
+            if (!img.hasAttribute('loading')) img.setAttribute('loading', 'lazy');
+            if (!img.hasAttribute('decoding')) img.setAttribute('decoding', 'async');
+        });
+    };
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => applyHints(document), { once: true });
+    else applyHints(document);
+    if (typeof MutationObserver !== 'undefined' && document.documentElement) {
+        const observer = new MutationObserver(records => records.forEach(record => record.addedNodes.forEach(node => {
+            if (node.nodeType === 1) { if (node.tagName === 'IMG') { if (!node.hasAttribute('loading')) node.loading = 'lazy'; if (!node.hasAttribute('decoding')) node.decoding = 'async'; } applyHints(node); }
+        })));
+        observer.observe(document.documentElement, { childList: true, subtree: true });
+    }
+})();
 
 document.addEventListener('DOMContentLoaded', () => {
     state.products = load(K.products, []); state.orders = load(K.orders, []); state.expenses = load(K.expenses, []); state.settings = load(K.settings, state.settings);
@@ -1313,6 +1403,9 @@ document.addEventListener('DOMContentLoaded', () => {
             Promise.resolve(loadOrdersListener()).catch((error) => console.error('loadOrdersListener failed after auth change:', error));
         });
     }
+
+    // Support a direct admin entry URL (also used by the legacy admin.html redirect).
+    if (new URLSearchParams(window.location.search).get('admin') === '1') goScreen('screen-admin-login');
 });
 
 function renderPromoBanner() { 
@@ -2244,14 +2337,73 @@ function openProductModal(id = null) {
 }
 window.openProductModal = openProductModal;
 
-function handleImageUpload(event) {
-    const files = event.target.files; if (!files.length) return;
-    Array.from(files).forEach(file => {
+// Compress uploaded images in the browser before storing them in database JSON fields.
+// This keeps the original aspect ratio and avoids unnecessarily large base64 payloads.
+function optimizeImageFile(file, options = {}) {
+    const maxDimension = Number(options.maxDimension || 1200);
+    const maxBytes = Number(options.maxBytes || 480 * 1024);
+    const startQuality = Number(options.quality || 0.82);
+    return new Promise((resolve, reject) => {
+        if (!file || !file.type || !file.type.startsWith('image/')) return reject(new Error('not_image'));
+        if (file.size > 15 * 1024 * 1024) return reject(new Error('file_too_large'));
         const reader = new FileReader();
-        reader.onload = function(e) { const img = new Image(); img.onload = function() { const canvas = document.createElement('canvas'); const MAX_WIDTH = 800; let scale = 1; if (img.width > MAX_WIDTH) scale = MAX_WIDTH / img.width; canvas.width = img.width * scale; canvas.height = img.height * scale; const ctx = canvas.getContext('2d'); ctx.drawImage(img, 0, 0, canvas.width, canvas.height); tempUploadedImages.push(canvas.toDataURL('image/jpeg', 0.7)); renderImagePreviews(); }; img.src = e.target.result; };
+        reader.onerror = () => reject(new Error('read_failed'));
+        reader.onload = () => {
+            const image = new Image();
+            image.onerror = () => reject(new Error('decode_failed'));
+            image.onload = async () => {
+                try {
+                    const ratio = Math.min(1, maxDimension / Math.max(image.naturalWidth || image.width, image.naturalHeight || image.height));
+                    const canvas = document.createElement('canvas');
+                    canvas.width = Math.max(1, Math.round((image.naturalWidth || image.width) * ratio));
+                    canvas.height = Math.max(1, Math.round((image.naturalHeight || image.height) * ratio));
+                    const ctx = canvas.getContext('2d', { alpha: false });
+                    if (!ctx) return reject(new Error('canvas_unavailable'));
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+                    let quality = startQuality;
+                    let blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', quality));
+                    while (blob && blob.size > maxBytes && quality > 0.55) {
+                        quality = Math.max(0.55, quality - 0.07);
+                        blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', quality));
+                    }
+                    if (!blob) return reject(new Error('compress_failed'));
+                    const outputReader = new FileReader();
+                    outputReader.onerror = () => reject(new Error('encode_failed'));
+                    outputReader.onload = () => resolve(String(outputReader.result));
+                    outputReader.readAsDataURL(blob);
+                } catch (err) { reject(err); }
+            };
+            image.src = String(reader.result);
+        };
         reader.readAsDataURL(file);
     });
-    event.target.value = '';
+}
+window.optimizeImageFile = optimizeImageFile;
+
+async function handleImageUpload(event) {
+    const files = Array.from(event.target.files || []);
+    if (!files.length) return;
+    const input = event.target;
+    input.disabled = true;
+    try {
+        for (const file of files) {
+            try {
+                const optimized = await optimizeImageFile(file, { maxDimension: 1200, maxBytes: 480 * 1024, quality: 0.82 });
+                tempUploadedImages.push(optimized);
+                renderImagePreviews();
+            } catch (err) {
+                const message = err.message === 'file_too_large'
+                    ? (state.currentLang === 'fr' ? 'Image trop volumineuse (maximum 15 Mo).' : 'الصورة كبيرة جدًا؛ الحد الأقصى 15 ميغابايت.')
+                    : (state.currentLang === 'fr' ? 'Impossible de traiter une image sélectionnée.' : 'تعذّر معالجة إحدى الصور المختارة.');
+                toast(message, 'error');
+            }
+        }
+    } finally {
+        input.disabled = false;
+        input.value = '';
+    }
 }
 window.handleImageUpload = handleImageUpload;
 
@@ -2426,10 +2578,25 @@ async function saveNoestPrices() {
 }
 window.saveNoestPrices = saveNoestPrices;
 
-function handleAdImageUpload(event) {
-    const files = event.target.files; if (!files.length) return;
-    Array.from(files).forEach(file => { const reader = new FileReader(); reader.onload = function(e) { const img = new Image(); img.onload = function() { const canvas = document.createElement('canvas'); const MAX_WIDTH = 1000; let scale = 1; if (img.width > MAX_WIDTH) scale = MAX_WIDTH / img.width; canvas.width = img.width * scale; canvas.height = img.height * scale; canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height); tempAdImages.push(canvas.toDataURL('image/jpeg', 0.5)); renderAdPreviews(); }; img.src = e.target.result; }; reader.readAsDataURL(file); });
-    event.target.value = '';
+async function handleAdImageUpload(event) {
+    const files = Array.from(event.target.files || []);
+    if (!files.length) return;
+    const input = event.target;
+    input.disabled = true;
+    try {
+        for (const file of files) {
+            try {
+                const optimized = await optimizeImageFile(file, { maxDimension: 1400, maxBytes: 600 * 1024, quality: 0.80 });
+                tempAdImages.push(optimized);
+                renderAdPreviews();
+            } catch (_) {
+                toast(state.currentLang === 'fr' ? 'Impossible de traiter une image sélectionnée.' : 'تعذّر معالجة إحدى الصور المختارة.', 'error');
+            }
+        }
+    } finally {
+        input.disabled = false;
+        input.value = '';
+    }
 }
 window.handleAdImageUpload = handleAdImageUpload;
 
