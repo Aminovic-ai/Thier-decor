@@ -4,7 +4,25 @@ const K = { products: 'td_prod', orders: 'td_ord', expenses: 'td_exp', settings:
 const TD_ADMIN_API_URL = 'https://thier-decor-admin-api.amindrody.workers.dev/';
 const TD_ADMIN_UID = 'DNlHoogN8vMCsZN0hyIC6yPS64J2';
 
-async function callAdminWorker(action) {
+// Customer login is verified server-side so the public browser does not need SELECT access to customers.
+async function callCustomerLoginWorker(phone, password) {
+    const response = await fetch(TD_ADMIN_API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'customerLogin', phone: String(phone || '').trim(), password: String(password || '') }),
+        cache: 'no-store'
+    });
+    let result;
+    try { result = await response.json(); }
+    catch (_) { throw new Error(state.currentLang === 'fr' ? 'Réponse invalide du serveur.' : 'ردّ الخادم غير صالح.'); }
+    if (!response.ok || result?.success !== true || !result.customer) {
+        const message = result?.error || (state.currentLang === 'fr' ? 'Connexion impossible.' : 'تعذر تسجيل الدخول.');
+        throw new Error(message);
+    }
+    return result.customer;
+}
+
+async function callAdminWorker(action, payload = {}) {
     if (!window.firebaseReady || typeof firebase === 'undefined' || !firebase.auth) {
         throw new Error(state.currentLang === 'fr' ? 'La session Firebase administrateur est indisponible.' : 'جلسة Firebase الخاصة بالمسؤول غير متاحة.');
     }
@@ -16,7 +34,7 @@ async function callAdminWorker(action) {
     const response = await fetch(TD_ADMIN_API_URL, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${idToken}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action }),
+        body: JSON.stringify({ action, ...payload }),
         cache: 'no-store'
     });
     let result;
@@ -1793,39 +1811,17 @@ async function confirmCustomerAuth() {
     submitBtn.textContent = '...';
 
     try {
-        const hashedPass = CryptoJS.SHA256(pass).toString();
         let c = null;
         
-        // 1. جلب بيانات الزبون للتأكد من وجوده
-        if (window.supabaseClient) { 
-            const { data, error } = await window.supabaseClient.from('customers').select('*').eq('phone', phone).limit(1).maybeSingle(); 
-            if (error) throw new Error(error.message); 
-            if (data) c = data; 
-        }
-        
-        // 2. تسجيل الدخول
+        // 1. تسجيل الدخول: التحقق من كلمة المرور داخل الخادم، دون فتح SELECT العام على customers.
         if (currentAuthMode === 'login') {
-            if (!c) throw new Error('رقم الهاتف غير مسجل');
+            c = await callCustomerLoginWorker(phone, pass);
             if (c.isBlocked) throw new Error('🚫 عذراً، هذا الحساب محظور.');
-            const isOldPlain = c.password === pass; 
-            const isNewHashed = c.password === hashedPass;
-            
-            if (!isOldPlain && !isNewHashed) throw new Error(i18n[state.currentLang].wrong_pass);
-            
-            if (isOldPlain) { 
-                c.password = hashedPass; 
-                save(K.customers, state.customers); 
-                if (window.supabaseClient) await window.supabaseClient.from('customers').update({ password: hashedPass }).eq('id', c.id); 
-            }
             toast(`✅ ${i18n[state.currentLang].welcome_back} ${c.name}`);
-        } 
-        
-        // 3. إنشاء حساب جديد
+        }
+        // 2. إنشاء حساب جديد: لا نقرأ جدول customers من المتصفح؛ يعتمد منع التكرار على قيد UNIQUE في قاعدة البيانات.
         else {
-            if (c) { 
-                if (c.isBlocked) throw new Error('🚫 هذا الحساب محظور'); 
-                throw new Error('❌ رقم الهاتف هذا مسجل مسبقاً! يرجى تسجيل الدخول.'); 
-            }
+            const hashedPass = CryptoJS.SHA256(pass).toString();
             if (!name) throw new Error('أدخل الاسم'); 
             if (!recoveryPin) throw new Error('أدخل الرقم السري');
             
@@ -2081,27 +2077,58 @@ function addOrderStockDelta(target, item, multiplier) {
 }
 
 async function updateOrderStatus(id, status) {
-    const order=state.orders.find(x=>String(x.id)===String(id)); if(!order||!window.supabaseClient)return;
-    const previousStatus=order.status, nextStatus=normalizeOrderStatus(status); if(previousStatus===nextStatus)return;
-    const restored=[];
+    const order = state.orders.find(x => String(x.id) === String(id));
+    if (!order) return;
+
+    const previousStatus = normalizeOrderStatus(order.status);
+    const nextStatus = normalizeOrderStatus(status);
+    if (previousStatus === nextStatus) return;
+
+    const restored = [];
     try {
-        if(nextStatus==='cancelled' && previousStatus!=='cancelled') {
+        // When cancelling, restore stock first; if that fails, do not change order status.
+        if (nextStatus === 'cancelled' && previousStatus !== 'cancelled') {
+            if (!window.supabaseClient) throw new Error('اتصال قاعدة البيانات غير متاح');
             for (const [productId, qtyBack] of getOrderStockDeltas(order.items)) {
-                const prod=state.products.find(p=>String(p.id)===productId); if(!prod) throw new Error('Product missing while restoring stock: '+productId);
-                const oldQty=Number(prod.qty||0), nextQty=oldQty+qtyBack;
-                const {error}=await window.supabaseClient.from('products').update({qty:nextQty}).eq('id',prod.id); if(error)throw error;
-                restored.push({prod,oldQty,nextQty});
+                const prod = state.products.find(p => String(p.id) === String(productId));
+                if (!prod) throw new Error('Product missing while restoring stock: ' + productId);
+                const oldQty = Number(prod.qty || 0);
+                const nextQty = oldQty + qtyBack;
+                const { error } = await window.supabaseClient.from('products').update({ qty: nextQty }).eq('id', prod.id);
+                if (error) throw error;
+                restored.push({ prod, oldQty, nextQty });
             }
         }
-        const {error}=await window.supabaseClient.from('orders').update({status:nextStatus}).eq('id',id); if(error)throw error;
-        order.status=nextStatus; restored.forEach(x=>x.prod.qty=x.nextQty); save(K.orders,state.orders); save(K.products,state.products);
-        toast('✓ '+i18n[state.currentLang].updated);
-    } catch(error) {
-        for(const x of restored.reverse()) { try{await window.supabaseClient.from('products').update({qty:x.oldQty}).eq('id',x.prod.id);}catch(_){} }
-        order.status=previousStatus; save(K.orders,state.orders); save(K.products,state.products); console.error('Order status update failed:',error); toast((state.currentLang==='ar'?'تعذر تحديث الطلبية: ':'Impossible de mettre à jour : ')+(error.message||''),'error');
+
+        // All order-status writes go through the authenticated Cloudflare Worker.
+        const result = await callAdminWorker('updateOrderStatus', { id, status: nextStatus });
+        if (!result.order || String(result.order.id) !== String(id) || normalizeOrderStatus(result.order.status) !== nextStatus) {
+            throw new Error(state.currentLang === 'fr' ? 'Le statut enregistré n’a pas pu être vérifié.' : 'لم نتمكن من التحقق من حفظ حالة الطلبية.');
+        }
+
+        order.status = nextStatus;
+        restored.forEach(x => { x.prod.qty = x.nextQty; });
+        save(K.orders, state.orders);
+        save(K.products, state.products);
+        toast('✓ ' + i18n[state.currentLang].updated);
+    } catch (error) {
+        for (const x of restored.reverse()) {
+            try { await window.supabaseClient.from('products').update({ qty: x.oldQty }).eq('id', x.prod.id); } catch (_) {}
+        }
+        order.status = previousStatus;
+        save(K.orders, state.orders);
+        save(K.products, state.products);
+        console.error('Order status update failed:', error);
+        toast((state.currentLang === 'ar' ? 'تعذر تحديث الطلبية: ' : 'Impossible de mettre à jour : ') + (error.message || ''), 'error');
     }
-        if (typeof loadOrdersListener === 'function') loadOrdersListener();
-    renderAdminOrdersList(); renderAdminHome(); renderShop(); updateAdminBadges();
+
+    if (typeof loadOrdersListener === 'function') {
+        try { await loadOrdersListener({ forceWait: true }); } catch (refreshError) { console.error('Order refresh failed:', refreshError); }
+    }
+    renderAdminOrdersList();
+    renderAdminHome();
+    renderShop();
+    updateAdminBadges();
 }
 window.updateOrderStatus = updateOrderStatus;
 
