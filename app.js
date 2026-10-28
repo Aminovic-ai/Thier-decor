@@ -15,11 +15,26 @@ async function callCustomerLoginWorker(phone, password) {
     let result;
     try { result = await response.json(); }
     catch (_) { throw new Error(state.currentLang === 'fr' ? 'Réponse invalide du serveur.' : 'ردّ الخادم غير صالح.'); }
-    if (!response.ok || result?.success !== true || !result.customer) {
+    if (!response.ok || result?.success !== true || !result.customer || !result.token) {
         const message = result?.error || (state.currentLang === 'fr' ? 'Connexion impossible.' : 'تعذر تسجيل الدخول.');
         throw new Error(message);
     }
-    return result.customer;
+    return { customer: result.customer, token: result.token };
+}
+
+async function fetchCustomerDataViaWorker(token) {
+    if (!token) throw new Error(state.currentLang === 'fr' ? 'Session client expirée. Reconnectez-vous.' : 'انتهت جلسة الزبون، يرجى تسجيل الدخول مجدداً.');
+    const response = await fetch(TD_ADMIN_API_URL, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'customerData' }),
+        cache: 'no-store'
+    });
+    let result;
+    try { result = await response.json(); }
+    catch (_) { throw new Error(state.currentLang === 'fr' ? 'Réponse client invalide.' : 'ردّ خادم الزبون غير صالح.'); }
+    if (!response.ok || result?.success !== true) throw new Error(result?.error || (state.currentLang === 'fr' ? 'Impossible de charger vos données.' : 'تعذر جلب بياناتك.'));
+    return result;
 }
 
 async function callAdminWorker(action, payload = {}) {
@@ -1215,18 +1230,20 @@ async function loadOrdersListener(options = {}) {
         const currentFirebaseUser = Boolean(window.firebaseReady && typeof firebase !== 'undefined' && firebase.auth && firebase.auth().currentUser);
         const isFirebaseAdmin = currentFirebaseUser && firebase.auth().currentUser.uid === 'DNlHoogN8vMCsZN0hyIC6yPS64J2';
         if (state.session && state.session.role === 'customer' && !isFirebaseAdmin) {
-            const cust = state.customers.find(x => String(x.id) === String(state.session.id));
-            if (!cust || !cust.phone) {
+            // Customer-private orders/messages are fetched only through the signed-session Worker.
+            try {
+                const customerData = await fetchCustomerDataViaWorker(state.session.customerToken);
+                if (Array.isArray(customerData.orders)) { state.orders = customerData.orders; save(K.orders, customerData.orders); }
+                if (Array.isArray(customerData.messages)) { state.messages = customerData.messages; save(K.messages, customerData.messages); }
+            } catch (customerDataError) {
+                console.error('Customer Worker data read failed:', customerDataError.message || customerDataError);
+                // Do not query private Supabase tables directly from the customer browser.
                 state.orders = [];
-            } else {
-                query = query.eq('customerPhone', cust.phone);
-                const { data: orders, error: ordersError } = await query;
-                if (!ordersError && orders) { state.orders = orders; save(K.orders, orders); }
-                else if (ordersError) console.error('Customer orders read failed:', ordersError.message);
-                // Load only this customer's messages and product requests after refresh.
-                const { data: ownMessages, error: messagesError } = await window.supabaseClient.from('messages').select('*').eq('customerId', cust.id).order('id', { ascending: false });
-                if (!messagesError && ownMessages) { state.messages = ownMessages; save(K.messages, ownMessages); }
-                else if (messagesError) console.warn('Customer messages are unavailable under current database policies:', messagesError.message);
+                state.messages = [];
+            }
+            const cust = state.customers.find(x => String(x.id) === String(state.session.id));
+            if (cust && cust.phone) {
+                // Requests remain separate from the private orders/messages Worker endpoint.
                 const { data: ownRequests, error: requestsError } = await window.supabaseClient.from('requests').select('*').eq('customerPhone', cust.phone).order('id', { ascending: false });
                 if (!requestsError && ownRequests) { state.requests = ownRequests; save(K.requests, ownRequests); }
                 else if (requestsError) console.warn('Customer requests are unavailable under current database policies:', requestsError.message);
@@ -1815,7 +1832,9 @@ async function confirmCustomerAuth() {
         
         // 1. تسجيل الدخول: التحقق من كلمة المرور داخل الخادم، دون فتح SELECT العام على customers.
         if (currentAuthMode === 'login') {
-            c = await callCustomerLoginWorker(phone, pass);
+            const loginResult = await callCustomerLoginWorker(phone, pass);
+            c = loginResult.customer;
+            var customerSessionToken = loginResult.token;
             if (c.isBlocked) throw new Error('🚫 عذراً، هذا الحساب محظور.');
             toast(`✅ ${i18n[state.currentLang].welcome_back} ${c.name}`);
         }
@@ -1850,7 +1869,7 @@ async function confirmCustomerAuth() {
         }
         save(K.customers, state.customers); // حفظ في المتصفح
 
-        state.session = { id: c.id, role: 'customer' }; 
+        state.session = { id: c.id, role: 'customer', ...(typeof customerSessionToken === 'string' ? { customerToken: customerSessionToken } : {}) }; 
         save(K.session, state.session); 
         state.wishlist = c.wishlist || []; 
         save(K.wishlist, state.wishlist); 
