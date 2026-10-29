@@ -1983,12 +1983,28 @@ window.renderMyRequests = renderMyRequests;
 
 function openMessageModal() { document.getElementById('msg-text').value = ''; openModal('m-customer-message'); }
 async function submitCustomerMessage() {
-    const text = document.getElementById('msg-text').value.trim(); if (!text) return toast(i18n[state.currentLang].write_message_first, 'error');
+    const field = document.getElementById('msg-text');
+    const text = (field?.value || '').trim();
+    if (!text) return toast(i18n[state.currentLang].write_message_first, 'error');
+    if (!window.supabaseClient) return toast(state.currentLang === 'fr' ? 'Connexion indisponible : message non envoyé.' : 'الاتصال بقاعدة البيانات غير متاح؛ لم تُرسل الرسالة.', 'error');
     let name = '', phone = '';
-    if (state.session) { const cust = state.customers.find(x => x.id === state.session.id); name = cust ? cust.name : 'زبون'; phone = cust ? cust.phone : ''; } else { name = 'زائر'; phone = 'غير متوفر'; }
-    const msg = { id: Date.now(), customerId: state.session ? state.session.id : null, name: name, phone: phone, text: text, date: new Date().toISOString() };
-    state.messages.unshift(msg); save(K.messages, state.messages); if (window.supabaseClient) await window.supabaseClient.from('messages').insert([msg]);
-    closeModal('m-customer-message'); toast(`✅ ${i18n[state.currentLang].msg_sent_success}`);
+    if (state.session) {
+        const cust = state.customers.find(x => String(x.id) === String(state.session.id));
+        name = cust?.name || 'زبون'; phone = cust?.phone || '';
+    } else { name = 'زائر'; phone = 'غير متوفر'; }
+    const msg = { id: Date.now(), customerId: state.session ? state.session.id : null, name, phone, text, date: new Date().toISOString(), reply: null };
+    try {
+        const { data, error } = await window.supabaseClient.from('messages').insert([msg]).select();
+        if (error) throw error;
+        const saved = Array.isArray(data) && data[0] ? data[0] : msg;
+        state.messages = [saved, ...state.messages.filter(m => String(m.id) !== String(saved.id))];
+        save(K.messages, state.messages);
+        closeModal('m-customer-message');
+        toast('✅ ' + i18n[state.currentLang].msg_sent_success);
+    } catch (error) {
+        console.error('Customer message insert failed:', error);
+        toast((state.currentLang === 'fr' ? 'Message non envoyé : ' : 'لم تُرسل الرسالة: ') + (error.message || 'Database error'), 'error');
+    }
 }
 window.openMessageModal = openMessageModal; window.submitCustomerMessage = submitCustomerMessage;
 
@@ -2516,10 +2532,40 @@ function renderAdminMessages() {
 }
 window.renderAdminMessages = renderAdminMessages;
 
-async function replyToMessage(msgId) { const text = document.getElementById('reply-' + msgId).value.trim(); if (!text) return toast(i18n[state.currentLang].write_reply_first, 'error'); const msg = state.messages.find(m => m.id === msgId); if (msg) { msg.reply = text; msg.repliedAt = new Date().toISOString(); save(K.messages, state.messages); if (window.supabaseClient) await window.supabaseClient.from('messages').update({ reply: text, repliedAt: msg.repliedAt }).eq('id', msgId); renderAdminMessages(); toast('✅ ' + i18n[state.currentLang].reply_sent_success); } }
+async function replyToMessage(msgId) {
+    const field = document.getElementById('reply-' + msgId);
+    const text = (field?.value || '').trim();
+    if (!text) return toast(i18n[state.currentLang].write_reply_first, 'error');
+    if (!window.supabaseClient) return toast(state.currentLang === 'fr' ? 'Connexion indisponible : réponse non enregistrée.' : 'الاتصال بقاعدة البيانات غير متاح؛ لم يُحفظ الرد.', 'error');
+    const msg = state.messages.find(m => String(m.id) === String(msgId));
+    if (!msg) return toast(state.currentLang === 'fr' ? 'Message introuvable.' : 'الرسالة غير موجودة.', 'error');
+    const repliedAt = new Date().toISOString();
+    try {
+        const { data, error } = await window.supabaseClient.from('messages').update({ reply: text, repliedAt }).eq('id', msgId).select();
+        if (error) throw error;
+        if (!Array.isArray(data) || data.length === 0) throw new Error(state.currentLang === 'fr' ? 'Aucune ligne modifiée (vérifiez les droits RLS).' : 'لم يتم تعديل أي سجل (تحقق من صلاحيات RLS).');
+        msg.reply = text; msg.repliedAt = repliedAt; save(K.messages, state.messages);
+        renderAdminMessages(); toast('✅ ' + i18n[state.currentLang].reply_sent_success);
+    } catch (error) {
+        console.error('Admin message reply failed:', error);
+        toast((state.currentLang === 'fr' ? 'Réponse non enregistrée : ' : 'لم يُحفظ الرد: ') + (error.message || 'Database error'), 'error');
+    }
+}
 window.replyToMessage = replyToMessage;
 
-async function deleteMessage(id) { if (!confirm(i18n[state.currentLang].delete_message_confirm)) return; state.messages = state.messages.filter(m => m.id !== id); save(K.messages, state.messages); if (window.supabaseClient) await window.supabaseClient.from('messages').delete().eq('id', id); renderAdminMessages(); }
+async function deleteMessage(id) {
+    if (!confirm(i18n[state.currentLang].delete_message_confirm)) return;
+    if (!window.supabaseClient) return toast(state.currentLang === 'fr' ? 'Connexion indisponible.' : 'الاتصال بقاعدة البيانات غير متاح.', 'error');
+    try {
+        const { data, error } = await window.supabaseClient.from('messages').delete().eq('id', id).select();
+        if (error) throw error;
+        if (!Array.isArray(data) || data.length === 0) throw new Error(state.currentLang === 'fr' ? 'Aucune ligne supprimée (vérifiez les droits RLS).' : 'لم يُحذف أي سجل (تحقق من صلاحيات RLS).');
+        state.messages = state.messages.filter(m => String(m.id) !== String(id)); save(K.messages, state.messages); renderAdminMessages();
+    } catch (error) {
+        console.error('Admin message delete failed:', error);
+        toast((state.currentLang === 'fr' ? 'Suppression impossible : ' : 'تعذر حذف الرسالة: ') + (error.message || 'Database error'), 'error');
+    }
+}
 window.deleteMessage = deleteMessage;
 
 function renderAdminExpenses() {
@@ -2752,7 +2798,11 @@ window.deleteRequest = deleteRequest;
 async function notifyCustomerProductAvailable(req) {
     const msg = { id: Date.now(), customerId: null, name: req.customerName, phone: req.customerPhone, text: `🎉 ${req.productName}`, date: new Date().toISOString(), reply: null };
     const cust = state.customers.find(c => c.phone === req.customerPhone); if (cust) msg.customerId = cust.id;
-    state.messages.unshift(msg); save(K.messages, state.messages); if (window.supabaseClient) await window.supabaseClient.from('messages').insert([msg]);
+    if (!window.supabaseClient) throw new Error(state.currentLang === 'fr' ? 'Connexion indisponible.' : 'الاتصال بقاعدة البيانات غير متاح.');
+    const { data, error } = await window.supabaseClient.from('messages').insert([msg]).select();
+    if (error) throw error;
+    const saved = Array.isArray(data) && data[0] ? data[0] : msg;
+    state.messages = [saved, ...state.messages.filter(m => String(m.id) !== String(saved.id))]; save(K.messages, state.messages);
 }
 window.notifyCustomerProductAvailable = notifyCustomerProductAvailable;
 
