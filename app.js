@@ -89,7 +89,8 @@ function playNotificationSound() {
         if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
     } catch (e) {}
 }
-if ('Notification' in window) Notification.requestPermission();
+// Ask for notification permission only after the customer explicitly enables notifications.
+// Never trigger a browser permission prompt automatically on page load.
 
 const save = (key, val) => {
     try {
