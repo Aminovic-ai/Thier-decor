@@ -1945,14 +1945,9 @@ function renderMyOrders() {
     c.innerHTML = myOrders.map(o => {
         const status = statusMap[o.status] || statusMap['new']; const paid = o.paidAmount ?? o.total; const debt = o.total - paid;
         let debtHtml = ''; if (debt > 0) { debtHtml = `<div style="background: #fee2e2; border: 1px solid #ef4444; padding: 10px; border-radius: 8px; margin-top: 10px; display: flex; justify-content: space-between; align-items: center;"><span style="font-weight: bold; color: #b91c1c;"><i class="fas fa-exclamation-triangle"></i> ${i18n[state.currentLang].debt_alert}</span><span style="font-family: monospace; font-size: 1.1rem; font-weight: 900; color: #b91c1c;">${fmtMoney(debt)}</span></div>`; }
-        
-        // تمت إضافة كلاس btn-export هنا للحفاظ على اللون الأخضر
-        let confirmBtnHtml = ''; if (o.status === 'on_the_way' || o.status === 'out_for_delivery') { confirmBtnHtml = `<button onclick="customerConfirmReceipt(${o.id})" class="btn-primary btn-export" style="background:#10b981; margin-top:10px; width:100%; padding:10px;">${i18n[state.currentLang].confirm_receipt}</button>`; }
-        
+        let confirmBtnHtml = ''; if (o.status === 'on_the_way' || o.status === 'out_for_delivery') { confirmBtnHtml = `<button onclick="customerConfirmReceipt(${o.id})" class="btn-primary" style="background:#10b981; margin-top:10px; width:100%; padding:10px;">${i18n[state.currentLang].confirm_receipt}</button>`; }
         const itemsList = o.items.map(i => { const components = i.isPack && Array.isArray(i.packItems) && i.packItems.length ? `<div style="font-size:0.78rem; margin:2px 0 5px 10px; color:var(--text-mid);">${i.packItems.map(comp => `${esc(state.products.find(p => String(p.id) === String(comp.id))?.name || comp.name || 'Produit')} × ${Number(comp.qty)||0}`).join(' · ')}</div>` : ''; return `<div style="display:flex; justify-content:space-between; font-size:0.85rem; color:var(--text-mid); margin-bottom:4px;"><span>${esc(i.name)} (x${i.qty})</span><span>${fmtMoney(i.price * i.qty)}</span></div>${components}`; }).join('');
-        
-        // تمت إضافة كلاس btn-export هنا أيضاً لزر الطباعة
-        return `<div class="admin-card" style="flex-direction: column; align-items: stretch; gap: 12px; margin-bottom: 15px;"><div style="display:flex; justify-content: space-between; align-items: center;"><strong style="font-size: 1.1rem;">${i18n[state.currentLang].order_num} #${String(o.id).slice(-6)}</strong><span style="background:${status.bg}; color:${status.color}; padding: 6px 12px; border-radius: 20px; font-size: 0.85rem; font-weight: bold;">${status.text}</span></div>${o.trackingNumber ? `<div style="background: #e0f2fe; border: 1px solid #7dd3fc; padding: 12px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center;"><span style="font-weight: bold; color: #0369a1;"><i class="fas fa-truck"></i> ${i18n[state.currentLang].your_tracking_code}:</span><span style="font-family: monospace; font-size: 1.2rem; font-weight: 900; color: #0f172a;">${esc(o.trackingNumber)}</span></div>` : ''}<div style="background:var(--bg-light); padding:10px; border-radius:8px;">${itemsList}<div style="display:flex; justify-content:space-between; margin-top:8px; padding-top:8px; border-top:1px dashed var(--border); font-weight:bold;"><span>${i18n[state.currentLang].total_with_delivery}</span><span>${fmtMoney(o.total)}</span></div></div>${debtHtml}${confirmBtnHtml}<div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border); padding-top: 12px; flex-wrap: wrap; gap: 10px;"><small style="color: var(--text-mid);">${new Date(o.createdAt).toLocaleDateString()}</small><button onclick="printOrderInvoice(${o.id})" class="btn-primary btn-export" style="padding:10px 15px; width:auto; background:#6366f1;"><i class="fas fa-print"></i> ${i18n[state.currentLang].print_invoice}</button></div></div>`;
+        return `<div class="admin-card" style="flex-direction: column; align-items: stretch; gap: 12px; margin-bottom: 15px;"><div style="display:flex; justify-content: space-between; align-items: center;"><strong style="font-size: 1.1rem;">${i18n[state.currentLang].order_num} #${String(o.id).slice(-6)}</strong><span style="background:${status.bg}; color:${status.color}; padding: 6px 12px; border-radius: 20px; font-size: 0.85rem; font-weight: bold;">${status.text}</span></div>${o.trackingNumber ? `<div style="background: #e0f2fe; border: 1px solid #7dd3fc; padding: 12px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center;"><span style="font-weight: bold; color: #0369a1;"><i class="fas fa-truck"></i> ${i18n[state.currentLang].your_tracking_code}:</span><span style="font-family: monospace; font-size: 1.2rem; font-weight: 900; color: #0f172a;">${esc(o.trackingNumber)}</span></div>` : ''}<div style="background:var(--bg-light); padding:10px; border-radius:8px;">${itemsList}<div style="display:flex; justify-content:space-between; margin-top:8px; padding-top:8px; border-top:1px dashed var(--border); font-weight:bold;"><span>${i18n[state.currentLang].total_with_delivery}</span><span>${fmtMoney(o.total)}</span></div></div>${debtHtml}${confirmBtnHtml}<div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border); padding-top: 12px; flex-wrap: wrap; gap: 10px;"><small style="color: var(--text-mid);">${new Date(o.createdAt).toLocaleDateString()}</small><button onclick="printOrderInvoice(${o.id})" class="btn-primary" style="padding:10px 15px; width:auto; background:#6366f1;"><i class="fas fa-print"></i> ${i18n[state.currentLang].print_invoice}</button></div></div>`;
     }).join('');
 }
 window.renderMyOrders = renderMyOrders;
@@ -1988,28 +1983,12 @@ window.renderMyRequests = renderMyRequests;
 
 function openMessageModal() { document.getElementById('msg-text').value = ''; openModal('m-customer-message'); }
 async function submitCustomerMessage() {
-    const field = document.getElementById('msg-text');
-    const text = (field?.value || '').trim();
-    if (!text) return toast(i18n[state.currentLang].write_message_first, 'error');
-    if (!window.supabaseClient) return toast(state.currentLang === 'fr' ? 'Connexion indisponible : message non envoyé.' : 'الاتصال بقاعدة البيانات غير متاح؛ لم تُرسل الرسالة.', 'error');
+    const text = document.getElementById('msg-text').value.trim(); if (!text) return toast(i18n[state.currentLang].write_message_first, 'error');
     let name = '', phone = '';
-    if (state.session) {
-        const cust = state.customers.find(x => String(x.id) === String(state.session.id));
-        name = cust?.name || 'زبون'; phone = cust?.phone || '';
-    } else { name = 'زائر'; phone = 'غير متوفر'; }
-    const msg = { id: Date.now(), customerId: state.session ? state.session.id : null, name, phone, text, date: new Date().toISOString(), reply: null };
-    try {
-        const { data, error } = await window.supabaseClient.from('messages').insert([msg]).select();
-        if (error) throw error;
-        const saved = Array.isArray(data) && data[0] ? data[0] : msg;
-        state.messages = [saved, ...state.messages.filter(m => String(m.id) !== String(saved.id))];
-        save(K.messages, state.messages);
-        closeModal('m-customer-message');
-        toast('✅ ' + i18n[state.currentLang].msg_sent_success);
-    } catch (error) {
-        console.error('Customer message insert failed:', error);
-        toast((state.currentLang === 'fr' ? 'Message non envoyé : ' : 'لم تُرسل الرسالة: ') + (error.message || 'Database error'), 'error');
-    }
+    if (state.session) { const cust = state.customers.find(x => x.id === state.session.id); name = cust ? cust.name : 'زبون'; phone = cust ? cust.phone : ''; } else { name = 'زائر'; phone = 'غير متوفر'; }
+    const msg = { id: Date.now(), customerId: state.session ? state.session.id : null, name: name, phone: phone, text: text, date: new Date().toISOString() };
+    state.messages.unshift(msg); save(K.messages, state.messages); if (window.supabaseClient) await window.supabaseClient.from('messages').insert([msg]);
+    closeModal('m-customer-message'); toast(`✅ ${i18n[state.currentLang].msg_sent_success}`);
 }
 window.openMessageModal = openMessageModal; window.submitCustomerMessage = submitCustomerMessage;
 
@@ -2195,31 +2174,26 @@ window.deleteOrder = deleteOrder;
 
 function viewOrderDetails(orderId) {
     const order = state.orders.find(o => o.id === orderId); if (!order) return; const customer = state.customers.find(c => c.phone === order.customerPhone); const isVip = customer && customer.isVip;
-const itemsHtml = order.items.map(i => { const components = i.isPack && Array.isArray(i.packItems) && i.packItems.length ? `<div style="font-size:0.8rem;color:var(--text-mid);margin-top:4px;">${i.packItems.map(comp => `${esc(state.products.find(p => String(p.id) === String(comp.id))?.name || comp.name || 'Produit')} × ${Number(comp.qty)||0}`).join(' · ')}</div>` : ''; return `<div style="display:flex; justify-content:space-between; border-bottom:1px solid var(--border); padding:10px 0;"><div><strong>${esc(i.name)}</strong><br><small style="color:var(--text-mid);">${i.qty} × ${fmtMoney(i.price)}</small>${components}</div><div style="font-weight:900;">${fmtMoney(i.price * i.qty)}</div></div>`; }).join('');
-const paid = order.paidAmount ?? order.total; const debt = order.total - paid;
-
-// تمت إضافة btn-export لزر التوصيل المجاني وزر تعديل الطلب
-let actionButtons = `<div style="margin-top:20px; border-top:2px dashed var(--border); padding-top:15px;"><h4 style="margin-bottom:10px; color:var(--primary);">Actions</h4><button onclick="makeDeliveryFree(${order.id})" class="btn-secondary btn-export" style="margin-bottom:10px; background:#10b981; color:white;"><i class="fas fa-truck"></i> ${i18n[state.currentLang].free_delivery}</button><button onclick="openEditOrder(${order.id})" class="btn-secondary btn-export" style="margin-bottom:10px; background:#f59e0b; color:white;"><i class="fas fa-edit"></i> ${i18n[state.currentLang].edit_order}</button>`;
-
-const itemsOnly = order.itemsTotal ?? (order.total - (order.deliveryPrice || 0));
-actionButtons += `<div style="background:#f0fdf4; padding:10px; border-radius:8px; border:1px solid #86efac; margin-top:10px;">
-    <label style="font-weight:bold; color:#15803d; display:block; margin-bottom:5px;"><i class="fas fa-money-bill-wave"></i> تسجيل الدفع${isVip ? ' ⭐' : ''}</label>
-    <div style="display:flex; gap:5px; margin-bottom:10px; flex-wrap:wrap;">
-        <button type="button" onclick="document.getElementById('paid-amount-${order.id}').value=${order.total}; calcDebt(${order.id}, ${order.total})" style="flex:1; padding:6px; font-size:0.75rem; background:#d1fae5; color:#059669; border:1px solid #10b981; border-radius:6px; font-weight:bold;"><i class="fas fa-check-double"></i> دفع الكل (${fmtMoney(order.total)})</button>
-        <button type="button" onclick="document.getElementById('paid-amount-${order.id}').value=${itemsOnly}; calcDebt(${order.id}, ${order.total})" style="flex:1; padding:6px; font-size:0.75rem; background:#e0f2fe; color:#0284c7; border:1px solid #38bdf8; border-radius:6px; font-weight:bold;"><i class="fas fa-box-open"></i> دفع المنتجات فقط (${fmtMoney(itemsOnly)})</button>
-        <button type="button" onclick="document.getElementById('paid-amount-${order.id}').value=${order.deliveryPrice || 0}; calcDebt(${order.id}, ${order.total})" style="flex:1; padding:6px; font-size:0.75rem; background:#fef3c7; color:#b45309; border:1px solid #fcd34d; border-radius:6px; font-weight:bold;"><i class="fas fa-truck"></i> دفع التوصيل فقط (${fmtMoney(order.deliveryPrice || 0)})</button>
-    </div>
-    <div class="form-group"><label>${i18n[state.currentLang].paid_amount}</label><input type="number" id="paid-amount-${order.id}" value="${paid}" oninput="calcDebt(${order.id}, ${order.total})" style="padding:8px; border-radius:6px; border:1px solid #cbd5e1; width:100%;"></div>
-    <div style="display:flex; justify-content:space-between; font-weight:bold; margin-bottom:10px;"><span>${i18n[state.currentLang].remaining_debt}:</span><span id="debt-display-${order.id}" style="color:var(--danger);">${fmtMoney(debt)}</span></div>
+    const itemsHtml = order.items.map(i => { const components = i.isPack && Array.isArray(i.packItems) && i.packItems.length ? `<div style="font-size:0.8rem;color:var(--text-mid);margin-top:4px;">${i.packItems.map(comp => `${esc(state.products.find(p => String(p.id) === String(comp.id))?.name || comp.name || 'Produit')} × ${Number(comp.qty)||0}`).join(' · ')}</div>` : ''; return `<div style="display:flex; justify-content:space-between; border-bottom:1px solid var(--border); padding:10px 0;"><div><strong>${esc(i.name)}</strong><br><small style="color:var(--text-mid);">${i.qty} × ${fmtMoney(i.price)}</small>${components}</div><div style="font-weight:900;">${fmtMoney(i.price * i.qty)}</div></div>`; }).join('');
+    const paid = order.paidAmount ?? order.total; const debt = order.total - paid;
+    let actionButtons = `<div style="margin-top:20px; border-top:2px dashed var(--border); padding-top:15px;"><h4 style="margin-bottom:10px; color:var(--primary);">Actions</h4><button onclick="makeDeliveryFree(${order.id})" class="btn-secondary" style="margin-bottom:10px; background:#10b981; color:white;"><i class="fas fa-truck"></i> ${i18n[state.currentLang].free_delivery}</button><button onclick="openEditOrder(${order.id})" class="btn-secondary" style="margin-bottom:10px; background:#f59e0b; color:white;"><i class="fas fa-edit"></i> ${i18n[state.currentLang].edit_order}</button>`;
+    const itemsOnly = order.itemsTotal ?? (order.total - (order.deliveryPrice || 0));
+    actionButtons += `<div style="background:#f0fdf4; padding:10px; border-radius:8px; border:1px solid #86efac; margin-top:10px;">
+        <label style="font-weight:bold; color:#15803d; display:block; margin-bottom:5px;"><i class="fas fa-money-bill-wave"></i> تسجيل الدفع${isVip ? ' ⭐' : ''}</label>
+        <div style="display:flex; gap:5px; margin-bottom:10px; flex-wrap:wrap;">
+            <button type="button" onclick="document.getElementById('paid-amount-${order.id}').value=${order.total}; calcDebt(${order.id}, ${order.total})" style="flex:1; padding:6px; font-size:0.75rem; background:#d1fae5; color:#059669; border:1px solid #10b981; border-radius:6px; font-weight:bold;"><i class="fas fa-check-double"></i> دفع الكل (${fmtMoney(order.total)})</button>
+            <button type="button" onclick="document.getElementById('paid-amount-${order.id}').value=${itemsOnly}; calcDebt(${order.id}, ${order.total})" style="flex:1; padding:6px; font-size:0.75rem; background:#e0f2fe; color:#0284c7; border:1px solid #38bdf8; border-radius:6px; font-weight:bold;"><i class="fas fa-box-open"></i> دفع المنتجات فقط (${fmtMoney(itemsOnly)})</button>
+            <button type="button" onclick="document.getElementById('paid-amount-${order.id}').value=${order.deliveryPrice || 0}; calcDebt(${order.id}, ${order.total})" style="flex:1; padding:6px; font-size:0.75rem; background:#fef3c7; color:#b45309; border:1px solid #fcd34d; border-radius:6px; font-weight:bold;"><i class="fas fa-truck"></i> دفع التوصيل فقط (${fmtMoney(order.deliveryPrice || 0)})</button>
+        </div>
+        <div class="form-group"><label>${i18n[state.currentLang].paid_amount}</label><input type="number" id="paid-amount-${order.id}" value="${paid}" oninput="calcDebt(${order.id}, ${order.total})" style="padding:8px; border-radius:6px; border:1px solid #cbd5e1; width:100%;"></div>
+        <div style="display:flex; justify-content:space-between; font-weight:bold; margin-bottom:10px;"><span>${i18n[state.currentLang].remaining_debt}:</span><span id="debt-display-${order.id}" style="color:var(--danger);">${fmtMoney(debt)}</span></div>
+        <button onclick="saveOrderDebt(${order.id})" class="btn-primary" style="padding:8px; background:#10b981; width:100%;">${i18n[state.currentLang].save_debt}</button>
+    </div>`;
+    actionButtons += `</div>`;
     
-    <!-- تمت إضافة btn-export لزر حفظ الدين -->
-    <button onclick="saveOrderDebt(${order.id})" class="btn-primary btn-export" style="padding:8px; background:#10b981; width:100%;">${i18n[state.currentLang].save_debt}</button>
-</div>`;
-actionButtons += `</div>`;
-
-document.getElementById('order-details-body').innerHTML = `<div style="margin-bottom:15px; background:var(--primary-light); padding:15px; border-radius:8px; border:1px solid var(--border);"><p><strong>${i18n[state.currentLang].full_name}:</strong> ${esc(order.customerName)} ${isVip ? '⭐' : ''}</p><p><strong>${i18n[state.currentLang].phone}:</strong> <a href="tel:${esc(order.customerPhone)}" style="color:green; font-weight:bold;">${esc(order.customerPhone)}</a></p><p><strong>${i18n[state.currentLang].address}:</strong> ${esc(order.wilaya)} - ${esc(order.commune)} - ${esc(order.address)}</p><p><strong>${i18n[state.currentLang].delivery_cost}</strong> ${esc(order.courier)} - <span style="color:${order.deliveryType === 'stopdesk' ? '#b45309' : '#15803d'}; font-weight:bold;">${order.deliveryType === 'stopdesk' ? '🏢 مكتب (' + esc(order.stationName || 'غير محدد') + ')' : '🏠 المنزل'}</span></p>${order.promoCode || order.couponCode ? `<p><strong>كود البرومو:</strong> ${esc(order.promoCode || order.couponCode)} — <strong>التخفيض:</strong> ${Number(order.promoDiscountPercent || 0)}% (${fmtMoney(order.promoDiscountAmount ?? order.discount ?? 0)})</p>` : ''}</div><h4 style="margin-bottom:10px;">${i18n[state.currentLang].products_price}</h4><div style="margin-bottom:20px;">${itemsHtml}</div><div style="display:flex; justify-content:space-between; font-weight:bold; margin-bottom:8px;"><span>${i18n[state.currentLang].products_price}</span><span>${fmtMoney(order.itemsTotal)}</span></div>${(order.promoCode || order.couponCode || Number(order.discount || 0) > 0) ? `<div style="display:flex;justify-content:space-between;font-weight:bold;margin-bottom:8px;color:#059669"><span>تخفيض البرومو (${Number(order.promoDiscountPercent || 0)}%)</span><span>− ${fmtMoney(order.promoDiscountAmount ?? order.discount ?? 0)}</span></div>` : ''}<div style="display:flex; justify-content:space-between; font-weight:bold; margin-bottom:15px; color:var(--primary);"><span>${i18n[state.currentLang].delivery_cost}</span><span>${fmtMoney(order.deliveryPrice)}</span></div><div style="display:flex; justify-content:space-between; font-weight:900; font-size:1.3rem; border-top:2px solid var(--border); padding-top:15px;"><span>${i18n[state.currentLang].total_price}</span><span>${fmtMoney(order.total)}</span></div>${debt > 0 ? `<div style="display:flex; justify-content:space-between; font-weight:bold; font-size:1.1rem; margin-top:10px; color:var(--danger);"><span>${i18n[state.currentLang].remaining_debt}:</span><span>${fmtMoney(debt)}</span></div>` : ''}${actionButtons}`;
-
-openModal('m-order-details');
+    document.getElementById('order-details-body').innerHTML = `<div style="margin-bottom:15px; background:var(--primary-light); padding:15px; border-radius:8px; border:1px solid var(--border);"><p><strong>${i18n[state.currentLang].full_name}:</strong> ${esc(order.customerName)} ${isVip ? '⭐' : ''}</p><p><strong>${i18n[state.currentLang].phone}:</strong> <a href="tel:${esc(order.customerPhone)}" style="color:green; font-weight:bold;">${esc(order.customerPhone)}</a></p><p><strong>${i18n[state.currentLang].address}:</strong> ${esc(order.wilaya)} - ${esc(order.commune)} - ${esc(order.address)}</p><p><strong>${i18n[state.currentLang].delivery_cost}</strong> ${esc(order.courier)} - <span style="color:${order.deliveryType === 'stopdesk' ? '#b45309' : '#15803d'}; font-weight:bold;">${order.deliveryType === 'stopdesk' ? '🏢 مكتب (' + esc(order.stationName || 'غير محدد') + ')' : '🏠 المنزل'}</span></p>${order.promoCode || order.couponCode ? `<p><strong>كود البرومو:</strong> ${esc(order.promoCode || order.couponCode)} — <strong>التخفيض:</strong> ${Number(order.promoDiscountPercent || 0)}% (${fmtMoney(order.promoDiscountAmount ?? order.discount ?? 0)})</p>` : ''}</div><h4 style="margin-bottom:10px;">${i18n[state.currentLang].products_price}</h4><div style="margin-bottom:20px;">${itemsHtml}</div><div style="display:flex; justify-content:space-between; font-weight:bold; margin-bottom:8px;"><span>${i18n[state.currentLang].products_price}</span><span>${fmtMoney(order.itemsTotal)}</span></div>${(order.promoCode || order.couponCode || Number(order.discount || 0) > 0) ? `<div style="display:flex;justify-content:space-between;font-weight:bold;margin-bottom:8px;color:#059669"><span>تخفيض البرومو (${Number(order.promoDiscountPercent || 0)}%)</span><span>− ${fmtMoney(order.promoDiscountAmount ?? order.discount ?? 0)}</span></div>` : ''}<div style="display:flex; justify-content:space-between; font-weight:bold; margin-bottom:15px; color:var(--primary);"><span>${i18n[state.currentLang].delivery_cost}</span><span>${fmtMoney(order.deliveryPrice)}</span></div><div style="display:flex; justify-content:space-between; font-weight:900; font-size:1.3rem; border-top:2px solid var(--border); padding-top:15px;"><span>${i18n[state.currentLang].total_price}</span><span>${fmtMoney(order.total)}</span></div>${debt > 0 ? `<div style="display:flex; justify-content:space-between; font-weight:bold; font-size:1.1rem; margin-top:10px; color:var(--danger);"><span>${i18n[state.currentLang].remaining_debt}:</span><span>${fmtMoney(debt)}</span></div>` : ''}${actionButtons}`;
+    
+    openModal('m-order-details');
                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     }
 window.viewOrderDetails = viewOrderDetails;
 
@@ -2542,40 +2516,10 @@ function renderAdminMessages() {
 }
 window.renderAdminMessages = renderAdminMessages;
 
-async function replyToMessage(msgId) {
-    const field = document.getElementById('reply-' + msgId);
-    const text = (field?.value || '').trim();
-    if (!text) return toast(i18n[state.currentLang].write_reply_first, 'error');
-    if (!window.supabaseClient) return toast(state.currentLang === 'fr' ? 'Connexion indisponible : réponse non enregistrée.' : 'الاتصال بقاعدة البيانات غير متاح؛ لم يُحفظ الرد.', 'error');
-    const msg = state.messages.find(m => String(m.id) === String(msgId));
-    if (!msg) return toast(state.currentLang === 'fr' ? 'Message introuvable.' : 'الرسالة غير موجودة.', 'error');
-    const repliedAt = new Date().toISOString();
-    try {
-        const { data, error } = await window.supabaseClient.from('messages').update({ reply: text, repliedAt }).eq('id', msgId).select();
-        if (error) throw error;
-        if (!Array.isArray(data) || data.length === 0) throw new Error(state.currentLang === 'fr' ? 'Aucune ligne modifiée (vérifiez les droits RLS).' : 'لم يتم تعديل أي سجل (تحقق من صلاحيات RLS).');
-        msg.reply = text; msg.repliedAt = repliedAt; save(K.messages, state.messages);
-        renderAdminMessages(); toast('✅ ' + i18n[state.currentLang].reply_sent_success);
-    } catch (error) {
-        console.error('Admin message reply failed:', error);
-        toast((state.currentLang === 'fr' ? 'Réponse non enregistrée : ' : 'لم يُحفظ الرد: ') + (error.message || 'Database error'), 'error');
-    }
-}
+async function replyToMessage(msgId) { const text = document.getElementById('reply-' + msgId).value.trim(); if (!text) return toast(i18n[state.currentLang].write_reply_first, 'error'); const msg = state.messages.find(m => m.id === msgId); if (msg) { msg.reply = text; msg.repliedAt = new Date().toISOString(); save(K.messages, state.messages); if (window.supabaseClient) await window.supabaseClient.from('messages').update({ reply: text, repliedAt: msg.repliedAt }).eq('id', msgId); renderAdminMessages(); toast('✅ ' + i18n[state.currentLang].reply_sent_success); } }
 window.replyToMessage = replyToMessage;
 
-async function deleteMessage(id) {
-    if (!confirm(i18n[state.currentLang].delete_message_confirm)) return;
-    if (!window.supabaseClient) return toast(state.currentLang === 'fr' ? 'Connexion indisponible.' : 'الاتصال بقاعدة البيانات غير متاح.', 'error');
-    try {
-        const { data, error } = await window.supabaseClient.from('messages').delete().eq('id', id).select();
-        if (error) throw error;
-        if (!Array.isArray(data) || data.length === 0) throw new Error(state.currentLang === 'fr' ? 'Aucune ligne supprimée (vérifiez les droits RLS).' : 'لم يُحذف أي سجل (تحقق من صلاحيات RLS).');
-        state.messages = state.messages.filter(m => String(m.id) !== String(id)); save(K.messages, state.messages); renderAdminMessages();
-    } catch (error) {
-        console.error('Admin message delete failed:', error);
-        toast((state.currentLang === 'fr' ? 'Suppression impossible : ' : 'تعذر حذف الرسالة: ') + (error.message || 'Database error'), 'error');
-    }
-}
+async function deleteMessage(id) { if (!confirm(i18n[state.currentLang].delete_message_confirm)) return; state.messages = state.messages.filter(m => m.id !== id); save(K.messages, state.messages); if (window.supabaseClient) await window.supabaseClient.from('messages').delete().eq('id', id); renderAdminMessages(); }
 window.deleteMessage = deleteMessage;
 
 function renderAdminExpenses() {
@@ -2808,11 +2752,7 @@ window.deleteRequest = deleteRequest;
 async function notifyCustomerProductAvailable(req) {
     const msg = { id: Date.now(), customerId: null, name: req.customerName, phone: req.customerPhone, text: `🎉 ${req.productName}`, date: new Date().toISOString(), reply: null };
     const cust = state.customers.find(c => c.phone === req.customerPhone); if (cust) msg.customerId = cust.id;
-    if (!window.supabaseClient) throw new Error(state.currentLang === 'fr' ? 'Connexion indisponible.' : 'الاتصال بقاعدة البيانات غير متاح.');
-    const { data, error } = await window.supabaseClient.from('messages').insert([msg]).select();
-    if (error) throw error;
-    const saved = Array.isArray(data) && data[0] ? data[0] : msg;
-    state.messages = [saved, ...state.messages.filter(m => String(m.id) !== String(saved.id))]; save(K.messages, state.messages);
+    state.messages.unshift(msg); save(K.messages, state.messages); if (window.supabaseClient) await window.supabaseClient.from('messages').insert([msg]);
 }
 window.notifyCustomerProductAvailable = notifyCustomerProductAvailable;
 

@@ -11,7 +11,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&family=Tajawal:wght@400;700;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="style.css">
-    <link rel="stylesheet" href="custom.css?v=41">
+    <link rel="stylesheet" href="custom.css?v=39">
 </head>
 <body>
     <div class="screen active" id="screen-shop">
@@ -160,8 +160,8 @@
                         <div class="stat-card"><span data-i18n="visits_total">إجمالي الزيارات</span><h3 id="td-stat-visits-total">—</h3></div>
                     </div>
                     <div style="margin-top:20px; display:flex; gap:10px; flex-wrap:wrap;">
-                        <button class="btn-primary btn-export" onclick="exportCSV('orders')" style="background:#10b981; width:auto;"><i class="fas fa-file-excel"></i> <span data-i18n="export_orders">تصدير الطلبات</span></button>
-                        <button class="btn-primary btn-export" onclick="exportCSV('customers')" style="background:#10b981; width:auto;"><i class="fas fa-file-excel"></i> <span data-i18n="export_customers">تصدير الزبائن</span></button>
+                        <button class="btn-primary" onclick="exportCSV('orders')" style="background:#10b981; width:auto;"><i class="fas fa-file-excel"></i> <span data-i18n="export_orders">تصدير الطلبات</span></button>
+                        <button class="btn-primary" onclick="exportCSV('customers')" style="background:#10b981; width:auto;"><i class="fas fa-file-excel"></i> <span data-i18n="export_customers">تصدير الزبائن</span></button>
                     </div>
                 </section>
                 <section class="admin-section" id="sec-analytics" style="display:none;"><div class="section-header"><h2 data-i18n="store_analytics">إحصائيات المتجر</h2><button class="btn-primary" onclick="refreshStoreAnalytics()" style="width:auto;"><i class="fas fa-sync"></i> <span data-i18n="refresh">تحديث</span></button></div><div id="td-analytics-detail" class="stats-grid"></div><p id="td-analytics-note" style="font-size:.85rem;color:var(--text-mid);margin-top:14px;"></p></section>
@@ -175,8 +175,8 @@
                         <button type="button" class="filter-btn" onclick="filterAdminOrders('cancelled', this)" data-i18n="cancelled">ملغاة</button>
                     </div>
                     <div style="margin-bottom:15px; display:flex; gap:10px; flex-wrap:wrap;">
-                        <button class="btn-primary btn-export" onclick="printLabels()" style="background:#6366f1; width:auto;"><i class="fas fa-print"></i> <span data-i18n="print_labels">طباعة بوالص الشحن</span></button>
-                        <button class="btn-primary btn-export" onclick="openExportModal()" style="background:#10b981; width:auto;"><i class="fas fa-file-excel"></i> <span data-i18n="export_noest">تصدير طلبيات Noest (CSV)</span></button>
+                        <button class="btn-primary" onclick="printLabels()" style="background:#6366f1; width:auto;"><i class="fas fa-print"></i> <span data-i18n="print_labels">طباعة بوالص الشحن</span></button>
+                        <button class="btn-primary" onclick="openExportModal()" style="background:#10b981; width:auto;"><i class="fas fa-file-excel"></i> <span data-i18n="export_noest">تصدير طلبيات Noest (CSV)</span></button>
                     </div>
                     <div id="a-orders-list" class="admin-grid-list"></div>
                 </section>
@@ -300,7 +300,7 @@
                 </table>
             </div>
             <div style="padding:15px; border-top:1px solid var(--border); display:flex; gap:10px; justify-content:flex-end;">
-                <button class="btn-primary btn-export" onclick="downloadExportFile()" style="background:#10b981; width:auto;"><i class="fas fa-file-excel"></i> <span data-i18n="download_excel">تحميل ملف CSV</span></button>
+                <button class="btn-primary" onclick="downloadExportFile()" style="background:#10b981; width:auto;"><i class="fas fa-file-excel"></i> <span data-i18n="download_excel">تحميل ملف CSV</span></button>
                 <button onclick="closeModal('m-export-orders')" class="btn-secondary" style="width:auto;" data-i18n="cancel">إلغاء</button>
             </div>
         </div>
@@ -354,7 +354,7 @@
                     <div class="summary-total"><span data-i18n="total_price">المجموع:</span><span id="chk-total-price">0</span></div>
                 </div>
                 <button class="btn-primary" onclick="confirmShopOrder()" style="padding: 15px; font-size: 1.1rem; border-radius: 10px; width:100%;" data-i18n="confirm_order">تأكيد الطلب</button>
-                <button class="btn-primary btn-export" onclick="callStore()" style="padding: 15px; font-size: 1.1rem; border-radius: 10px; width:100%; margin-top:10px; background:#10b981;"><i class="fas fa-phone-alt"></i> <span data-i18n="call_us">اتصل بنا للطلب</span></button>
+                <button class="btn-primary" onclick="callStore()" style="padding: 15px; font-size: 1.1rem; border-radius: 10px; width:100%; margin-top:10px; background:#10b981;"><i class="fas fa-phone-alt"></i> <span data-i18n="call_us">اتصل بنا للطلب</span></button>
             </div>
         </div>
     </div>

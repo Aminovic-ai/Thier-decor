@@ -114,151 +114,62 @@ img { max-width: 100%; }
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }
 
-/* v35: polished, colorful-but-soft buttons and icon controls */
-:root {
-  --td-blue-50:#f0f9ff; --td-blue-100:#e0f2fe; --td-blue-200:#bae6fd;
-  --td-blue-600:#0284c7; --td-blue-700:#0369a1;
-  --td-green-50:#ecfdf5; --td-green-100:#d1fae5; --td-green-700:#047857;
-  --td-violet-50:#f5f3ff; --td-violet-100:#ede9fe; --td-violet-700:#6d28d9;
-  --td-orange-50:#fff7ed; --td-orange-100:#ffedd5; --td-orange-700:#c2410c;
-  --td-pink-50:#fdf2f8; --td-pink-100:#fce7f3; --td-pink-700:#be185d;
-}
-button, .btn-primary, .btn-secondary, .btn-danger, .btn-icon, .action-btn, .product-mini-action,
-#screen-admin .admin-store-button, #screen-admin .admin-logout-button {
-  border-radius: 12px; font-weight: 750; letter-spacing: .01em;
-  transition: transform .18s ease, box-shadow .18s ease, background-color .18s ease, border-color .18s ease, filter .18s ease;
-}
-button:not(:disabled):hover, .btn-primary:not(:disabled):hover, .btn-secondary:not(:disabled):hover,
-.btn-danger:not(:disabled):hover, .btn-icon:not(:disabled):hover, .action-btn:not(:disabled):hover {
-  transform: translateY(-1px); box-shadow: 0 6px 15px rgba(34, 112, 160, .12);
-}
-button:active, .btn-primary:active, .btn-secondary:active, .btn-danger:active, .btn-icon:active { transform: translateY(0) scale(.985); }
-button:disabled { opacity:.58; cursor:not-allowed; transform:none; box-shadow:none; }
-.btn-primary, .cart-btn { background:linear-gradient(135deg,#38bdf8,#0284c7); border:1px solid #38bdf8; color:#fff; box-shadow:0 4px 10px rgba(2,132,199,.15); }
-.btn-secondary { background:var(--td-blue-50); color:var(--td-blue-700); border:1px solid var(--td-blue-200); }
-.btn-danger { background:var(--td-pink-50); color:var(--td-pink-700); border:1px solid #fbcfe8; }
-.btn-success, .btn-confirm, .confirm-btn { background:var(--td-green-50); color:var(--td-green-700); border:1px solid #a7f3d0; }
-.btn-warning, .promo-admin-button { background:var(--td-orange-50); color:var(--td-orange-700); border:1px solid #fed7aa; }
-.btn-icon, .action-btn, .product-mini-action { background:#f0f9ff; color:#2876a0; border:1px solid #d7edf9; min-width:38px; min-height:38px; display:inline-flex; align-items:center; justify-content:center; gap:7px; }
-.product-mini-action:hover, .action-btn:hover, .btn-icon:hover { background:#e0f2fe; border-color:#bae6fd; }
-.product-mini-wishlist, .wishlist-btn, [aria-label*="favorite" i], [title*="favorite" i] { background:var(--td-pink-50); color:var(--td-pink-700); border-color:#fbcfe8; }
-.admin-nav a { transition:background-color .18s ease, color .18s ease, transform .18s ease; }
-.admin-nav a:hover { transform:translateX(-2px); }
-.admin-nav a i, .admin-nav a svg { color:#38a3d9; }
-.admin-card-actions { gap:8px; flex-wrap:wrap; }
-.admin-card-actions button { min-height:38px; }
-.modal-content { border:1px solid #dcecf7; box-shadow:0 20px 60px rgba(24,86,125,.16); }
-.toast { border-radius:12px; }
-@media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition:none !important; scroll-behavior:auto !important; } }
 /* =======================================================
-   Thier Décor — تحديث الأزرار والأيقونات (v41 - نهائي)
+   تحديث احترافي: أزرار وأيقونات بألوان ناعمة (v39)
+   متوافق مع RTL/LTR ويحافظ على ألوان الأزرار المخصصة.
    ======================================================= */
-
-/* 1. الإعدادات العامة */
-button, .btn-primary, .btn-secondary, .btn-danger, .btn-icon, .action-btn, .product-mini-action, .cart-btn {
-    box-sizing: border-box;
+button, .btn-primary, .btn-secondary, .btn-danger, .btn-icon,
+.action-btn, .product-mini-action, .cart-btn {
     border-radius: 10px !important;
     font-weight: 700 !important;
     font-family: 'Cairo', 'Tajawal', sans-serif !important;
-    transition: all 0.2s ease !important;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.02);
+    transition: background-color .2s ease, color .2s ease, border-color .2s ease,
+                box-shadow .2s ease, transform .2s ease !important;
+    border: 1px solid transparent !important;
+    box-shadow: 0 2px 5px rgba(0,0,0,.02) !important;
 }
-
-/* 2. الأزرار الأساسية (مع استثناء الأزرار ذات الألوان المخصصة) */
-.btn-primary:not(.btn-export):not(.btn-success):not(.btn-danger):not(.btn-warning),
-.cart-btn:not(.btn-export) {
+.btn-primary:not([style*="background"]),
+.cart-btn:not([style*="background"]) {
     background-color: #e0f2fe !important;
     color: #0369a1 !important;
-    border: 1px solid #bae6fd !important;
+    border-color: #bae6fd !important;
 }
-.btn-primary:not(.btn-export):not(.btn-success):not(.btn-danger):not(.btn-warning) i,
-.cart-btn:not(.btn-export) i {
-    color: #0284c7 !important;
-}
-.btn-primary:not(.btn-export):not(.btn-success):not(.btn-danger):not(.btn-warning):hover,
-.cart-btn:not(.btn-export):hover {
+.btn-primary:not([style*="background"]) i,
+.cart-btn:not([style*="background"]) i { color: #0284c7 !important; }
+.btn-primary:not([style*="background"]):hover,
+.cart-btn:not([style*="background"]):hover {
     background-color: #bae6fd !important;
     color: #075985 !important;
+    transform: translateY(-1px);
 }
-
-/* 3. الأزرار الثانوية (مع استثناء الأزرار الملونة) */
-.action-btn:not(.btn-export), .btn-icon:not(.btn-export), 
-.btn-secondary:not(.btn-export), .product-mini-action:not(.btn-export) {
+/* Keep explicit inline background colors (e.g. export/print) intact. */
+.btn-primary[style*="background"] { color: #fff !important; border-color: transparent !important; }
+.btn-primary[style*="background"] i { color: #fff !important; }
+.action-btn, .btn-icon, .btn-secondary, .product-mini-action {
     background-color: #f8fafc !important;
     color: #334155 !important;
-    border: 1px solid #e2e8f0 !important;
+    border-color: #e2e8f0 !important;
 }
-.action-btn:not(.btn-export) i, .btn-icon:not(.btn-export) i, 
-.btn-secondary:not(.btn-export) i, .product-mini-action:not(.btn-export) i {
-    color: #64748b !important;
-}
-.action-btn:not(.btn-export):hover, .btn-icon:not(.btn-export):hover, 
-.btn-secondary:not(.btn-export):hover, .product-mini-action:not(.btn-export):hover {
+.action-btn i, .btn-icon i, .btn-secondary i, .product-mini-action i { color: #64748b !important; }
+.action-btn:hover, .btn-icon:hover, .btn-secondary:hover, .product-mini-action:hover {
     background-color: #f1f5f9 !important;
     color: #0f172a !important;
 }
-
-/* 4. حماية الأزرار المخصصة (التي تحمل كلاس btn-export) */
-.btn-export {
-    color: #ffffff !important;
-    border-color: transparent !important;
-}
-.btn-export i {
-    color: #ffffff !important;
-}
-
-/* 5. أزرار الحذف */
-.btn-danger {
-    background-color: #fef2f2 !important;
-    color: #b91c1c !important;
-    border: 1px solid #fecaca !important;
-}
-.btn-danger i { color: #dc2626 !important; }
+.btn-danger { background-color: #fef2f2 !important; color: #b91c1c !important; border-color: #fecaca !important; }
+.btn-danger i { color: #ef4444 !important; }
 .btn-danger:hover { background-color: #fee2e2 !important; }
-
-/* 6. أزرار النجاح */
-.btn-success, .confirm-btn {
-    background-color: #f0fdf4 !important;
-    color: #166534 !important;
-    border: 1px solid #bbf7d0 !important;
-}
-
-/* 7. أزرار العروض */
-.promo-admin-button {
-    background-color: #fffbeb !important;
-    color: #92400e !important;
-    border: 1px solid #fde68a !important;
-}
-
-/* 8. أزرار الخروج */
 #btn-logout-header, .admin-logout-button {
-    background-color: #f1f5f9 !important;
-    color: #475569 !important;
-    border: 1px solid #cbd5e1 !important;
+    background-color: #f1f5f9 !important; color: #475569 !important; border-color: #cbd5e1 !important;
 }
 #btn-logout-header i, .admin-logout-button i { color: #64748b !important; }
-#btn-logout-header:hover, .admin-logout-button:hover {
-    background-color: #e2e8f0 !important;
-    color: #1e293b !important;
+#btn-logout-header:hover, .admin-logout-button:hover { background-color: #e2e8f0 !important; color: #1e293b !important; }
+.admin-nav a.active { background-color: #e0f2fe !important; color: #0369a1 !important; border-right: 3px solid #38bdf8 !important; border-left: none !important; }
+html[dir="ltr"] .admin-nav a.active { border-left: 3px solid #38bdf8 !important; border-right: none !important; }
+.admin-nav a i { color: #38bdf8 !important; }
+button:focus-visible, .btn-primary:focus-visible, .btn-danger:focus-visible,
+.btn-icon:focus-visible, .action-btn:focus-visible {
+    outline: 3px solid #0ea5e9 !important; outline-offset: 2px !important;
+    box-shadow: 0 0 0 4px rgba(14,165,233,.2) !important;
 }
+button:disabled, button[disabled] { cursor: not-allowed !important; opacity: .58; transform: none !important; }
 
-/* 9. القائمة الجانبية (تدعم RTL و LTR) */
-.admin-nav a.active {
-    background-color: #e0f2fe !important;
-    color: #0369a1 !important;
-    border-inline-start: 3px solid #38bdf8 !important;
-}
-.admin-nav a i { color: #0284c7 !important; }
-
-/* 10. المفضلة والسلة المصغرة */
-.product-mini-action.is-favorite {
-    background-color: #fdf2f8 !important;
-    border-color: #fbcfe8 !important;
-}
-.product-mini-action.is-favorite i { color: #be185d !important; }
-
-/* 11. التركيز وإمكانية الوصول */
-button:focus-visible, .btn-primary:focus-visible, .btn-secondary:focus-visible, .btn-danger:focus-visible {
-    outline: 3px solid #0284c7 !important;
-    outline-offset: 2px !important;
-}
