@@ -160,8 +160,8 @@
                         <div class="stat-card"><span data-i18n="visits_total">إجمالي الزيارات</span><h3 id="td-stat-visits-total">—</h3></div>
                     </div>
                     <div style="margin-top:20px; display:flex; gap:10px; flex-wrap:wrap;">
-                        <button class="btn-primary" onclick="exportCSV('orders')" style="background:#10b981; width:auto;"><i class="fas fa-file-excel"></i> <span data-i18n="export_orders">تصدير الطلبات</span></button>
-                        <button class="btn-primary" onclick="exportCSV('customers')" style="background:#10b981; width:auto;"><i class="fas fa-file-excel"></i> <span data-i18n="export_customers">تصدير الزبائن</span></button>
+                        <button class="btn-primary btn export" onclick="exportCSV('orders')" style="background:#10b981; width:auto;"><i class="fas fa-file-excel"></i> <span data-i18n="export_orders">تصدير الطلبات</span></button>
+                        <button class="btn-primary btn export" onclick="exportCSV('customers')" style="background:#10b981; width:auto;"><i class="fas fa-file-excel"></i> <span data-i18n="export_customers">تصدير الزبائن</span></button>
                     </div>
                 </section>
                 <section class="admin-section" id="sec-analytics" style="display:none;"><div class="section-header"><h2 data-i18n="store_analytics">إحصائيات المتجر</h2><button class="btn-primary" onclick="refreshStoreAnalytics()" style="width:auto;"><i class="fas fa-sync"></i> <span data-i18n="refresh">تحديث</span></button></div><div id="td-analytics-detail" class="stats-grid"></div><p id="td-analytics-note" style="font-size:.85rem;color:var(--text-mid);margin-top:14px;"></p></section>
