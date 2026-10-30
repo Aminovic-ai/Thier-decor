@@ -1928,8 +1928,25 @@ async function updateCustomerProfile() {
         if (ordersCheckError) return toast(state.currentLang === 'fr' ? 'Impossible de vérifier les anciennes commandes. Le téléphone n’a pas été modifié.' : 'تعذر التحقق من الطلبيات القديمة. لم يتم تغيير الهاتف.', 'error');
         if (priorOrders && priorOrders.length) return toast(state.currentLang === 'fr' ? 'Le téléphone ne peut pas être modifié après une commande. Contactez le magasin.' : 'لا يمكن تغيير الهاتف بعد وجود طلبيات سابقة. اتصل بالمتجر للمساعدة.', 'error');
     }
-    const { error } = await window.supabaseClient.from('customers').update(payload).eq('id', c.id);
-    if (error) { console.error('Customer profile update failed:', error); return toast('❌ ' + error.message, 'error'); }
+    const { data: updatedCustomer, error } = await window.supabaseClient
+        .from('customers')
+        .update(payload)
+        .eq('id', c.id)
+        .select('id, name, phone, address')
+        .maybeSingle();
+    if (error) {
+        console.error('Customer profile update failed:', error);
+        return toast(state.currentLang === 'fr'
+            ? 'Enregistrement impossible. Vérifiez les autorisations du serveur.'
+            : 'تعذر حفظ البيانات. تحقق من صلاحيات الخادم ثم أعد المحاولة.', 'error');
+    }
+    // PostgREST may return no error but update zero rows when RLS blocks the write.
+    // Never report success or update the local profile unless the server confirms a row.
+    if (!updatedCustomer) {
+        return toast(state.currentLang === 'fr'
+            ? 'Aucune modification confirmée par le serveur. Réessayez ou contactez le magasin.'
+            : 'لم يؤكد الخادم حفظ أي تغيير. أعد المحاولة أو تواصل مع المتجر.', 'error');
+    }
     Object.assign(c, payload); save(K.customers, state.customers);
     toast('✅ ' + i18n[state.currentLang].saved); setTimeout(() => { shopGo('shop'); }, 1000);
 }
