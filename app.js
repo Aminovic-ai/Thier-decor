@@ -2331,7 +2331,24 @@ window.toggleCustomerTop = toggleCustomerTop;
 async function toggleCustomerBlock(id) { const c = state.customers.find(x => x.id === id); if (!c) return; c.isBlocked = !c.isBlocked; save(K.customers, state.customers); if (window.supabaseClient) { try { await window.supabaseClient.from('customers').update({ isBlocked: c.isBlocked }).eq('id', id); } catch (e) { toast('❌ ' + i18n[state.currentLang].save_failed, 'error'); return; } } if (c.isBlocked && state.session && state.session.id === id) { setTimeout(() => { logoutCustomer(); toast('🚫', 'error'); }, 500); } renderAdminCustomers(document.getElementById('admin-customer-search')?.value); toast(c.isBlocked ? '🚫' : '✅'); }
 window.toggleCustomerBlock = toggleCustomerBlock;
 
-async function deleteCustomer(id) { if (!confirm(i18n[state.currentLang].delete_customer_confirm)) return; state.customers = state.customers.filter(c => c.id !== id); save(K.customers, state.customers); if (window.supabaseClient) await window.supabaseClient.from('customers').delete().eq('id', id); renderAdminCustomers(); toast('✅ ' + i18n[state.currentLang].deleted); }
+async function deleteCustomer(id) {
+    if (!confirm(i18n[state.currentLang].delete_customer_confirm)) return;
+    if (!window.supabaseClient) return toast(i18n[state.currentLang].error_connection, 'error');
+    const customer = state.customers.find(c => String(c.id) === String(id));
+    if (!customer) return;
+    try {
+        const { data, error } = await window.supabaseClient.from('customers').delete().eq('id', id).select('id').maybeSingle();
+        if (error) throw error;
+        if (!data) throw new Error(state.currentLang === 'fr' ? 'Le serveur n’a pas confirmé la suppression.' : 'الخادم لم يؤكد حذف الزبون.');
+        state.customers = state.customers.filter(c => String(c.id) !== String(id));
+        save(K.customers, state.customers);
+        renderAdminCustomers();
+        toast('✓ ' + i18n[state.currentLang].deleted);
+    } catch (error) {
+        console.error('Customer deletion failed:', error);
+        toast(state.currentLang === 'fr' ? 'Échec de suppression. Aucune modification locale.' : 'فشل حذف الزبون. لم يتم تغيير البيانات المحلية.', 'error');
+    }
+}
 window.deleteCustomer = deleteCustomer;
 
 function effectiveProductPrice(p) {
@@ -2536,7 +2553,24 @@ window.renderAdminMessages = renderAdminMessages;
 async function replyToMessage(msgId) { const text = document.getElementById('reply-' + msgId).value.trim(); if (!text) return toast(i18n[state.currentLang].write_reply_first, 'error'); const msg = state.messages.find(m => m.id === msgId); if (msg) { msg.reply = text; msg.repliedAt = new Date().toISOString(); save(K.messages, state.messages); if (window.supabaseClient) await window.supabaseClient.from('messages').update({ reply: text, repliedAt: msg.repliedAt }).eq('id', msgId); renderAdminMessages(); toast('✅ ' + i18n[state.currentLang].reply_sent_success); } }
 window.replyToMessage = replyToMessage;
 
-async function deleteMessage(id) { if (!confirm(i18n[state.currentLang].delete_message_confirm)) return; state.messages = state.messages.filter(m => m.id !== id); save(K.messages, state.messages); if (window.supabaseClient) await window.supabaseClient.from('messages').delete().eq('id', id); renderAdminMessages(); }
+async function deleteMessage(id) {
+    if (!confirm(i18n[state.currentLang].delete_message_confirm)) return;
+    if (!window.supabaseClient) return toast(i18n[state.currentLang].error_connection, 'error');
+    const message = state.messages.find(m => String(m.id) === String(id));
+    if (!message) return;
+    try {
+        const { data, error } = await window.supabaseClient.from('messages').delete().eq('id', id).select('id').maybeSingle();
+        if (error) throw error;
+        if (!data) throw new Error(state.currentLang === 'fr' ? 'Le serveur n’a pas confirmé la suppression.' : 'الخادم لم يؤكد حذف الرسالة.');
+        state.messages = state.messages.filter(m => String(m.id) !== String(id));
+        save(K.messages, state.messages);
+        renderAdminMessages();
+        toast('✓ ' + i18n[state.currentLang].deleted);
+    } catch (error) {
+        console.error('Message deletion failed:', error);
+        toast(state.currentLang === 'fr' ? 'Échec de suppression. Aucune modification locale.' : 'فشل حذف الرسالة. لم يتم تغيير البيانات المحلية.', 'error');
+    }
+}
 window.deleteMessage = deleteMessage;
 
 function renderAdminExpenses() {
