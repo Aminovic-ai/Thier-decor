@@ -1,4 +1,4 @@
-const CACHE_NAME = 'thier-decor-v30';
+const CACHE_NAME = 'thier-decor-v31';
 const ASSETS_TO_CACHE = [
     './', './index.html', './style.css', './custom.css', './app.js',
     './analytics-notifications.js', './supabase-config.js',
