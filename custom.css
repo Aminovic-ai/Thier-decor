@@ -173,3 +173,100 @@ button:focus-visible, .btn-primary:focus-visible, .btn-danger:focus-visible,
 }
 button:disabled, button[disabled] { cursor: not-allowed !important; opacity: .58; transform: none !important; }
 
+
+
+/* =======================================================
+   Thier Décor — Emerald / Navy / Gold identity (v40)
+   High contrast typography and accessible controls.
+   ======================================================= */
+:root {
+  --primary: #087f5b;
+  --primary-hover: #066548;
+  --accent: #142b45;
+  --primary-light: #e7f2ed;
+  --bg-light: #f5f7f5;
+  --bg-white: #ffffff;
+  --text-dark: #17251f;
+  --text-mid: #46574e;
+  --border: #d6e1da;
+  --danger: #b42332;
+  --success: #087f5b;
+  --sidebar-bg: #142b45;
+  --sidebar-text: #ffffff;
+  --shadow-soft: 0 8px 24px rgba(20, 43, 69, .08);
+  --td-gold: #c6a45c;
+  --td-navy: #142b45;
+  --td-green: #087f5b;
+}
+body { background: var(--bg-light) !important; color: var(--text-dark) !important; font-size: 16px !important; line-height: 1.65 !important; }
+h1 { font-size: 1.5rem !important; line-height: 1.35 !important; }
+h2 { font-size: 1.3rem !important; line-height: 1.4 !important; }
+h3 { font-size: 1.12rem !important; line-height: 1.45 !important; }
+p, label, input, select, textarea, option, td, th, .nav-links a,
+.admin-nav a, .stat-card span, .admin-card, .product-card,
+.category-item, .form-group, .modal-content { color: var(--text-dark); }
+small, .text-muted, .stat-card small, .admin-card small { color: #46574e !important; font-size: .875rem !important; }
+.store-header { background: #fff !important; border-bottom: 2px solid var(--td-gold) !important; }
+.logo-icon { background: linear-gradient(145deg, #087f5b, #142b45) !important; color: #fff !important; }
+.logo-text h1 { color: var(--td-navy) !important; }
+.logo-text span { color: #46574e !important; }
+.nav-links li.active a, .nav-links a:hover { color: var(--td-green) !important; }
+.hero-banner { background: linear-gradient(120deg, #142b45 0%, #087f5b 100%) !important; color: #fff !important; border: 1px solid var(--td-gold) !important; }
+.hero-banner * { color: #fff !important; }
+.pack-badge { background: var(--td-gold) !important; color: #142b45 !important; font-weight: 800 !important; }
+.cart-btn, .btn-primary, .product-mini-cart {
+  background: #087f5b !important; color: #fff !important; border-color: #066548 !important;
+}
+.cart-btn:hover, .btn-primary:hover, .product-mini-cart:hover { background: #066548 !important; color: #fff !important; }
+.btn-primary i, .cart-btn i, .product-mini-cart i { color: #fff !important; }
+.btn-secondary, .action-btn, .btn-icon, .product-mini-action {
+  background: #fff !important; color: #142b45 !important; border: 1px solid #aab9af !important;
+}
+.btn-secondary i, .action-btn i, .btn-icon i, .product-mini-action i { color: #087f5b !important; }
+.btn-secondary:hover, .action-btn:hover, .btn-icon:hover, .product-mini-action:hover {
+  background: #e7f2ed !important; color: #142b45 !important; border-color: #087f5b !important;
+}
+.admin-sidebar { background: linear-gradient(180deg, #142b45 0%, #0d3b35 100%) !important; color: #fff !important; border-left: 2px solid var(--td-gold) !important; }
+.admin-brand, .admin-brand *, .admin-sidebar-footer, .admin-sidebar-footer * { color: #fff !important; }
+.admin-nav a { color: #f3f6f4 !important; }
+.admin-nav a i { color: #e0c27d !important; }
+.admin-nav a:hover, .admin-nav a.active {
+  background: rgba(198,164,92,.18) !important; color: #fff !important;
+  border-right: 3px solid var(--td-gold) !important;
+}
+html[dir="ltr"] .admin-nav a:hover, html[dir="ltr"] .admin-nav a.active {
+  border-left: 3px solid var(--td-gold) !important; border-right: none !important;
+}
+.admin-content, #screen-admin, .admin-layout { background: #f5f7f5 !important; }
+.admin-header { background: #fff !important; border-bottom: 1px solid #d6e1da !important; }
+.admin-card, .stat-card, .modal-content, .product-card, .profile-box, .form-card {
+  background: #fff !important; border-color: #d6e1da !important;
+}
+.stat-card h3 { color: #087f5b !important; font-size: 1.45rem !important; }
+.stat-card span { color: #33463b !important; font-weight: 700 !important; }
+input, select, textarea, .header-search input {
+  color: #17251f !important; background: #fff !important; border-color: #aab9af !important;
+  font-size: 1rem !important; min-height: 44px;
+}
+input::placeholder, textarea::placeholder { color: #66766c !important; opacity: 1 !important; }
+input:focus, select:focus, textarea:focus {
+  border-color: #087f5b !important; box-shadow: 0 0 0 3px rgba(8,127,91,.16) !important;
+}
+button, .btn-primary, .btn-secondary, .btn-danger, .btn-icon, .action-btn {
+  font-size: .95rem !important; min-height: 40px; font-weight: 800 !important;
+}
+.btn-danger { background: #fff0f0 !important; color: #9f1729 !important; border: 1px solid #e7aab0 !important; }
+.btn-danger i { color: #b42332 !important; }
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
+  outline: 3px solid var(--td-gold) !important; outline-offset: 3px !important;
+}
+a { text-underline-offset: 3px; }
+.toast { font-size: 1rem !important; font-weight: 700 !important; }
+@media (max-width: 680px) {
+  body { font-size: 15px !important; }
+  h1 { font-size: 1.35rem !important; }
+  h2 { font-size: 1.2rem !important; }
+  h3 { font-size: 1.08rem !important; }
+  button, .btn-primary, .btn-secondary, .btn-danger, .btn-icon, .action-btn { font-size: .92rem !important; }
+  .admin-nav a { color: #fff !important; }
+}
