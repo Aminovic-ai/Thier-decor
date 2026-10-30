@@ -270,3 +270,59 @@ a { text-underline-offset: 3px; }
   button, .btn-primary, .btn-secondary, .btn-danger, .btn-icon, .action-btn { font-size: .92rem !important; }
   .admin-nav a { color: #fff !important; }
 }
+
+
+/* Fix visibility of admin Store / Logout labels in both sidebar and header */
+.admin-sidebar-footer .admin-store-button,
+.admin-sidebar-footer .admin-logout-button,
+.admin-header-actions .admin-store-quick {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px !important;
+  min-height: 44px !important;
+  padding: 10px 14px !important;
+  border-radius: 10px !important;
+  font-size: 15px !important;
+  font-weight: 800 !important;
+  line-height: 1.4 !important;
+  white-space: nowrap !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+.admin-sidebar-footer .admin-store-button {
+  background: #c6a45c !important;
+  color: #142b45 !important;
+  border: 1px solid #e0c27d !important;
+}
+.admin-sidebar-footer .admin-store-button span,
+.admin-sidebar-footer .admin-store-button i {
+  color: #142b45 !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+.admin-sidebar-footer .admin-logout-button {
+  background: #fff !important;
+  color: #142b45 !important;
+  border: 1px solid #d6e1da !important;
+}
+.admin-sidebar-footer .admin-logout-button span,
+.admin-sidebar-footer .admin-logout-button i {
+  color: #142b45 !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+.admin-header-actions .admin-store-quick {
+  background: #c6a45c !important;
+  color: #142b45 !important;
+  border: 1px solid #ad8c49 !important;
+}
+.admin-header-actions .admin-store-quick span,
+.admin-header-actions .admin-store-quick i {
+  color: #142b45 !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+.admin-sidebar-footer .admin-store-button:hover,
+.admin-header-actions .admin-store-quick:hover { background: #d7b96f !important; }
+.admin-sidebar-footer .admin-logout-button:hover { background: #f1f5f2 !important; }
