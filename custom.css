@@ -150,3 +150,115 @@ button:disabled { opacity:.58; cursor:not-allowed; transform:none; box-shadow:no
 .modal-content { border:1px solid #dcecf7; box-shadow:0 20px 60px rgba(24,86,125,.16); }
 .toast { border-radius:12px; }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition:none !important; scroll-behavior:auto !important; } }
+/* =======================================================
+   Thier Décor — تحديث الأزرار والأيقونات (v41 - نهائي)
+   ======================================================= */
+
+/* 1. الإعدادات العامة */
+button, .btn-primary, .btn-secondary, .btn-danger, .btn-icon, .action-btn, .product-mini-action, .cart-btn {
+    box-sizing: border-box;
+    border-radius: 10px !important;
+    font-weight: 700 !important;
+    font-family: 'Cairo', 'Tajawal', sans-serif !important;
+    transition: all 0.2s ease !important;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.02);
+}
+
+/* 2. الأزرار الأساسية (مع استثناء الأزرار ذات الألوان المخصصة) */
+.btn-primary:not(.btn-export):not(.btn-success):not(.btn-danger):not(.btn-warning),
+.cart-btn:not(.btn-export) {
+    background-color: #e0f2fe !important;
+    color: #0369a1 !important;
+    border: 1px solid #bae6fd !important;
+}
+.btn-primary:not(.btn-export):not(.btn-success):not(.btn-danger):not(.btn-warning) i,
+.cart-btn:not(.btn-export) i {
+    color: #0284c7 !important;
+}
+.btn-primary:not(.btn-export):not(.btn-success):not(.btn-danger):not(.btn-warning):hover,
+.cart-btn:not(.btn-export):hover {
+    background-color: #bae6fd !important;
+    color: #075985 !important;
+}
+
+/* 3. الأزرار الثانوية (مع استثناء الأزرار الملونة) */
+.action-btn:not(.btn-export), .btn-icon:not(.btn-export), 
+.btn-secondary:not(.btn-export), .product-mini-action:not(.btn-export) {
+    background-color: #f8fafc !important;
+    color: #334155 !important;
+    border: 1px solid #e2e8f0 !important;
+}
+.action-btn:not(.btn-export) i, .btn-icon:not(.btn-export) i, 
+.btn-secondary:not(.btn-export) i, .product-mini-action:not(.btn-export) i {
+    color: #64748b !important;
+}
+.action-btn:not(.btn-export):hover, .btn-icon:not(.btn-export):hover, 
+.btn-secondary:not(.btn-export):hover, .product-mini-action:not(.btn-export):hover {
+    background-color: #f1f5f9 !important;
+    color: #0f172a !important;
+}
+
+/* 4. حماية الأزرار المخصصة (التي تحمل كلاس btn-export) */
+.btn-export {
+    color: #ffffff !important;
+    border-color: transparent !important;
+}
+.btn-export i {
+    color: #ffffff !important;
+}
+
+/* 5. أزرار الحذف */
+.btn-danger {
+    background-color: #fef2f2 !important;
+    color: #b91c1c !important;
+    border: 1px solid #fecaca !important;
+}
+.btn-danger i { color: #dc2626 !important; }
+.btn-danger:hover { background-color: #fee2e2 !important; }
+
+/* 6. أزرار النجاح */
+.btn-success, .confirm-btn {
+    background-color: #f0fdf4 !important;
+    color: #166534 !important;
+    border: 1px solid #bbf7d0 !important;
+}
+
+/* 7. أزرار العروض */
+.promo-admin-button {
+    background-color: #fffbeb !important;
+    color: #92400e !important;
+    border: 1px solid #fde68a !important;
+}
+
+/* 8. أزرار الخروج */
+#btn-logout-header, .admin-logout-button {
+    background-color: #f1f5f9 !important;
+    color: #475569 !important;
+    border: 1px solid #cbd5e1 !important;
+}
+#btn-logout-header i, .admin-logout-button i { color: #64748b !important; }
+#btn-logout-header:hover, .admin-logout-button:hover {
+    background-color: #e2e8f0 !important;
+    color: #1e293b !important;
+}
+
+/* 9. القائمة الجانبية (تدعم RTL و LTR) */
+.admin-nav a.active {
+    background-color: #e0f2fe !important;
+    color: #0369a1 !important;
+    border-inline-start: 3px solid #38bdf8 !important;
+}
+.admin-nav a i { color: #0284c7 !important; }
+
+/* 10. المفضلة والسلة المصغرة */
+.product-mini-action.is-favorite {
+    background-color: #fdf2f8 !important;
+    border-color: #fbcfe8 !important;
+}
+.product-mini-action.is-favorite i { color: #be185d !important; }
+
+/* 11. التركيز وإمكانية الوصول */
+button:focus-visible, .btn-primary:focus-visible, .btn-secondary:focus-visible, .btn-danger:focus-visible {
+    outline: 3px solid #0284c7 !important;
+    outline-offset: 2px !important;
+}
