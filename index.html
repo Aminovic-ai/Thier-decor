@@ -175,8 +175,8 @@
                         <button type="button" class="filter-btn" onclick="filterAdminOrders('cancelled', this)" data-i18n="cancelled">ملغاة</button>
                     </div>
                     <div style="margin-bottom:15px; display:flex; gap:10px; flex-wrap:wrap;">
-                        <button class="btn-primary" onclick="printLabels()" style="background:#6366f1; width:auto;"><i class="fas fa-print"></i> <span data-i18n="print_labels">طباعة بوالص الشحن</span></button>
-                        <button class="btn-primary" onclick="openExportModal()" style="background:#10b981; width:auto;"><i class="fas fa-file-excel"></i> <span data-i18n="export_noest">تصدير طلبيات Noest (CSV)</span></button>
+                        <button class="btn-primary btn export" onclick="printLabels()" style="background:#6366f1; width:auto;"><i class="fas fa-print"></i> <span data-i18n="print_labels">طباعة بوالص الشحن</span></button>
+                        <button class="btn-primary btn export" onclick="openExportModal()" style="background:#10b981; width:auto;"><i class="fas fa-file-excel"></i> <span data-i18n="export_noest">تصدير طلبيات Noest (CSV)</span></button>
                     </div>
                     <div id="a-orders-list" class="admin-grid-list"></div>
                 </section>
