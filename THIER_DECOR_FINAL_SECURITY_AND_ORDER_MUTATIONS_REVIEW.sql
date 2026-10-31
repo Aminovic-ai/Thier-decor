@@ -130,6 +130,48 @@ begin
 end;
 $$;
 
+create or replace function public.td_order_snapshot_safe(p_items jsonb)
+returns boolean
+language plpgsql
+security definer
+set search_path=public,pg_temp
+as $
+declare
+  item jsonb;
+  stored_component jsonb;
+  db_component jsonb;
+  product_row public.products%rowtype;
+  product_id bigint;
+  component_index bigint;
+  stored_components jsonb;
+  db_components jsonb;
+begin
+  if jsonb_typeof(p_items)<>'array' then return false; end if;
+  for item in select value from jsonb_array_elements(p_items) loop
+    begin product_id := (item->>'id')::bigint; exception when others then return false; end;
+    select * into product_row from public.products where id=product_id;
+    if not found then return false; end if;
+    if coalesce((item->>'isPack')::boolean,false) is distinct from coalesce(product_row."isPack",false) then return false; end if;
+    stored_components := coalesce(item->'packItems','[]'::jsonb);
+    db_components := case when coalesce(product_row."isPack",false) then coalesce(product_row."packItems",'[]'::jsonb) else '[]'::jsonb end;
+    if jsonb_typeof(stored_components)<>'array' or jsonb_typeof(db_components)<>'array' then return false; end if;
+    if jsonb_array_length(stored_components)<>jsonb_array_length(db_components) then return false; end if;
+    for stored_component,component_index in
+      select value,ordinality from jsonb_array_elements(stored_components) with ordinality
+    loop
+      select value into db_component from jsonb_array_elements(db_components) with ordinality where ordinality=component_index;
+      if (stored_component->>'id')::bigint is distinct from (db_component->>'id')::bigint
+         or (stored_component->>'qty')::numeric is distinct from (db_component->>'qty')::numeric then
+        return false;
+      end if;
+    end loop;
+  end loop;
+  return true;
+exception when others then
+  return false;
+end;
+$;
+
 -- 2) Replace checkout RPC: trusted customer identity + canonical item snapshot + one transaction.
 create or replace function public.td_create_order(p_order jsonb)
 returns jsonb
@@ -256,6 +298,9 @@ begin
     raise exception 'Orders with loyalty history cannot be edited';
   end if;
 
+  if not public.td_order_snapshot_safe(order_row.items) then
+    raise exception 'Legacy order stock snapshot is not verifiable; manual stock audit required';
+  end if;
   new_items := public.td_build_order_items(p_items);
   old_req := public.td_order_stock_requirements(order_row.items);
   new_req := public.td_order_stock_requirements(new_items);
@@ -310,6 +355,9 @@ begin
      or exists(select 1 from public.td_loyalty_awards where order_id=p_order_id) then
     raise exception 'Orders with loyalty history cannot be deleted; preserve the audit history';
   end if;
+  if not public.td_order_snapshot_safe(order_row.items) then
+    raise exception 'Legacy order stock snapshot is not verifiable; manual stock audit required';
+  end if;
 
   if order_row.status<>'cancelled' then
     required := public.td_order_stock_requirements(order_row.items);
@@ -355,6 +403,9 @@ begin
   if order_row.status='delivered' then raise exception 'Delivered orders cannot change status'; end if;
 
   if p_status='cancelled' then
+    if not public.td_order_snapshot_safe(order_row.items) then
+      raise exception 'Legacy order stock snapshot is not verifiable; manual stock audit required';
+    end if;
     required := public.td_order_stock_requirements(order_row.items);
     for item_key,required_qty in select key,value::numeric from jsonb_each_text(required) order by key::bigint loop
       perform 1 from public.products where id=item_key::bigint for update;
@@ -487,6 +538,7 @@ $$;
 -- 7) Function execution is restricted to the server Worker, except minimal coupon validation.
 revoke all on function public.td_build_order_items(jsonb) from public,anon,authenticated;
 revoke all on function public.td_order_stock_requirements(jsonb) from public,anon,authenticated;
+revoke all on function public.td_order_snapshot_safe(jsonb) from public,anon,authenticated;
 revoke all on function public.td_create_order(jsonb) from public,anon,authenticated;
 revoke all on function public.td_admin_edit_order(bigint,jsonb) from public,anon,authenticated;
 revoke all on function public.td_admin_delete_order(bigint) from public,anon,authenticated;
