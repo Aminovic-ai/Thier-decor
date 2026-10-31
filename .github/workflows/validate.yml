@@ -37,7 +37,9 @@ jobs:
           from pathlib import Path
           from pglast import parse_sql
           files = [
+              Path("THIER_DECOR_SUPABASE_SCHEMA_FIXED_V2.sql"),
               Path("THIER_DECOR_FINAL_SECURITY_AND_ORDER_MUTATIONS_REVIEW.sql"),
+              Path("THIER_DECOR_CUSTOMER_PHONE_UNIQUE_REVIEW.sql"),
               Path("THIER_DECOR_ORDER_SECURITY_REVIEW.sql"),
               Path("THIER_DECOR_CUSTOMER_POINTS_ADDRESS_MIGRATION_REVIEW.sql"),
               Path("THIER_DECOR_LOYALTY_REDEMPTION_ATOMIC_REVIEW.sql"),
