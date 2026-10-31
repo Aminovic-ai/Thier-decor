@@ -1,4 +1,4 @@
-name: Deploy Thier Decor API V2 (manual only)
+name: Deploy Thier Decor API (manual)
 
 on:
   workflow_dispatch:
@@ -7,11 +7,11 @@ permissions:
   contents: read
 
 concurrency:
-  group: thier-decor-api-v2-deploy
+  group: thier-decor-api-deploy
   cancel-in-progress: false
 
 jobs:
-  deploy-v2:
+  deploy:
     runs-on: ubuntu-latest
     environment: cloudflare-v2-staging
     steps:
@@ -23,7 +23,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Deploy isolated V2 Worker
+      - name: Deploy the existing Thier Decor API Worker
         run: npx --yes wrangler@4 deploy --config wrangler.toml
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}

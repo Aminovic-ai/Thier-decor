@@ -1,9 +1,9 @@
-name: Validate Thier Decor V2 # syntax and SQL parser checks
+name: Validate Thier Decor API
 
 on:
   push:
     branches:
-      - worker-v2-review
+      - main
   pull_request:
     branches:
       - main
@@ -28,7 +28,7 @@ jobs:
           node --check sw.js
           node --check firebase-config.js
           node --check supabase-config.js
-      - name: Check Worker module syntax
+      - name: Check Thier Decor API Worker module syntax
         run: node --input-type=module --check < thier-decor-api.js
       - name: Validate SQL statement syntax
         run: |

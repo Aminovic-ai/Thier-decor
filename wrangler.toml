@@ -1,5 +1,5 @@
-name = "thier-decor-api-v2"
-main = "thier-decor-api-v2.js"
+name = "thier-decor-api"
+main = "thier-decor-api.js"
 compatibility_date = "2026-10-31"
 workers_dev = true
 
@@ -10,4 +10,3 @@ SUPABASE_URL = "https://xdsbnmtthvqgdlytwpes.supabase.co"
 # SUPABASE_SERVICE_ROLE_KEY, FIREBASE_API_KEY,
 # CUSTOMER_SESSION_SECRET, AUTH_RATE_SECRET, VISIT_RATE_SECRET
 # Variable: ADMIN_UID
-# This config does not deploy automatically.
