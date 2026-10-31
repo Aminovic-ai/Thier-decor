@@ -880,16 +880,23 @@ async function adminVisitStats(env) {
   const stats = await dbRequest(env, "rpc/td_get_visit_stats", { method: "POST", body: "{}" });
   return json({ success: true, visits: stats || {} });
 }
-async function recordVisit(body, env) {
-  const path = cleanText(body.path || "/", 240, "مسار الصفحة").replace(/[^a-zA-Z0-9/_?=&.-]/g, "").slice(0, 240) || "/";
-  const sessionKey = cleanText(body.sessionKey, 80, "معرّف الجلسة");
-  if (!/^[a-f0-9-]{24,80}$/i.test(sessionKey)) return fail("معرّف جلسة الزيارة غير صالح.");
-  const result = await dbRequest(env, "rpc/td_record_visit_safe", {
-    method: "POST", body: JSON.stringify({ p_path: path, p_session_key: sessionKey })
+async function hmacSha256Hex(secret, value) {
+  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  const signature = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(value));
+  return [...new Uint8Array(signature)].map(b => b.toString(16).padStart(2, '0')).join('');
+}
+async function recordVisit(request, body, env) {
+  const path = cleanText(body.path || '/', 240, 'مسار الصفحة').replace(/[^a-zA-Z0-9\/_?=&.-]/g, '').slice(0, 240) || '/';
+  const sessionKey = cleanText(body.sessionKey, 80, 'معرّف الجلسة');
+  if (!/^[a-f0-9-]{24,80}$/i.test(sessionKey)) return fail('معرّف جلسة الزيارة غير صالح.');
+  if (!env.VISIT_RATE_SECRET) return fail('Visit tracking is not configured.', 503);
+  const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
+  const ipHash = await hmacSha256Hex(env.VISIT_RATE_SECRET, ip);
+  const result = await dbRequest(env, 'rpc/td_record_visit_safe', {
+    method: 'POST', body: JSON.stringify({ p_path: path, p_session_key: sessionKey, p_ip_hash: ipHash })
   });
   return json({ success: true, recorded: result?.recorded === true });
 }
-
 /* ---------------- MAIN ROUTER ---------------- */
 
 export default {
@@ -951,7 +958,7 @@ export default {
           return await customerConfirmReceipt(request, body, env);
 
         case "recordVisit":
-          return await recordVisit(body, env);
+          return await recordVisit(request, body, env);
 
         case "listOrders":
         case "listAdminData":
