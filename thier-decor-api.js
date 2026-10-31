@@ -804,7 +804,19 @@ async function adminMutation(action, body, env) {
       if (!product.name || !Number.isFinite(product.price) || product.price <= 0 || !Number.isFinite(product.cost) || product.cost < 0 || !Number.isFinite(product.qty) || product.qty < 0) return fail("تحقق من اسم المنتج والسعر والتكلفة والكمية.");
       if (product.images !== undefined && (!Array.isArray(product.images) || product.images.length > 12 || product.images.some(x => typeof x !== "string" || x.length > 900000))) return fail("صور المنتج غير صالحة.");
       if (product.packItems !== undefined && (!Array.isArray(product.packItems) || product.packItems.length > 60)) return fail("مكونات الباقة غير صالحة.");
-      if (product.isPack === true && (!Array.isArray(product.packItems) || !product.packItems.length)) return fail("يجب تحديد مكونات الباقة.");
+      if (product.isPack === true) {
+        if (!Array.isArray(product.packItems) || !product.packItems.length) return fail("يجب تحديد مكونات الباقة.");
+        const componentIds = [];
+        for (const component of product.packItems) {
+          const componentId = Number(component?.id), componentQty = Number(component?.qty);
+          if (!Number.isSafeInteger(componentId) || componentId <= 0 || componentId === id || !Number.isSafeInteger(componentQty) || componentQty <= 0 || componentQty > 1000) return fail("أحد مكونات الباقة غير صالح.");
+          componentIds.push(componentId);
+        }
+        if (new Set(componentIds).size !== componentIds.length) return fail("لا تكرر المنتج نفسه داخل مكونات الباقة.");
+        const existingComponents = await dbRequest(env, "products?select=id&id=in.(" + componentIds.join(",") + ")");
+        if (!Array.isArray(existingComponents) || existingComponents.length !== componentIds.length) return fail("بعض مكونات الباقة غير موجودة.");
+      }
+      if (product.promoPrice != null && (!(Number(product.promoPrice) > 0) || Number(product.promoPrice) >= product.price)) return fail("سعر العرض غير صالح.");
       product.id = id;
       if (body.id == null) product.createdAt = new Date().toISOString();
       const rows = await dbRequest(env, "products?on_conflict=id&select=id", {
@@ -817,6 +829,9 @@ async function adminMutation(action, body, env) {
     }
     case "adminDeleteProduct": {
       const id = positiveId(body.id, "معرّف المنتج");
+      const packs = await dbRequest(env, "products?select=id,name,packItems&isPack=eq.true");
+      const dependentPack = (packs || []).find(pack => Number(pack.id) !== id && Array.isArray(pack.packItems) && pack.packItems.some(item => Number(item.id) === id));
+      if (dependentPack) return fail("لا يمكن حذف هذا المنتج لأنه مكوّن داخل باقة: " + cleanText(dependentPack.name, 120, "اسم الباقة"), 409);
       await deleteRow(env, "products", id);
       return json({ success: true });
     }
@@ -876,8 +891,24 @@ async function adminMutation(action, body, env) {
       if (patch.shopName !== undefined) patch.shopName = cleanText(patch.shopName, 120, "اسم المتجر");
       if (patch.shopPhone !== undefined) patch.shopPhone = cleanText(patch.shopPhone, 40, "هاتف المتجر");
       if (patch.shopAddress !== undefined) patch.shopAddress = cleanText(patch.shopAddress, 300, "عنوان المتجر");
+      if (patch.promoText !== undefined) patch.promoText = cleanText(patch.promoText, 1000, "نص العرض");
+      if (patch.adText !== undefined) patch.adText = cleanText(patch.adText, 1000, "نص الإشهار");
+      for (const key of ["promoActive","adActive"]) if (patch[key] !== undefined && typeof patch[key] !== "boolean") return fail("قيمة تفعيل العرض أو الإشهار غير صالحة.");
       if (patch.adImages !== undefined && (!Array.isArray(patch.adImages) || patch.adImages.length > 12 || patch.adImages.some(x => typeof x !== "string" || x.length > 900000))) return fail("صور الإشهار غير صالحة.");
-      if (patch.coupons !== undefined && (!Array.isArray(patch.coupons) || patch.coupons.length > 500)) return fail("قائمة الكوبونات غير صالحة.");
+      if (patch.customPrices !== undefined && (!patch.customPrices || typeof patch.customPrices !== "object" || Array.isArray(patch.customPrices) || JSON.stringify(patch.customPrices).length > 150000)) return fail("أسعار التوصيل غير صالحة.");
+      if (patch.manualSalesAdjustment !== undefined && !Number.isFinite(Number(patch.manualSalesAdjustment))) return fail("تعديل المبيعات غير صالح.");
+      if (patch.coupons !== undefined) {
+        if (!Array.isArray(patch.coupons) || patch.coupons.length > 500) return fail("قائمة الكوبونات غير صالحة.");
+        const seenCodes = new Set();
+        for (const coupon of patch.coupons) {
+          const code = cleanText(coupon?.code, 80, "كود الخصم").toUpperCase();
+          const phone = cleanText(coupon?.phone, 40, "هاتف الكوبون");
+          const discount = Number(coupon?.discount), maxUses = Number(coupon?.maxUses);
+          if (!code || !phone || !Number.isFinite(discount) || discount <= 0 || discount > 100 || !Number.isSafeInteger(maxUses) || maxUses < 1 || maxUses > 100000 || (coupon.active !== undefined && typeof coupon.active !== "boolean")) return fail("بيانات أحد الكوبونات غير صالحة.");
+          if (seenCodes.has(code)) return fail("أكواد الخصم يجب أن تكون فريدة.");
+          seenCodes.add(code);
+        }
+      }
       const rows = await dbRequest(env, "settings?id=eq.1&select=id", { method: "PATCH", headers: { "Prefer": "return=representation" }, body: JSON.stringify(patch) });
       if (!Array.isArray(rows) || !rows.length) return fail("لم يؤكد الخادم حفظ الإعدادات.", 409);
       return json({ success: true });
