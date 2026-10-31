@@ -61,7 +61,13 @@
   }
   window.refreshStoreAnalytics=async function(){
     let visits={today:null,total:null};
-    if(window.supabaseClient){try{const {data,error}=await window.supabaseClient.rpc('td_get_visit_stats');if(!error&&data){visits={today:Number(data.today_visits||0),total:Number(data.total_visits||0)};}}catch(e){console.warn('Analytics visits not configured yet',e);}}
+    if(window.callAdminWorker){
+      try {
+        const result=await window.callAdminWorker('adminVisitStats');
+        const data=result.visits||{};
+        visits={today:Number(data.today_visits||0),total:Number(data.total_visits||0)};
+      } catch(e){console.warn('Admin visit statistics unavailable:',e.message||e);}
+    }
     fillAnalytics(visits);
   };
   const originalAdminGo=window.adminGo;
@@ -71,7 +77,26 @@
   const originalUpdateBadges=window.updateAdminBadges;
   window.updateAdminBadges=function(){if(originalUpdateBadges)originalUpdateBadges();const count=(state.orders||[]).filter(o=>o.status==='new').length+(state.messages||[]).filter(m=>!m.reply).length;const b=$('admin-notification-badge');if(b){b.textContent=count;b.style.display=count?'inline-block':'none';}if(window.renderCustomerNotifications)window.renderCustomerNotifications();};
   function trackVisit(){
-    try{const session=sessionStorage.getItem(VISIT_KEY);if(session)return;if(window.supabaseClient){window.supabaseClient.rpc('td_record_visit',{p_path:location.pathname}).then(({error})=>{if(error){console.warn('Visit tracking not enabled; run analytics_visitors.sql',error.message);return;}sessionStorage.setItem(VISIT_KEY,'1');}).catch(error=>console.warn('Visit tracking failed:',error));}}catch(e){}
+    try {
+      if(sessionStorage.getItem(VISIT_KEY)) return;
+      const sessionKeyName='td_visit_session_key_v1';
+      let sessionKey=sessionStorage.getItem(sessionKeyName);
+      if(!sessionKey){
+        const bytes=new Uint8Array(16);
+        if(window.crypto&&crypto.getRandomValues) crypto.getRandomValues(bytes);
+        else for(let i=0;i<bytes.length;i++) bytes[i]=Math.floor(Math.random()*256);
+        sessionKey=Array.from(bytes,b=>b.toString(16).padStart(2,'0')).join('');
+        sessionStorage.setItem(sessionKeyName,sessionKey);
+      }
+      fetch('https://thier-decor-api.amindrody.workers.dev/',{
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({action:'recordVisit',path:location.pathname,sessionKey}),
+        cache:'no-store'
+      }).then(async response=>{
+        const result=await response.json().catch(()=>null);
+        if(response.ok&&result?.success) sessionStorage.setItem(VISIT_KEY,'1');
+      }).catch(error=>console.warn('Visit tracking failed:',error));
+    } catch(e) {}
   }
   document.addEventListener('DOMContentLoaded',()=>{
     trackVisit();
