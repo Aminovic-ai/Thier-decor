@@ -172,6 +172,46 @@ exception when others then
 end;
 $;
 
+create or replace function public.td_consume_promo(p_code text,p_phone text,p_order_id text)
+returns jsonb
+language plpgsql
+security definer
+set search_path=public,pg_temp
+as $
+declare
+  code_norm text:=upper(trim(coalesce(p_code,'')));
+  phone_norm text:=public.td_normalize_phone(p_phone);
+  order_phone text;
+  old_code text;
+  old_phone text;
+  validation jsonb;
+begin
+  if code_norm='' or phone_norm='' or coalesce(p_order_id,'')='' then
+    return jsonb_build_object('ok',false,'reason','missing_order_or_promo');
+  end if;
+  select public.td_normalize_phone("customerPhone") into order_phone
+    from public.orders where id::text=p_order_id;
+  if order_phone is null then return jsonb_build_object('ok',false,'reason','order_not_found'); end if;
+  if order_phone<>phone_norm then return jsonb_build_object('ok',false,'reason','order_phone_mismatch'); end if;
+
+  perform pg_advisory_xact_lock(hashtext(code_norm||':'||phone_norm));
+  select upper(promo_code),customer_phone into old_code,old_phone
+    from public.td_promo_uses where order_id=p_order_id;
+  if found then
+    if old_code=code_norm and old_phone=phone_norm then return jsonb_build_object('ok',true,'already_recorded',true); end if;
+    return jsonb_build_object('ok',false,'reason','order_already_has_different_promo');
+  end if;
+
+  validation:=public.td_check_promo(code_norm,p_phone);
+  if coalesce((validation->>'valid')::boolean,false) is not true then
+    return jsonb_build_object('ok',false,'reason',validation->>'reason');
+  end if;
+  insert into public.td_promo_uses(promo_code,customer_phone,order_id)
+    values(code_norm,phone_norm,p_order_id);
+  return jsonb_build_object('ok',true);
+end;
+$;
+
 -- 2) Replace checkout RPC: trusted customer identity + canonical item snapshot + one transaction.
 create or replace function public.td_create_order(p_order jsonb)
 returns jsonb
@@ -418,6 +458,7 @@ begin
       update public.customers set points=coalesce(points,0)+redeemed
         where id=order_row."customerId";
     end if;
+    delete from public.td_promo_uses where order_id=p_order_id::text;
   end if;
 
   update public.orders set status=p_status where id=p_order_id returning * into order_row;
@@ -539,6 +580,7 @@ $$;
 revoke all on function public.td_build_order_items(jsonb) from public,anon,authenticated;
 revoke all on function public.td_order_stock_requirements(jsonb) from public,anon,authenticated;
 revoke all on function public.td_order_snapshot_safe(jsonb) from public,anon,authenticated;
+revoke all on function public.td_consume_promo(text,text,text) from public,anon,authenticated;
 revoke all on function public.td_create_order(jsonb) from public,anon,authenticated;
 revoke all on function public.td_admin_edit_order(bigint,jsonb) from public,anon,authenticated;
 revoke all on function public.td_admin_delete_order(bigint) from public,anon,authenticated;
