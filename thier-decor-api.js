@@ -613,22 +613,11 @@ async function customerData(request, env) {
     return fail("الحساب غير متاح.", 403);
   }
 
-  const orders = await dbRequest(
-    env,
-    "orders?select=*&customerId=eq." + id +
-    "&order=createdAt.desc&limit=100"
-  );
-
-  const messages = await dbRequest(
-    env,
-    "messages?select=*&customerId=eq." + id +
-    "&order=date.desc&limit=100"
-  );
-  const requests = await dbRequest(
-    env,
-    "requests?select=*&customerId=eq." + id +
-    "&order=date.desc&limit=100"
-  );
+  const [orders, messages, requests] = await Promise.all([
+    dbRequestPaged(env, "orders?select=*&customerId=eq." + id + "&order=createdAt.desc"),
+    dbRequestPaged(env, "messages?select=*&customerId=eq." + id + "&order=date.desc"),
+    dbRequestPaged(env, "requests?select=*&customerId=eq." + id + "&order=date.desc")
+  ]);
 
   return json({
     success: true,
