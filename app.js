@@ -1760,35 +1760,9 @@ async function confirmShopOrder() {
     if (useLoyaltyPoints) delPrice = 0;
     const total = itemsTotal + delPrice;
 
-    if (window.supabaseClient) {
-        try {
-            let outOfStock = [];
-            const requiredByProduct = new Map();
-            for (const item of orderItems) {
-                requiredByProduct.set(String(item.id), (requiredByProduct.get(String(item.id)) || 0) + item.qty);
-                if (item.isPack) for (const comp of item.packItems) {
-                    const key = String(comp.id);
-                    requiredByProduct.set(key, (requiredByProduct.get(key) || 0) + (Number(comp.qty) || 0) * item.qty);
-                }
-            }
-            for (const [productId, requiredQty] of requiredByProduct) {
-                const { data, error: stockError } = await window.supabaseClient.from('products').select('id,name,qty').eq('id', productId).maybeSingle();
-                if (stockError) throw stockError;
-                if (!data || Number(data.qty) < requiredQty) outOfStock.push(`"${data?.name || orderItems.find(x => String(x.id) === productId)?.name || 'Produit'}"`);
-            }
-            if (outOfStock.length > 0) { return toast(`❌ ${i18n[state.currentLang].max_stock}: ${[...new Set(outOfStock)].join(' و ')}`, 'error'); }
-        } catch (error) { return toast(i18n[state.currentLang].error_connection, 'error'); }
-    }
+    // Stock availability, authoritative prices and coupon consumption are checked atomically by the Worker RPC.
 
     const order = { id: (lastKnownOrderId || (lastKnownOrderId = Date.now())), customerId: state.session.id, customerName: c.name, customerPhone: c.phone, items: orderItems, itemsTotal: itemsTotal + discountAmount, discount: discountAmount, couponCode: appliedCoupon ? appliedCoupon.code : null, promoCode: appliedCoupon ? appliedCoupon.code : null, promoDiscountPercent: appliedCoupon ? appliedCoupon.discount : 0, promoDiscountAmount: discountAmount, deliveryPrice: delPrice, total: total, courier, deliveryType: type, wilaya: wData.name, commune: finalCommune, address: finalAddress, stationCode: stationCode || null, stationName: stationName || null, stationAddress: stationAddress || null, status: 'new', createdAt: new Date().toISOString(), useLoyaltyPoints };
-
-    if (appliedCoupon && window.supabaseClient) {
-        // Recheck at submission time; the database atomically records each order ID only once.
-        const { data: check, error: checkError } = await window.supabaseClient.rpc('td_check_promo', { p_code: appliedCoupon.code, p_phone: c.phone });
-        if (checkError || !check || check.valid !== true) { appliedCoupon = null; updateDeliveryPrice(); return toast('انتهت صلاحية البرومو أو استُنفدت استعمالاته. أعد إدخال الكود.', 'error'); }
-        const freshDiscount = Number(check.discount);
-        if (freshDiscount !== Number(order.promoDiscountPercent)) return toast('تغيرت نسبة التخفيض. أعد تطبيق الكود من جديد.', 'error');
-    }
 
     if (state.session.customerToken) {
         orderSubmitting = true;
