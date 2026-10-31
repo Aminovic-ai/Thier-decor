@@ -317,12 +317,40 @@ async function createCustomerOrder(request, body, env) {
     return fail("الحساب غير متاح.", 403);
   }
 
-  // Ignore client-supplied identity fields; use the official account data.
+  const orderId = Number(order.id);
+  if (!Number.isSafeInteger(orderId) || orderId <= 0) return fail("رقم الطلبية غير صالح.");
+  if (!Array.isArray(order.items) || order.items.length < 1 || order.items.length > 100) return fail("قائمة المنتجات غير صالحة.");
+  const safeItems = [];
+  for (const item of order.items) {
+    const productId = Number(item?.id);
+    const quantity = Number(item?.qty);
+    if (!Number.isSafeInteger(productId) || productId <= 0 || !Number.isSafeInteger(quantity) || quantity <= 0 || quantity > 1000) {
+      return fail("معرّف المنتج أو الكمية غير صالحين.");
+    }
+    // Only IDs and quantities cross the trust boundary. Names, prices, costs and pack data
+    // are rebuilt from the products table by td_build_order_items inside the DB transaction.
+    safeItems.push({ id: productId, qty: quantity });
+  }
+
   const trustedOrder = {
-    ...order,
+    id: orderId,
     customerId: customer.id,
     customerName: customer.name,
-    customerPhone: customer.phone
+    customerPhone: customer.phone,
+    items: safeItems,
+    couponCode: String(order.couponCode || "").trim().slice(0, 80) || null,
+    promoCode: String(order.promoCode || "").trim().slice(0, 80) || null,
+    courier: String(order.courier || "").trim().slice(0, 60),
+    deliveryType: String(order.deliveryType || "").trim().slice(0, 40),
+    wilaya: String(order.wilaya || "").trim().slice(0, 120),
+    commune: String(order.commune || "").trim().slice(0, 120),
+    address: String(order.address || "").trim().slice(0, 500),
+    stationCode: String(order.stationCode || "").trim().slice(0, 80),
+    stationName: String(order.stationName || "").trim().slice(0, 160),
+    stationAddress: String(order.stationAddress || "").trim().slice(0, 300),
+    weight: String(order.weight || "").trim().slice(0, 40),
+    phone2: String(order.phone2 || "").trim().slice(0, 40),
+    useLoyaltyPoints: order.useLoyaltyPoints === true
   };
 
   let created;
