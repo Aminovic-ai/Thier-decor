@@ -2659,28 +2659,36 @@ function renderAdminMessages() {
 }
 window.renderAdminMessages = renderAdminMessages;
 
-async function replyToMessage(msgId) { const text = document.getElementById('reply-' + msgId).value.trim(); if (!text) return toast(i18n[state.currentLang].write_reply_first, 'error'); const msg = state.messages.find(m => m.id === msgId); if (msg) { msg.reply = text; msg.repliedAt = new Date().toISOString(); save(K.messages, state.messages); if (window.supabaseClient) await window.supabaseClient.from('messages').update({ reply: text, repliedAt: msg.repliedAt }).eq('id', msgId); renderAdminMessages(); toast('✅ ' + i18n[state.currentLang].reply_sent_success); } }
+async function replyToMessage(msgId) {
+    const input = document.getElementById('reply-' + msgId);
+    const reply = input?.value.trim() || '';
+    if (!reply) return toast(i18n[state.currentLang].write_reply_first, 'error');
+    const msg = state.messages.find(m => String(m.id) === String(msgId));
+    if (!msg) return;
+    try {
+        await callAdminWorker('adminReplyMessage', { id: msgId, reply });
+        msg.reply = reply; msg.repliedAt = new Date().toISOString();
+        save(K.messages, state.messages); renderAdminMessages();
+        toast('✅ ' + i18n[state.currentLang].reply_sent_success);
+    } catch (error) { toast(error.message || i18n[state.currentLang].save_failed, 'error'); }
+}
 window.replyToMessage = replyToMessage;
+
 
 async function deleteMessage(id) {
     if (!confirm(i18n[state.currentLang].delete_message_confirm)) return;
-    if (!window.supabaseClient) return toast(i18n[state.currentLang].error_connection, 'error');
-    const message = state.messages.find(m => String(m.id) === String(id));
-    if (!message) return;
+    const message = state.messages.find(m => String(m.id) === String(id)); if (!message) return;
     try {
-        const { data, error } = await window.supabaseClient.from('messages').delete().eq('id', id).select('id').maybeSingle();
-        if (error) throw error;
-        if (!data) throw new Error(state.currentLang === 'fr' ? 'Le serveur n’a pas confirmé la suppression.' : 'الخادم لم يؤكد حذف الرسالة.');
+        await callAdminWorker('adminDeleteMessage', { id });
         state.messages = state.messages.filter(m => String(m.id) !== String(id));
-        save(K.messages, state.messages);
-        renderAdminMessages();
-        toast('✓ ' + i18n[state.currentLang].deleted);
+        save(K.messages, state.messages); renderAdminMessages(); toast('✓ ' + i18n[state.currentLang].deleted);
     } catch (error) {
         console.error('Message deletion failed:', error);
-        toast(state.currentLang === 'fr' ? 'Échec de suppression. Aucune modification locale.' : 'فشل حذف الرسالة. لم يتم تغيير البيانات المحلية.', 'error');
+        toast((state.currentLang === 'fr' ? 'Échec de suppression: ' : 'فشل حذف الرسالة: ') + (error.message || ''), 'error');
     }
 }
 window.deleteMessage = deleteMessage;
+
 
 function renderAdminExpenses() {
     const c = document.getElementById('a-expenses-list'); if (!c) return;
@@ -2692,16 +2700,31 @@ function openExpenseModal() { document.getElementById('ef-title').value = ''; do
 window.openExpenseModal = openExpenseModal;
 
 async function saveExpense() {
-    const t = document.getElementById('ef-title').value.trim(); const a = Number(document.getElementById('ef-amount').value); const d = document.getElementById('ef-date').value;
-    if (!t || !a) return toast(i18n[state.currentLang].save_failed, 'error');
-    const exp = { id: Date.now(), title: t, amount: a, date: d };
-    state.expenses.push(exp); save(K.expenses, state.expenses); if (window.supabaseClient) await window.supabaseClient.from('expenses').insert([exp]);
-    closeModal('m-expense-form'); renderAdminExpenses(); renderAdminHome(); toast('✅ ' + i18n[state.currentLang].saved);
+    const title = document.getElementById('ef-title').value.trim();
+    const amount = Number(document.getElementById('ef-amount').value);
+    const date = document.getElementById('ef-date').value;
+    if (!title || !Number.isFinite(amount) || amount <= 0) return toast(i18n[state.currentLang].save_failed, 'error');
+    const expense = { id: Date.now(), title, amount, date };
+    try {
+        await callAdminWorker('adminCreateExpense', { expense });
+        state.expenses.push(expense); save(K.expenses, state.expenses);
+        closeModal('m-expense-form'); renderAdminExpenses(); renderAdminHome();
+        toast('✅ ' + i18n[state.currentLang].saved);
+    } catch (error) { toast(error.message || i18n[state.currentLang].save_failed, 'error'); }
 }
 window.saveExpense = saveExpense;
 
-async function deleteExpense(id) { if (!confirm(i18n[state.currentLang].delete_expense_confirm)) return; state.expenses = state.expenses.filter(e => e.id !== id); save(K.expenses, state.expenses); if (window.supabaseClient) await window.supabaseClient.from('expenses').delete().eq('id', id); renderAdminExpenses(); renderAdminHome(); }
+
+async function deleteExpense(id) {
+    if (!confirm(i18n[state.currentLang].delete_expense_confirm)) return;
+    try {
+        await callAdminWorker('adminDeleteExpense', { id });
+        state.expenses = state.expenses.filter(e => String(e.id) !== String(id));
+        save(K.expenses, state.expenses); renderAdminExpenses(); renderAdminHome();
+    } catch (error) { toast(error.message || i18n[state.currentLang].save_failed, 'error'); }
+}
 window.deleteExpense = deleteExpense;
+
 
 function renderAdminReports() {
     const now = new Date(); const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime(); const startOfWeek = now.getTime() - (7 * 24 * 60 * 60 * 1000);
@@ -2738,16 +2761,28 @@ window.renderAdminSettings = renderAdminSettings;
 document.addEventListener('input', event => { if (event.target && event.target.id === 'set-ad-text') renderAdPreviews(); });
 
 async function saveSettingsToCloud() {
-    state.settings.shopName = document.getElementById('set-shop').value.trim() || 'Thier Décor'; state.settings.shopPhone = document.getElementById('set-phone').value.trim(); const addressInput = document.getElementById('set-address'); if (addressInput) state.settings.shopAddress = addressInput.value.trim();
-    state.settings.promoText = document.getElementById('set-promo-text').value; state.settings.promoActive = document.getElementById('set-promo-active').checked;
-    state.settings.adActive = document.getElementById('set-ad-active').checked; state.settings.adText = document.getElementById('set-ad-text').value.trim();
-    state.settings.adEndTime = document.getElementById('set-ad-endtime').value; state.settings.adImages = [...tempAdImages];
-    if (!window.supabaseClient) return toast(i18n[state.currentLang].error_connection, 'error');
-    const { error } = await window.supabaseClient.from('settings').update({ shopName: state.settings.shopName, shopPhone: state.settings.shopPhone, shopAddress: state.settings.shopAddress || '', promoText: state.settings.promoText, promoActive: state.settings.promoActive, adActive: state.settings.adActive, adText: state.settings.adText, adEndTime: state.settings.adEndTime, adImages: state.settings.adImages }).eq('id', 1);
-    if (error) { console.error('Settings save failed:', error); return toast('❌ ' + error.message, 'error'); }
-    save(K.settings, state.settings); updateStoreBranding(); renderPromoBanner(); renderSliderAd(); toast('✅ ' + i18n[state.currentLang].saved); setTimeout(() => { adminGo('dashboard'); }, 1000);
+    state.settings.shopName = document.getElementById('set-shop').value.trim() || 'Thier Décor';
+    state.settings.shopPhone = document.getElementById('set-phone').value.trim();
+    const addressInput = document.getElementById('set-address');
+    if (addressInput) state.settings.shopAddress = addressInput.value.trim();
+    state.settings.promoText = document.getElementById('set-promo-text').value;
+    state.settings.promoActive = document.getElementById('set-promo-active').checked;
+    state.settings.adActive = document.getElementById('set-ad-active').checked;
+    state.settings.adText = document.getElementById('set-ad-text').value.trim();
+    state.settings.adEndTime = document.getElementById('set-ad-endtime').value;
+    state.settings.adImages = [...tempAdImages];
+    try {
+        await callAdminWorker('adminUpdateSettings', { settings: {
+            shopName: state.settings.shopName, shopPhone: state.settings.shopPhone, shopAddress: state.settings.shopAddress || '',
+            promoText: state.settings.promoText, promoActive: state.settings.promoActive, adActive: state.settings.adActive,
+            adText: state.settings.adText, adEndTime: state.settings.adEndTime, adImages: state.settings.adImages
+        }});
+        save(K.settings, state.settings); updateStoreBranding(); renderPromoBanner(); renderSliderAd();
+        toast('✅ ' + i18n[state.currentLang].saved); setTimeout(() => adminGo('dashboard'), 1000);
+    } catch (error) { console.error('Settings save failed:', error); toast('❌ ' + (error.message || ''), 'error'); }
 }
 window.saveSettingsToCloud = saveSettingsToCloud;
+
 
 function renderYalidinePricesTab() {
     const tbody = document.getElementById('yalidine-prices-body'); if (!tbody) return;
@@ -2759,13 +2794,24 @@ function renderYalidinePricesTab() {
 }
 window.renderYalidinePricesTab = renderYalidinePricesTab;
 async function saveYalidinePrices() {
-    const inputs = document.querySelectorAll('#yalidine-prices-body input'); const newPrices = JSON.parse(JSON.stringify(state.settings.customPrices || {}));
-    inputs.forEach(input => { const wilaya=input.dataset.wilaya, type=input.dataset.type, val=input.value.trim(); if(!newPrices[wilaya]) newPrices[wilaya]={}; if(!newPrices[wilaya].yalidine) newPrices[wilaya].yalidine={}; if(val!=='') newPrices[wilaya].yalidine[type]=Number(val); else delete newPrices[wilaya].yalidine[type]; if(Object.keys(newPrices[wilaya].yalidine).length===0) delete newPrices[wilaya].yalidine; if(Object.keys(newPrices[wilaya]).length===0) delete newPrices[wilaya]; });
-    state.settings.customPrices=newPrices; save(K.settings,state.settings);
-    if(window.supabaseClient){ const {error}=await window.supabaseClient.from('settings').update({customPrices:newPrices}).eq('id',1); if(error){toast('❌ '+i18n[state.currentLang].save_failed,'error');return;} }
-    toast('✅ '+i18n[state.currentLang].saved);
+    const inputs = document.querySelectorAll('#yalidine-prices-body input');
+    const newPrices = JSON.parse(JSON.stringify(state.settings.customPrices || {}));
+    inputs.forEach(input => {
+        const wilaya = input.dataset.wilaya, type = input.dataset.type, val = input.value.trim();
+        if (!newPrices[wilaya]) newPrices[wilaya] = {};
+        if (!newPrices[wilaya].yalidine) newPrices[wilaya].yalidine = {};
+        if (val !== '') newPrices[wilaya].yalidine[type] = Number(val); else delete newPrices[wilaya].yalidine[type];
+        if (!Object.keys(newPrices[wilaya].yalidine).length) delete newPrices[wilaya].yalidine;
+        if (!Object.keys(newPrices[wilaya]).length) delete newPrices[wilaya];
+    });
+    try {
+        await callAdminWorker('adminUpdateSettings', { settings: { customPrices: newPrices } });
+        state.settings.customPrices = newPrices; save(K.settings, state.settings);
+        toast('✅ ' + i18n[state.currentLang].saved);
+    } catch (error) { toast('❌ ' + (error.message || i18n[state.currentLang].save_failed), 'error'); }
 }
 window.saveYalidinePrices = saveYalidinePrices;
+
 
 function renderNoestPricesTab() {
     const tbody = document.getElementById('noest-prices-body'); if (!tbody) return;
@@ -2778,11 +2824,24 @@ function renderNoestPricesTab() {
 window.renderNoestPricesTab = renderNoestPricesTab;
 
 async function saveNoestPrices() {
-    const inputs = document.querySelectorAll('#noest-prices-body input'); const newPrices = JSON.parse(JSON.stringify(state.settings.customPrices || {}));
-    inputs.forEach(input => { const wilaya = input.dataset.wilaya; const type = input.dataset.type; const val = input.value.trim(); if (!newPrices[wilaya]) newPrices[wilaya] = {}; if (!newPrices[wilaya].noest) newPrices[wilaya].noest = {}; if (val !== '') newPrices[wilaya].noest[type] = Number(val); else delete newPrices[wilaya].noest[type]; if (Object.keys(newPrices[wilaya].noest).length === 0) delete newPrices[wilaya].noest; if (Object.keys(newPrices[wilaya]).length === 0) delete newPrices[wilaya]; });
-    state.settings.customPrices = newPrices; save(K.settings, state.settings); if (window.supabaseClient) { try { await window.supabaseClient.from('settings').update({ customPrices: newPrices }).eq('id', 1); } catch (e) { toast('❌ ' + i18n[state.currentLang].save_failed, 'error'); return; } } toast('✅ ' + i18n[state.currentLang].saved);
+    const inputs = document.querySelectorAll('#noest-prices-body input');
+    const newPrices = JSON.parse(JSON.stringify(state.settings.customPrices || {}));
+    inputs.forEach(input => {
+        const wilaya = input.dataset.wilaya, type = input.dataset.type, val = input.value.trim();
+        if (!newPrices[wilaya]) newPrices[wilaya] = {};
+        if (!newPrices[wilaya].noest) newPrices[wilaya].noest = {};
+        if (val !== '') newPrices[wilaya].noest[type] = Number(val); else delete newPrices[wilaya].noest[type];
+        if (!Object.keys(newPrices[wilaya].noest).length) delete newPrices[wilaya].noest;
+        if (!Object.keys(newPrices[wilaya]).length) delete newPrices[wilaya];
+    });
+    try {
+        await callAdminWorker('adminUpdateSettings', { settings: { customPrices: newPrices } });
+        state.settings.customPrices = newPrices; save(K.settings, state.settings);
+        toast('✅ ' + i18n[state.currentLang].saved);
+    } catch (error) { toast('❌ ' + (error.message || i18n[state.currentLang].save_failed), 'error'); }
 }
 window.saveNoestPrices = saveNoestPrices;
+
 
 async function handleAdImageUpload(event) {
     const files = Array.from(event.target.files || []);
@@ -2833,12 +2892,15 @@ function renderSliderAd() {
 window.renderSliderAd = renderSliderAd;
 
 let editingCouponIndex = -1;
-function saveCouponsToSettings() {
-    save(K.settings, state.settings);
-    if (window.supabaseClient) return window.supabaseClient.from('settings').update({ coupons: state.settings.coupons || [] }).eq('id', 1);
-    return Promise.resolve({ error: null });
+async function saveCouponsToSettings() {
+    try {
+        await callAdminWorker('adminUpdateSettings', { settings: { coupons: state.settings.coupons || [] } });
+        save(K.settings, state.settings);
+        return { error: null };
+    } catch (error) { return { error }; }
 }
-async function addCoupon() {
+async function addCoupon()
+ {
     const code = document.getElementById('new-coupon-code').value.trim().toUpperCase();
     const phone = document.getElementById('new-coupon-phone').value.trim();
     const disc = Number(document.getElementById('new-coupon-discount').value);
@@ -2861,17 +2923,21 @@ async function addCoupon() {
 }
 window.addCoupon = addCoupon;
 async function renderCouponsList() {
-    const c = document.getElementById('coupons-list'); if (!c) return;
+    const container = document.getElementById('coupons-list'); if (!container) return;
     let usage = {};
-    if (window.supabaseClient) { try { const { data, error } = await window.supabaseClient.rpc('td_promo_usage_stats'); if (!error && data) usage = data; } catch (_) {} }
-    c.innerHTML = (state.settings.coupons || []).map((cp, i) => {
-        const used = Number(usage[String(cp.code).toUpperCase()] || 0), max = Math.max(1, Number(cp.maxUses || 1)), remaining = Math.max(0, max-used);
+    try {
+        const result = await callAdminWorker('adminCouponUsage');
+        if (result.usage && typeof result.usage === 'object') usage = result.usage;
+    } catch (error) { console.warn('Coupon usage stats unavailable:', error.message || error); }
+    container.innerHTML = (state.settings.coupons || []).map((cp, i) => {
+        const used = Number(usage[String(cp.code).toUpperCase()] || 0), max = Math.max(1, Number(cp.maxUses || 1)), remaining = Math.max(0, max - used);
         const expired = cp.expiresAt && new Date(cp.expiresAt).getTime() < Date.now();
         const active = cp.active !== false && !expired && remaining > 0;
-        return `<div style="display:block;background:var(--bg-light);padding:12px;border-radius:8px;margin-bottom:8px;border:1px solid var(--border);"><div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><strong>${esc(cp.code)} — ${Number(cp.discount)}%</strong><span style="font-weight:bold;color:${active?'#059669':'#dc2626'}">${active?'نشط':'متوقف / منتهي'}</span></div><div style="font-size:.88rem;margin:6px 0;line-height:1.8">الهاتف: <b>${esc(cp.phone || '—')}</b><br>الطلبيات: ${used} / ${max} — المتبقي: ${remaining}<br>الانتهاء: ${cp.expiresAt ? new Date(cp.expiresAt).toLocaleDateString() : 'بدون تاريخ'}</div><div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn-secondary" onclick="editCoupon(${i})" style="padding:5px 9px">تعديل / تجديد</button><button class="btn-secondary" onclick="toggleCoupon(${i})" style="padding:5px 9px">${cp.active === false ? 'تفعيل' : 'إيقاف'}</button><button class="btn-danger" onclick="removeCoupon(${i})" style="padding:5px 9px">${i18n[state.currentLang].delete}</button></div></div>`;
+        return \`<div style="display:block;background:var(--bg-light);padding:12px;border-radius:8px;margin-bottom:8px;border:1px solid var(--border);"><div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><strong>\${esc(cp.code)} — \${Number(cp.discount)}%</strong><span style="font-weight:bold;color:\${active?'#059669':'#dc2626'}">\${active?'نشط':'متوقف / منتهي'}</span></div><div style="font-size:.88rem;margin:6px 0;line-height:1.8">الهاتف: <b>\${esc(cp.phone || '—')}</b><br>الطلبيات: \${used} / \${max} — المتبقي: \${remaining}<br>الانتهاء: \${cp.expiresAt ? new Date(cp.expiresAt).toLocaleDateString() : 'بدون تاريخ'}</div><div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn-secondary" onclick="editCoupon(\${i})" style="padding:5px 9px">تعديل / تجديد</button><button class="btn-secondary" onclick="toggleCoupon(\${i})" style="padding:5px 9px">\${cp.active === false ? 'تفعيل' : 'إيقاف'}</button><button class="btn-danger" onclick="removeCoupon(\${i})" style="padding:5px 9px">\${i18n[state.currentLang].delete}</button></div></div>\`;
     }).join('') || '<p style="padding:10px">لا توجد أكواد برومو بعد.</p>';
 }
 window.renderCouponsList = renderCouponsList;
+
 function editCoupon(index) {
     const cp = state.settings.coupons[index]; if (!cp) return;
     editingCouponIndex = index;
