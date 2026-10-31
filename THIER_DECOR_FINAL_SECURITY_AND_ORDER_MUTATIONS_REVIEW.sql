@@ -135,7 +135,7 @@ returns boolean
 language plpgsql
 security definer
 set search_path=public,pg_temp
-as $
+as $$
 declare
   item jsonb;
   stored_component jsonb;
@@ -177,7 +177,7 @@ returns jsonb
 language plpgsql
 security definer
 set search_path=public,pg_temp
-as $
+as $$
 declare
   code_norm text:=upper(trim(coalesce(p_code,'')));
   phone_norm text:=public.td_normalize_phone(p_phone);
