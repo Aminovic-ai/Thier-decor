@@ -88,7 +88,7 @@
         sessionKey=Array.from(bytes,b=>b.toString(16).padStart(2,'0')).join('');
         sessionStorage.setItem(sessionKeyName,sessionKey);
       }
-      fetch('https://thier-decor-api.amindrody.workers.dev/',{
+      fetch(window.TD_API_URL || 'https://thier-decor-api.amindrody.workers.dev/',{
         method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({action:'recordVisit',path:location.pathname,sessionKey}),
         cache:'no-store'
