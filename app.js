@@ -2189,6 +2189,11 @@ async function deleteOrder(id) {
     if(!confirm(i18n[state.currentLang].delete_order_confirm))return;
     if(!window.supabaseClient)return toast(i18n[state.currentLang].error_connection,'error');
     const order=state.orders.find(o=>String(o.id)===String(id)); if(!order)return;
+    if (normalizeOrderStatus(order.status) === 'delivered') {
+        return toast(state.currentLang === 'fr'
+            ? 'Une commande livrée ne peut pas être supprimée afin de préserver le stock et l’historique.'
+            : 'لا يمكن حذف طلبية تم تسليمها حفاظاً على المخزون وسجل النقاط.', 'error');
+    }
     const restored=[];
     try {
         if(normalizeOrderStatus(order.status)!=='cancelled') for(const [productId, qtyBack] of getOrderStockDeltas(order.items)) {
