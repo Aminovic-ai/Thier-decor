@@ -1720,9 +1720,9 @@ async function applyCoupon() {
             const messages = { phone_mismatch: 'هذا الكود غير مرتبط برقم هاتفك', limit_reached: 'انتهى عدد استعمالات هذا الكود', expired: 'انتهت صلاحية الكود', inactive: 'هذا الكود متوقف', not_found: 'كود غير صحيح' };
             appliedCoupon = null; updateDeliveryPrice(); return toast(messages[data?.reason] || 'كود غير صالح', 'error');
         }
-        appliedCoupon = { code: data.code, discount: Number(data.discount), phone: customer.phone, maxUses: data.maxUses, used: data.used };
+        appliedCoupon = { code: data.code, discount: Number(data.discount), phone: customer.phone };
         updateDeliveryPrice(); toast(`✓ تم تطبيق تخفيض ${data.discount}%`);
-    } catch (e) { console.error('Promo validation failed', e); appliedCoupon = null; updateDeliveryPrice(); toast('تعذر التحقق من الكود. شغّل ملف SQL الخاص بالبرومو في Supabase.', 'error'); }
+    } catch (e) { console.error('Promo validation failed', e); appliedCoupon = null; updateDeliveryPrice(); toast(state.currentLang === 'fr' ? 'Impossible de vérifier ce code pour le moment.' : 'تعذر التحقق من الكود حالياً.', 'error'); }
 }
 window.applyCoupon = applyCoupon;
 
