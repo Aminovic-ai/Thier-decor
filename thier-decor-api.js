@@ -321,37 +321,25 @@ async function requireCustomer(request, env) {
 
 /* ---------------- CUSTOMER LOGIN ---------------- */
 
-async function customerLogin(body, env) {
+async function customerLogin(request, body, env) {
   const phone = String(body.phone || "").trim();
   const password = String(body.password || "");
-
-  if (!phone || !password) {
-    return fail("يرجى إدخال رقم الهاتف وكلمة المرور.", 400);
-  }
-
+  if (!phone || !password) return fail("يرجى إدخال رقم الهاتف وكلمة المرور.", 400);
+  if (!(await recordAuthAttempt("login", phone, request, env))) return fail("محاولات كثيرة. انتظر قليلاً ثم أعد المحاولة.", 429);
   const customer = await findCustomerByPhone(phone, env);
-
-  if (!customer) {
-    return fail("رقم الهاتف غير مسجل.", 401);
+  if (!customer) return fail("رقم الهاتف غير مسجل.", 401);
+  const verification = await verifyStoredSecret(customer.password, password);
+  if (!verification.valid) return fail("كلمة المرور غير صحيحة.", 401);
+  if (customer.isBlocked === true) return fail("هذا الحساب محظور.", 403);
+  if (verification.needsUpgrade) {
+    customer.password = await pbkdf2Hash(password);
+    await dbRequest(env, "customers?id=eq." + encodeURIComponent(customer.id), {
+      method: "PATCH", headers: { "Prefer": "return=minimal" },
+      body: JSON.stringify({ password: customer.password })
+    });
   }
-
-  const hashedPassword = await sha256(password);
-
-  if (String(customer.password || "") !== hashedPassword) {
-    return fail("كلمة المرور غير صحيحة.", 401);
-  }
-
-  if (customer.isBlocked === true) {
-    return fail("هذا الحساب محظور.", 403);
-  }
-
   const token = await signCustomerToken(customer.id, env);
-
-  return json({
-    success: true,
-    customer: safeCustomer(customer),
-    token
-  });
+  return json({ success: true, customer: safeCustomer(customer), token });
 }
 
 /* ---------------- CUSTOMER ORDER CREATION ---------------- */
@@ -458,7 +446,7 @@ async function createCustomerOrder(request, body, env) {
 
 /* ---------------- CUSTOMER REGISTER ---------------- */
 
-async function customerRegister(body, env) {
+async function customerRegister(request, body, env) {
   const name = String(body.name || "").trim();
   const phone = String(body.phone || "").trim();
   const password = String(body.password || "");
@@ -467,6 +455,7 @@ async function customerRegister(body, env) {
   if (!name || !phone || !password || !recoveryPin) {
     return fail("يرجى إكمال جميع البيانات المطلوبة.");
   }
+  if (!(await recordAuthAttempt("register", phone, request, env))) return fail("محاولات تسجيل كثيرة. حاول لاحقاً.", 429);
 
   if (password.length < 4) {
     return fail("كلمة المرور قصيرة جداً.");
@@ -489,12 +478,12 @@ async function customerRegister(body, env) {
     id: Date.now(),
     name,
     phone,
-    password: await sha256(password),
+    password: await pbkdf2Hash(password),
     isVip: false,
     isTop: false,
     isBlocked: false,
     points: 0,
-    recoveryPin,
+    recoveryPin: await pbkdf2Hash(recoveryPin),
     wishlist: []
   };
 
@@ -538,17 +527,21 @@ async function customerRegister(body, env) {
 
 
 /* ---------------- CUSTOMER PASSWORD RECOVERY ---------------- */
-async function customerResetPassword(body, env) {
+async function customerResetPassword(request, body, env) {
   const phone = String(body.phone || "").trim();
   const recoveryPin = String(body.recoveryPin || "").trim();
   const password = String(body.password || "");
   if (!phone || !recoveryPin || password.length < 4) return fail("تحقق من رقم الهاتف ورمز الاسترجاع وكلمة المرور (4 أحرف على الأقل).");
+  if (!(await recordAuthAttempt("reset", phone, request, env))) return fail("محاولات استرجاع كثيرة. حاول لاحقاً.", 429);
   const customer = await findCustomerByPhone(phone, env);
-  if (!customer || !customer.recoveryPin || String(customer.recoveryPin) !== recoveryPin) return fail("رقم الهاتف أو رمز الاسترجاع غير صحيح.", 401);
+  if (!customer || !customer.recoveryPin) return fail("رقم الهاتف أو رمز الاسترجاع غير صحيح.", 401);
+  const pinVerification = await verifyStoredSecret(customer.recoveryPin, recoveryPin);
+  if (!pinVerification.valid) return fail("رقم الهاتف أو رمز الاسترجاع غير صحيح.", 401);
   if (customer.isBlocked === true) return fail("هذا الحساب محظور.", 403);
+  const patch = { password: await pbkdf2Hash(password) };
+  if (pinVerification.needsUpgrade) patch.recoveryPin = await pbkdf2Hash(recoveryPin);
   await dbRequest(env, "customers?id=eq." + encodeURIComponent(customer.id), {
-    method: "PATCH", headers: { "Prefer": "return=minimal" },
-    body: JSON.stringify({ password: await sha256(password) })
+    method: "PATCH", headers: { "Prefer": "return=minimal" }, body: JSON.stringify(patch)
   });
   return json({ success: true });
 }
@@ -1013,10 +1006,10 @@ export default {
     try {
       switch (action) {
         case "customerLogin":
-          return await customerLogin(body, env);
+          return await customerLogin(request, body, env);
 
         case "customerRegister":
-          return await customerRegister(body, env);
+          return await customerRegister(request, body, env);
 
         case "customerData":
           return await customerData(request, env);
@@ -1025,7 +1018,7 @@ export default {
           return await createCustomerOrder(request, body, env);
 
         case "customerResetPassword":
-          return await customerResetPassword(body, env);
+          return await customerResetPassword(request, body, env);
 
         case "updateCustomerProfile":
           return await updateCustomerProfile(request, body, env);
