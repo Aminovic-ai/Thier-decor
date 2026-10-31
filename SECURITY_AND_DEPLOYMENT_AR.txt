@@ -26,3 +26,12 @@ SQL المرفق:
 - ترتيب ملفات SQL عند إعداد نسخة تجريبية: المخطط الأساسي أولاً، ثم ملف العنوان/النقاط والحالات، ثم ملف الاستبدال الذري للنقاط، ثم ملف توحيد الهاتف. لا تُعد تشغيل المخطط الأساسي بعد ملفات المراجعة؛ لأنه يعيد تعريف td_create_order ويمنح EXECUTE لـ anon/authenticated من جديد.
 - Worker V2 بعد هذا التعديل يستخدم td_find_customer_by_phone؛ لذلك لن يعمل تسجيل الدخول/التسجيل والبحث عن الهاتف حتى تُطبّق مراجعة الهاتف على قاعدة تجريبية أولاً.
 - لا تشغّل أي ملف SQL ولا تنشر Worker قبل مراجعة مخطط قاعدة البيانات الفعلي وتشغيل قائمة الاختبار على مشروع تجريبي. لم يتم إجراء اتصال حي بقاعدة Supabase أو اختبار عمليات فعلية.
+
+
+مراجعة أمنية إضافية لـ V2 (ملف مراجعة فقط — لم يُشغّل):
+- الملف THIER_DECOR_ORDER_SECURITY_REVIEW.sql يقصر EXECUTE للدوال الحساسة td_create_order(jsonb) وtd_consume_promo(text,text,text) وtd_promo_usage_stats() وtd_admin_update_order_status(bigint,text) على service_role فقط.
+- تبقى td_check_promo(text,text) متاحة لـ anon/authenticated لأنها مسار تحقق كوبون للواجهة الحالية؛ لا تستخدمها لتنفيذ/استهلاك الكوبون.
+- Worker V2 يجب أن يستدعي الدوال الإدارية/الحساسة عبر dbRequest باستخدام SUPABASE_SERVICE_ROLE_KEY الموجود كـ Secret في بيئة Worker فقط. لا تضع هذا المفتاح في app.js أو أي ملف واجهة.
+- الترتيب التجريبي: المخطط الأساسي، ثم THIER_DECOR_CUSTOMER_POINTS_ADDRESS_MIGRATION_REVIEW.sql، ثم THIER_DECOR_LOYALTY_REDEMPTION_ATOMIC_REVIEW.sql، ثم THIER_DECOR_CUSTOMER_PHONE_UNIQUE_REVIEW.sql، ثم THIER_DECOR_ORDER_SECURITY_REVIEW.sql.
+- تحذير مهم: لا تُعد تشغيل THIER_DECOR_SUPABASE_SCHEMA_FIXED_V2.sql بعد ملف الأمان؛ فهو يعيد منح EXECUTE لـ anon/authenticated على td_create_order وtd_consume_promo. لا تشغّل أي ملف على الإنتاج قبل مراجعة المخطط الفعلي والنسخة التجريبية.
+- هذه التغييرات ملفات في فرع worker-v2-review فقط. لم يتم تنفيذ SQL، ولم يتم اختبار اتصال حي، ولم يتم نشر Worker.
