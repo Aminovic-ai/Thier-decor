@@ -54,6 +54,66 @@ function phoneVariants(value) {
   ])];
 }
 
+
+function bytesToHex(bytes) {
+  return [...new Uint8Array(bytes)].map(b => b.toString(16).padStart(2, "0")).join("");
+}
+function hexToBytes(hex) {
+  if (typeof hex !== "string" || !/^(?:[a-f0-9]{2})+$/i.test(hex)) throw new Error("Invalid hex value");
+  return Uint8Array.from(hex.match(/.{2}/g), part => parseInt(part, 16));
+}
+function constantTimeEqual(a, b) {
+  const left = String(a || "");
+  const right = String(b || "");
+  let diff = left.length ^ right.length;
+  const length = Math.max(left.length, right.length);
+  for (let i = 0; i < length; i++) diff |= (left.charCodeAt(i) || 0) ^ (right.charCodeAt(i) || 0);
+  return diff === 0;
+}
+async function pbkdf2Hash(value, saltBytes = null, iterations = 310000) {
+  const salt = saltBytes || crypto.getRandomValues(new Uint8Array(16));
+  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(String(value)), "PBKDF2", false, ["deriveBits"]);
+  const bits = await crypto.subtle.deriveBits({ name: "PBKDF2", salt, iterations, hash: "SHA-256" }, key, 256);
+  return "pbkdf2$" + iterations + "$" + bytesToHex(salt) + "$" + bytesToHex(bits);
+}
+async function verifyStoredSecret(stored, supplied) {
+  const value = String(stored || "");
+  if (value.startsWith("pbkdf2$")) {
+    const parts = value.split("$");
+    if (parts.length !== 4) return { valid: false, needsUpgrade: false };
+    const iterations = Number(parts[1]);
+    if (!Number.isInteger(iterations) || iterations < 100000 || iterations > 1000000) return { valid: false, needsUpgrade: false };
+    try {
+      const candidate = await pbkdf2Hash(supplied, hexToBytes(parts[2]), iterations);
+      return { valid: constantTimeEqual(candidate, value), needsUpgrade: false };
+    } catch (_) { return { valid: false, needsUpgrade: false }; }
+  }
+  // Legacy compatibility: successful login/reset upgrades the verifier to salted PBKDF2.
+  const legacy = await sha256(supplied);
+  return { valid: constantTimeEqual(value, legacy) || constantTimeEqual(value, supplied), needsUpgrade: true };
+}
+async function recordAuthAttempt(action, phone, request, env) {
+  if (!env.AUTH_RATE_SECRET) throw new Error("AUTH_RATE_SECRET is missing");
+  const phoneKey = await hmacSha256Hex(env.AUTH_RATE_SECRET, "phone:" + normalizePhone(phone));
+  const ip = request.headers.get("CF-Connecting-IP") || "unknown";
+  const ipKey = await hmacSha256Hex(env.AUTH_RATE_SECRET, "ip:" + ip);
+  const windowMinutes = action === "register" ? 60 : 15;
+  const phoneLimit = action === "reset" ? 5 : (action === "register" ? 5 : 8);
+  const ipLimit = action === "register" ? 20 : 30;
+  const since = encodeURIComponent(new Date(Date.now() - windowMinutes * 60 * 1000).toISOString());
+  const [phoneAttempts, ipAttempts] = await Promise.all([
+    dbRequest(env, "td_customer_auth_attempts?select=id&phone_hash=eq." + phoneKey + "&action=eq." + action + "&attempted_at=gte." + since + "&limit=" + (phoneLimit + 1)),
+    dbRequest(env, "td_customer_auth_attempts?select=id&ip_hash=eq." + ipKey + "&attempted_at=gte." + since + "&limit=" + (ipLimit + 1))
+  ]);
+  if ((phoneAttempts || []).length >= phoneLimit || (ipAttempts || []).length >= ipLimit) return false;
+  await dbRequest(env, "td_customer_auth_attempts", {
+    method: "POST",
+    headers: { "Prefer": "return=minimal" },
+    body: JSON.stringify({ phone_hash: phoneKey, ip_hash: ipKey, action })
+  });
+  return true;
+}
+
 async function sha256(text) {
   const data = new TextEncoder().encode(String(text));
   const hash = await crypto.subtle.digest("SHA-256", data);
