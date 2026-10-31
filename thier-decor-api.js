@@ -523,12 +523,18 @@ async function customerData(request, env) {
     "messages?select=*&customerId=eq." + id +
     "&order=date.desc&limit=100"
   );
+  const requests = await dbRequest(
+    env,
+    "requests?select=*&customerId=eq." + id +
+    "&order=date.desc&limit=100"
+  );
 
   return json({
     success: true,
     customer: safeCustomer(customer),
     orders: orders || [],
-    messages: messages || []
+    messages: messages || [],
+    requests: requests || []
   });
 }
 
@@ -592,6 +598,80 @@ async function updateOrderStatus(body, env) {
   return json({ success: true, order: rows[0], pointsAwarded: Number(result.points_awarded || 0) });
 }
 
+
+
+/* ---------------- AUTHENTICATED CUSTOMER MUTATIONS ---------------- */
+async function customerUpdateWishlist(request, body, env) {
+  const session = await requireCustomer(request, env);
+  if (!session) return fail("انتهت جلسة الزبون. سجّل الدخول مجدداً.", 401);
+  if (!Array.isArray(body.wishlist) || body.wishlist.length > 500) return fail("قائمة المفضلة غير صالحة.");
+  const wishlist = [...new Set(body.wishlist.map(x => Number(x)).filter(x => Number.isSafeInteger(x) && x > 0))];
+  const rows = await patchRow(env, "customers", session.sub, { wishlist }, "id,wishlist");
+  return json({ success: true, wishlist: rows.wishlist || [] });
+}
+async function customerAddReview(request, body, env) {
+  const session = await requireCustomer(request, env);
+  if (!session) return fail("انتهت جلسة الزبون. سجّل الدخول مجدداً.", 401);
+  const productId = positiveId(body.productId, "معرّف المنتج");
+  const stars = Number(body.stars);
+  const reviewText = cleanText(body.text, 1200, "التقييم");
+  if (!Number.isInteger(stars) || stars < 1 || stars > 5 || !reviewText) return fail("التقييم غير صالح.");
+  const customers = await dbRequest(env, "customers?select=id,name,isBlocked&id=eq." + encodeURIComponent(session.sub) + "&limit=1");
+  const customer = customers?.[0];
+  if (!customer || customer.isBlocked) return fail("الحساب غير متاح.", 403);
+  const orders = await dbRequest(env, "orders?select=id,items,status&customerId=eq." + encodeURIComponent(session.sub) + "&status=eq.delivered&limit=100");
+  const hasPurchased = (orders || []).some(o => Array.isArray(o.items) && o.items.some(i => Number(i.id) === productId || (Array.isArray(i.packItems) && i.packItems.some(p => Number(p.id) === productId))));
+  if (!hasPurchased) return fail("يمكنك تقييم المنتجات بعد استلام طلبية تحتوي عليها.", 403);
+  const products = await dbRequest(env, "products?select=id,reviews&id=eq." + encodeURIComponent(productId) + "&limit=1");
+  const product = products?.[0];
+  if (!product) return fail("المنتج غير موجود.", 404);
+  const reviews = Array.isArray(product.reviews) ? product.reviews.slice(0, 499) : [];
+  reviews.push({ name: cleanText(customer.name, 120, "الاسم"), stars, text: reviewText, date: new Date().toISOString() });
+  await patchRow(env, "products", productId, { reviews }, "id,reviews");
+  return json({ success: true, reviews });
+}
+async function customerCreateRequest(request, body, env) {
+  const session = await requireCustomer(request, env);
+  if (!session) return fail("انتهت جلسة الزبون. سجّل الدخول مجدداً.", 401);
+  const productName = cleanText(body.productName, 180, "اسم المنتج");
+  const details = cleanText(body.details, 2000, "التفاصيل");
+  const qty = Number(body.qty);
+  if (!productName || !Number.isSafeInteger(qty) || qty < 1 || qty > 1000) return fail("بيانات الطلب الخاص غير صالحة.");
+  const rows = await dbRequest(env, "customers?select=id,name,phone,isTop,isBlocked&id=eq." + encodeURIComponent(session.sub) + "&limit=1");
+  const customer = rows?.[0];
+  if (!customer || customer.isBlocked) return fail("الحساب غير متاح.", 403);
+  const record = { id: Date.now(), customerId: customer.id, customerName: customer.name, customerPhone: customer.phone, productName, qty, details, date: new Date().toISOString(), status: "pending", isTopCustomer: customer.isTop === true };
+  const inserted = await dbRequest(env, "requests?select=id", { method: "POST", headers: { "Prefer": "return=representation" }, body: JSON.stringify(record) });
+  if (!Array.isArray(inserted) || !inserted.length) return fail("لم يؤكد الخادم إرسال الطلب.", 409);
+  return json({ success: true, request: record });
+}
+async function customerSendMessage(request, body, env) {
+  const token = await getBearerToken(request);
+  const session = token ? await verifyCustomerToken(token, env) : null;
+  const messageText = cleanText(body.text, 5000, "نص الرسالة");
+  if (!messageText) return fail("اكتب رسالتك أولاً.");
+  let customerId = null, name = "زائر", phone = "غير متوفر";
+  if (session) {
+    const rows = await dbRequest(env, "customers?select=id,name,phone,isBlocked&id=eq." + encodeURIComponent(session.sub) + "&limit=1");
+    const customer = rows?.[0];
+    if (!customer || customer.isBlocked) return fail("الحساب غير متاح.", 403);
+    customerId = customer.id; name = customer.name; phone = customer.phone;
+  }
+  const record = { id: Date.now(), customerId, name, phone, text: messageText, date: new Date().toISOString(), reply: null };
+  const inserted = await dbRequest(env, "messages?select=id", { method: "POST", headers: { "Prefer": "return=representation" }, body: JSON.stringify(record) });
+  if (!Array.isArray(inserted) || !inserted.length) return fail("لم يؤكد الخادم إرسال الرسالة.", 409);
+  return json({ success: true, message: record });
+}
+async function customerConfirmReceipt(request, body, env) {
+  const session = await requireCustomer(request, env);
+  if (!session) return fail("انتهت جلسة الزبون. سجّل الدخول مجدداً.", 401);
+  const id = positiveId(body.id, "معرّف الطلبية");
+  const rows = await dbRequest(env, "orders?select=id,customerId,status&id=eq." + encodeURIComponent(id) + "&limit=1");
+  const order = rows?.[0];
+  if (!order || String(order.customerId) !== String(session.sub)) return fail("الطلبية غير موجودة في حسابك.", 404);
+  if (!["confirmed","on_the_way","out_for_delivery"].includes(order.status)) return fail("لا يمكن تأكيد استلام هذه الطلبية في حالتها الحالية.", 409);
+  return await updateOrderStatus({ id, status: "delivered" }, env);
+}
 
 /* ---------------- ALLOW-LISTED ADMIN MUTATIONS ---------------- */
 function positiveId(value, label = "المعرّف") {
@@ -805,6 +885,21 @@ export default {
 
         case "updateCustomerProfile":
           return await updateCustomerProfile(request, body, env);
+
+        case "customerUpdateWishlist":
+          return await customerUpdateWishlist(request, body, env);
+
+        case "customerAddReview":
+          return await customerAddReview(request, body, env);
+
+        case "customerCreateRequest":
+          return await customerCreateRequest(request, body, env);
+
+        case "customerSendMessage":
+          return await customerSendMessage(request, body, env);
+
+        case "customerConfirmReceipt":
+          return await customerConfirmReceipt(request, body, env);
 
         case "listOrders":
         case "listAdminData":
