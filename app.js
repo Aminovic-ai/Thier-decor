@@ -4,6 +4,7 @@ const K = { products: 'td_prod', orders: 'td_ord', expenses: 'td_exp', settings:
 // New unified API Worker. The legacy thier-decor-admin-api Worker remains untouched.
 const TD_ADMIN_API_URL = 'https://thier-decor-api.amindrody.workers.dev/';
 const TD_CUSTOMER_API_URL = TD_ADMIN_API_URL;
+window.TD_API_URL = TD_ADMIN_API_URL;
 const TD_ADMIN_UID = 'DNlHoogN8vMCsZN0hyIC6yPS64J2';
 
 // Customer login is verified server-side so the public browser does not need SELECT access to customers.
@@ -2656,7 +2657,6 @@ async function saveProduct() {
             if (req) {
                 await callAdminWorker('adminSetRequestStatus', { id: req.id, status: 'fulfilled' });
                 req.status = 'fulfilled'; save(K.requests, state.requests);
-                await callAdminWorker('adminReplyMessage', { id: -1, reply: '' }).catch(() => {});
                 await notifyCustomerProductAvailable(req);
             }
             window.pendingRequestId = null; renderAdminRequests(); toast('🎉');
