@@ -198,26 +198,12 @@ async function dbRequest(env, path, options = {}) {
 }
 
 async function findCustomerByPhone(phone, env) {
-  const variants = phoneVariants(phone);
+  const rows = await dbRequest(env, "rpc/td_find_customer_by_phone", {
+    method: "POST",
+    body: JSON.stringify({ p_phone: String(phone || "") })
+  });
 
-  for (const variant of variants) {
-    const query = new URLSearchParams({
-      select: "*",
-      phone: "eq." + variant,
-      limit: "1"
-    });
-
-    const rows = await dbRequest(
-      env,
-      "customers?" + query.toString()
-    );
-
-    if (Array.isArray(rows) && rows.length) {
-      return rows[0];
-    }
-  }
-
-  return null;
+  return Array.isArray(rows) && rows.length ? rows[0] : null;
 }
 
 function safeCustomer(customer) {
@@ -424,17 +410,26 @@ async function customerRegister(body, env) {
     wishlist: []
   };
 
-  const inserted = await dbRequest(
-    env,
-    "customers?select=*",
-    {
-      method: "POST",
-      headers: {
-        "Prefer": "return=representation"
-      },
-      body: JSON.stringify(customer)
+  let inserted;
+  try {
+    inserted = await dbRequest(
+      env,
+      "customers?select=*",
+      {
+        method: "POST",
+        headers: {
+          "Prefer": "return=representation"
+        },
+        body: JSON.stringify(customer)
+      }
+    );
+  } catch (error) {
+    const reason = String(error?.message || "");
+    if (reason.includes("duplicate key") || reason.includes("customers_phone_canonical_uidx")) {
+      return fail("رقم الهاتف مسجل مسبقاً. يرجى تسجيل الدخول.", 409);
     }
-  );
+    throw error;
+  }
 
   const created = Array.isArray(inserted)
     ? inserted[0]
