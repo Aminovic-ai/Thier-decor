@@ -592,6 +592,175 @@ async function updateOrderStatus(body, env) {
   return json({ success: true, order: rows[0], pointsAwarded: Number(result.points_awarded || 0) });
 }
 
+
+/* ---------------- ALLOW-LISTED ADMIN MUTATIONS ---------------- */
+function positiveId(value, label = "المعرّف") {
+  const id = Number(value);
+  if (!Number.isSafeInteger(id) || id <= 0) throw new Error(label + " غير صحيح.");
+  return id;
+}
+function cleanText(value, max, label) {
+  const text = String(value ?? "").trim();
+  if (text.length > max) throw new Error(label + " طويل جداً.");
+  return text;
+}
+async function patchRow(env, table, id, patch, select = "id") {
+  const rows = await dbRequest(env, table + "?id=eq." + encodeURIComponent(id) + "&select=" + select, {
+    method: "PATCH",
+    headers: { "Prefer": "return=representation" },
+    body: JSON.stringify(patch)
+  });
+  if (!Array.isArray(rows) || !rows.length) throw new Error("لم يتم العثور على السجل أو لم يؤكد الخادم التعديل.");
+  return rows[0];
+}
+async function deleteRow(env, table, id) {
+  const rows = await dbRequest(env, table + "?id=eq." + encodeURIComponent(id) + "&select=id", {
+    method: "DELETE",
+    headers: { "Prefer": "return=representation" }
+  });
+  if (!Array.isArray(rows) || !rows.length) throw new Error("لم يؤكد الخادم حذف السجل.");
+  return rows[0];
+}
+async function adminMutation(action, body, env) {
+  switch (action) {
+    case "adminUpsertProduct": {
+      const id = body.id == null ? Date.now() : positiveId(body.id, "معرّف المنتج");
+      const source = body.product;
+      if (!source || typeof source !== "object" || Array.isArray(source)) return fail("بيانات المنتج غير صالحة.");
+      const allowed = ["name","price","cost","qty","category","desc","images","isPack","packItems","isSpecial","promoPrice","promoStart","promoEnd","reviews","createdAt"];
+      const product = {};
+      for (const key of allowed) if (Object.prototype.hasOwnProperty.call(source, key)) product[key] = source[key];
+      product.name = cleanText(product.name, 180, "اسم المنتج");
+      product.price = Number(product.price);
+      product.cost = Number(product.cost || 0);
+      product.qty = Number(product.qty);
+      if (!product.name || !Number.isFinite(product.price) || product.price <= 0 || !Number.isFinite(product.cost) || product.cost < 0 || !Number.isFinite(product.qty) || product.qty < 0) return fail("تحقق من اسم المنتج والسعر والتكلفة والكمية.");
+      if (product.images !== undefined && (!Array.isArray(product.images) || product.images.length > 12 || product.images.some(x => typeof x !== "string" || x.length > 900000))) return fail("صور المنتج غير صالحة.");
+      if (product.packItems !== undefined && (!Array.isArray(product.packItems) || product.packItems.length > 60)) return fail("مكونات الباقة غير صالحة.");
+      if (product.isPack === true && (!Array.isArray(product.packItems) || !product.packItems.length)) return fail("يجب تحديد مكونات الباقة.");
+      product.id = id;
+      if (body.id == null) product.createdAt = new Date().toISOString();
+      const rows = await dbRequest(env, "products?on_conflict=id&select=id", {
+        method: "POST",
+        headers: { "Prefer": "resolution=merge-duplicates,return=representation" },
+        body: JSON.stringify(product)
+      });
+      if (!Array.isArray(rows) || !rows.length) return fail("لم يؤكد الخادم حفظ المنتج.", 409);
+      return json({ success: true, productId: rows[0].id });
+    }
+    case "adminDeleteProduct": {
+      const id = positiveId(body.id, "معرّف المنتج");
+      await deleteRow(env, "products", id);
+      return json({ success: true });
+    }
+    case "adminSetCustomerFlags": {
+      const id = positiveId(body.id, "معرّف الزبون");
+      const flags = body.flags;
+      if (!flags || typeof flags !== "object" || Array.isArray(flags)) return fail("بيانات حالة الزبون غير صالحة.");
+      const patch = {};
+      for (const key of ["isVip","isTop","isBlocked"]) {
+        if (Object.prototype.hasOwnProperty.call(flags, key)) {
+          if (typeof flags[key] !== "boolean") return fail("قيمة حالة الزبون غير صالحة.");
+          patch[key] = flags[key];
+        }
+      }
+      if (!Object.keys(patch).length) return fail("لا توجد تغييرات.");
+      await patchRow(env, "customers", id, patch);
+      return json({ success: true });
+    }
+    case "adminDeleteCustomer": {
+      const id = positiveId(body.id, "معرّف الزبون");
+      await deleteRow(env, "customers", id);
+      return json({ success: true });
+    }
+    case "adminReplyMessage": {
+      const id = positiveId(body.id, "معرّف الرسالة");
+      const reply = cleanText(body.reply, 10000, "الرد");
+      if (!reply) return fail("اكتب الرد أولاً.");
+      await patchRow(env, "messages", id, { reply, repliedAt: new Date().toISOString() });
+      return json({ success: true });
+    }
+    case "adminDeleteMessage": {
+      await deleteRow(env, "messages", positiveId(body.id, "معرّف الرسالة"));
+      return json({ success: true });
+    }
+    case "adminCreateExpense": {
+      const expense = body.expense;
+      if (!expense || typeof expense !== "object" || Array.isArray(expense)) return fail("بيانات المصروف غير صالحة.");
+      const title = cleanText(expense.title, 180, "عنوان المصروف");
+      const amount = Number(expense.amount);
+      if (!title || !Number.isFinite(amount) || amount < 0) return fail("تحقق من عنوان المصروف ومبلغه.");
+      const row = { id: positiveId(expense.id || Date.now(), "معرّف المصروف"), title, amount, date: cleanText(expense.date || new Date().toISOString(), 80, "التاريخ") };
+      const rows = await dbRequest(env, "expenses?select=id", { method: "POST", headers: { "Prefer": "return=representation" }, body: JSON.stringify(row) });
+      if (!Array.isArray(rows) || !rows.length) return fail("لم يؤكد الخادم إضافة المصروف.", 409);
+      return json({ success: true, expenseId: rows[0].id });
+    }
+    case "adminDeleteExpense": {
+      await deleteRow(env, "expenses", positiveId(body.id, "معرّف المصروف"));
+      return json({ success: true });
+    }
+    case "adminUpdateSettings": {
+      const source = body.settings;
+      if (!source || typeof source !== "object" || Array.isArray(source)) return fail("إعدادات المتجر غير صالحة.");
+      const allowed = ["shopName","shopPhone","shopAddress","promoText","promoActive","adActive","adText","adEndTime","adImages","customPrices","manualSalesAdjustment","coupons"];
+      const patch = {};
+      for (const key of allowed) if (Object.prototype.hasOwnProperty.call(source, key)) patch[key] = source[key];
+      if (!Object.keys(patch).length) return fail("لا توجد إعدادات للتحديث.");
+      if (patch.shopName !== undefined) patch.shopName = cleanText(patch.shopName, 120, "اسم المتجر");
+      if (patch.shopPhone !== undefined) patch.shopPhone = cleanText(patch.shopPhone, 40, "هاتف المتجر");
+      if (patch.shopAddress !== undefined) patch.shopAddress = cleanText(patch.shopAddress, 300, "عنوان المتجر");
+      if (patch.adImages !== undefined && (!Array.isArray(patch.adImages) || patch.adImages.length > 12 || patch.adImages.some(x => typeof x !== "string" || x.length > 900000))) return fail("صور الإشهار غير صالحة.");
+      if (patch.coupons !== undefined && (!Array.isArray(patch.coupons) || patch.coupons.length > 500)) return fail("قائمة الكوبونات غير صالحة.");
+      const rows = await dbRequest(env, "settings?id=eq.1&select=id", { method: "PATCH", headers: { "Prefer": "return=representation" }, body: JSON.stringify(patch) });
+      if (!Array.isArray(rows) || !rows.length) return fail("لم يؤكد الخادم حفظ الإعدادات.", 409);
+      return json({ success: true });
+    }
+    case "adminUpdateOrderTracking": {
+      const id = positiveId(body.id, "معرّف الطلبية");
+      const trackingNumber = cleanText(body.trackingNumber, 120, "كود التتبع");
+      await patchRow(env, "orders", id, { trackingNumber });
+      return json({ success: true });
+    }
+    case "adminSetOrderPaid": {
+      const id = positiveId(body.id, "معرّف الطلبية");
+      const rows = await dbRequest(env, "orders?select=id,total&id=eq." + encodeURIComponent(id) + "&limit=1");
+      const order = rows?.[0];
+      if (!order) return fail("الطلبية غير موجودة.", 404);
+      const paidAmount = Number(body.paidAmount);
+      if (!Number.isFinite(paidAmount) || paidAmount < 0 || paidAmount > Number(order.total)) return fail("مبلغ الدفع خارج النطاق.");
+      await patchRow(env, "orders", id, { paidAmount });
+      return json({ success: true });
+    }
+    case "adminSetOrderFreeDelivery": {
+      const id = positiveId(body.id, "معرّف الطلبية");
+      const rows = await dbRequest(env, "orders?select=id,itemsTotal,discount,status&id=eq." + encodeURIComponent(id) + "&limit=1");
+      const order = rows?.[0];
+      if (!order) return fail("الطلبية غير موجودة.", 404);
+      if (order.status === "delivered" || order.status === "cancelled") return fail("لا يمكن تعديل توصيل طلبية مسلّمة أو ملغاة.", 409);
+      const total = Math.max(0, Number(order.itemsTotal || 0) - Number(order.discount || 0));
+      await patchRow(env, "orders", id, { deliveryPrice: 0, total });
+      return json({ success: true });
+    }
+    case "adminSetRequestStatus": {
+      const id = positiveId(body.id, "معرّف الطلب");
+      const status = String(body.status || "");
+      if (!["pending","fulfilled","rejected"].includes(status)) return fail("حالة الطلب غير صالحة.");
+      await patchRow(env, "requests", id, { status });
+      return json({ success: true });
+    }
+    case "adminDeleteRequest": {
+      await deleteRow(env, "requests", positiveId(body.id, "معرّف الطلب"));
+      return json({ success: true });
+    }
+    case "adminCouponUsage": {
+      const usage = await dbRequest(env, "rpc/td_promo_usage_stats", { method: "POST", body: "{}" });
+      return json({ success: true, usage: usage || {} });
+    }
+    default:
+      return fail("Unknown admin mutation.", 404);
+  }
+}
+
 /* ---------------- MAIN ROUTER ---------------- */
 
 export default {
@@ -639,22 +808,28 @@ export default {
 
         case "listOrders":
         case "listAdminData":
-        case "updateOrderStatus": {
+        case "updateOrderStatus":
+        case "adminUpsertProduct":
+        case "adminDeleteProduct":
+        case "adminSetCustomerFlags":
+        case "adminDeleteCustomer":
+        case "adminReplyMessage":
+        case "adminDeleteMessage":
+        case "adminCreateExpense":
+        case "adminDeleteExpense":
+        case "adminUpdateSettings":
+        case "adminUpdateOrderTracking":
+        case "adminSetOrderPaid":
+        case "adminSetOrderFreeDelivery":
+        case "adminSetRequestStatus":
+        case "adminDeleteRequest":
+        case "adminCouponUsage": {
           const isAdmin = await verifyFirebaseAdmin(request, env);
-
-          if (!isAdmin) {
-            return fail("غير مصرح لك بتنفيذ هذا الإجراء.", 401);
-          }
-
-          if (action === "listOrders") {
-            return await listOrders(env);
-          }
-
-          if (action === "listAdminData") {
-            return await listAdminData(env);
-          }
-
-          return await updateOrderStatus(body, env);
+          if (!isAdmin) return fail("غير مصرح لك بتنفيذ هذا الإجراء.", 401);
+          if (action === "listOrders") return await listOrders(env);
+          if (action === "listAdminData") return await listAdminData(env);
+          if (action === "updateOrderStatus") return await updateOrderStatus(body, env);
+          return await adminMutation(action, body, env);
         }
 
         default:
