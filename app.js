@@ -2123,46 +2123,30 @@ async function updateOrderStatus(id, status) {
     const nextStatus = normalizeOrderStatus(status);
     if (previousStatus === nextStatus) return;
 
-    const restored = [];
     try {
-        // When cancelling, restore stock first; if that fails, do not change order status.
-        if (nextStatus === 'cancelled' && previousStatus !== 'cancelled') {
-            if (!window.supabaseClient) throw new Error('اتصال قاعدة البيانات غير متاح');
-            for (const [productId, qtyBack] of getOrderStockDeltas(order.items)) {
-                const prod = state.products.find(p => String(p.id) === String(productId));
-                if (!prod) throw new Error('Product missing while restoring stock: ' + productId);
-                const oldQty = Number(prod.qty || 0);
-                const nextQty = oldQty + qtyBack;
-                const { error } = await window.supabaseClient.from('products').update({ qty: nextQty }).eq('id', prod.id);
-                if (error) throw error;
-                restored.push({ prod, oldQty, nextQty });
-            }
-        }
-
-        // All order-status writes go through the authenticated Cloudflare Worker.
+        // Stock restoration and the status transition are performed together by the database RPC.
+        // Never update product quantities from the browser here: that would restore stock twice.
         const result = await callAdminWorker('updateOrderStatus', { id, status: nextStatus });
         if (!result.order || String(result.order.id) !== String(id) || normalizeOrderStatus(result.order.status) !== nextStatus) {
             throw new Error(state.currentLang === 'fr' ? 'Le statut enregistré n’a pas pu être vérifié.' : 'لم نتمكن من التحقق من حفظ حالة الطلبية.');
         }
 
         order.status = nextStatus;
-        restored.forEach(x => { x.prod.qty = x.nextQty; });
         save(K.orders, state.orders);
-        save(K.products, state.products);
         toast('✓ ' + i18n[state.currentLang].updated);
     } catch (error) {
-        for (const x of restored.reverse()) {
-            try { await window.supabaseClient.from('products').update({ qty: x.oldQty }).eq('id', x.prod.id); } catch (_) {}
-        }
         order.status = previousStatus;
         save(K.orders, state.orders);
-        save(K.products, state.products);
         console.error('Order status update failed:', error);
         toast((state.currentLang === 'ar' ? 'تعذر تحديث الطلبية: ' : 'Impossible de mettre à jour : ') + (error.message || ''), 'error');
     }
 
     if (typeof loadOrdersListener === 'function') {
-        try { await loadOrdersListener({ forceWait: true }); } catch (refreshError) { console.error('Order refresh failed:', refreshError); }
+        try {
+            await loadOrdersListener({ forceWait: true, forceProducts: nextStatus === 'cancelled' });
+        } catch (refreshError) {
+            console.error('Order refresh failed:', refreshError);
+        }
     }
     renderAdminOrdersList();
     renderAdminHome();
