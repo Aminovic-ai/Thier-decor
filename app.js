@@ -1,12 +1,15 @@
 const K = { products: 'td_prod', orders: 'td_ord', expenses: 'td_exp', settings: 'td_set', customers: 'td_cust', session: 'td_sess', cart: 'td_cart', lang: 'td_lang', messages: 'td_msg', requests: 'td_req', wishlist: 'td_wish' };
 
 // Admin-only orders are fetched through the authenticated Cloudflare Worker.
-const TD_ADMIN_API_URL = 'https://thier-decor-admin-api.amindrody.workers.dev/';
+// New unified API Worker. The legacy thier-decor-admin-api Worker remains untouched.
+const TD_ADMIN_API_URL = 'https://thier-decor-api.amindrody.workers.dev/';
+const TD_CUSTOMER_API_URL = TD_ADMIN_API_URL;
+window.TD_API_URL = TD_ADMIN_API_URL;
 const TD_ADMIN_UID = 'DNlHoogN8vMCsZN0hyIC6yPS64J2';
 
 // Customer login is verified server-side so the public browser does not need SELECT access to customers.
 async function callCustomerLoginWorker(phone, password) {
-    const response = await fetch(TD_ADMIN_API_URL, {
+    const response = await fetch(TD_CUSTOMER_API_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'customerLogin', phone: String(phone || '').trim(), password: String(password || '') }),
@@ -24,7 +27,7 @@ async function callCustomerLoginWorker(phone, password) {
 
 async function fetchCustomerDataViaWorker(token) {
     if (!token) throw new Error(state.currentLang === 'fr' ? 'Session client expirée. Reconnectez-vous.' : 'انتهت جلسة الزبون، يرجى تسجيل الدخول مجدداً.');
-    const response = await fetch(TD_ADMIN_API_URL, {
+    const response = await fetch(TD_CUSTOMER_API_URL, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'customerData' }),
@@ -34,6 +37,19 @@ async function fetchCustomerDataViaWorker(token) {
     try { result = await response.json(); }
     catch (_) { throw new Error(state.currentLang === 'fr' ? 'Réponse client invalide.' : 'ردّ خادم الزبون غير صالح.'); }
     if (!response.ok || result?.success !== true) throw new Error(result?.error || (state.currentLang === 'fr' ? 'Impossible de charger vos données.' : 'تعذر جلب بياناتك.'));
+    return result;
+}
+
+
+async function callCustomerWorker(action, payload = {}) {
+    const token = state.session?.role === 'customer' ? state.session.customerToken : null;
+    if (state.session?.role === 'customer' && !token) throw new Error(state.currentLang === 'fr' ? 'Session client expirée.' : 'انتهت جلسة الزبون، يرجى تسجيل الدخول مجدداً.');
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) headers.Authorization = 'Bearer ' + token;
+    const response = await fetch(TD_CUSTOMER_API_URL, { method: 'POST', headers, body: JSON.stringify({ action, ...payload }), cache: 'no-store' });
+    let result;
+    try { result = await response.json(); } catch (_) { throw new Error(state.currentLang === 'fr' ? 'Réponse serveur invalide.' : 'ردّ الخادم غير صالح.'); }
+    if (!response.ok || result?.success !== true) throw new Error(result?.error || (state.currentLang === 'fr' ? 'Opération impossible.' : 'تعذر تنفيذ العملية.'));
     return result;
 }
 
@@ -62,6 +78,8 @@ async function callAdminWorker(action, payload = {}) {
     return result;
 }
 
+window.callAdminWorker = callAdminWorker;
+
 async function fetchAdminOrdersViaWorker() {
     const result = await callAdminWorker('listOrders');
     if (!Array.isArray(result.orders)) throw new Error(state.currentLang === 'fr' ? 'Réponse des commandes invalide.' : 'بيانات الطلبيات المستلمة غير صالحة.');
@@ -77,7 +95,7 @@ async function fetchAdminDataViaWorker() {
 let state = { products: [], orders: [], expenses: [], customers: [], messages: [], requests: [], session: null, cart: [], wishlist: [], currentLang: 'ar', settings: { shopName: 'Thier Décor', shopPhone: '', promoText: '', promoActive: false, customPrices: {}, manualSalesAdjustment: 0, adActive: false, adImages: [], adText: '', adEndTime: '', coupons: [] } };
 window.state = state;
 let currentCategory = 'all'; let currentOrderFilter = 'all'; let tempUploadedImages = []; let currentAuthMode = 'login'; let pendingCheckout = false;
-let tempAdImages = []; let adSliderInterval = null; let currentAdIndex = 0; let appliedCoupon = null; let lastKnownOrderId = null; let lastKnownMessageId = null;
+let tempAdImages = []; let adSliderInterval = null; let currentAdIndex = 0; let appliedCoupon = null; let lastKnownOrderId = null; let lastKnownMessageId = null; let orderSubmitting = false;
 // Stock changes made while editing an order are drafts until Save is pressed.
 window.pendingStockDelta = new Map();
 let editingOrderOriginal = null;
@@ -150,7 +168,7 @@ const i18n = {
         no_requests: "لا توجد طلبات حالياً", request_sent_success: "تم إرسال طلبك للمسؤول بنجاح", request_details: "تفاصيل المنتج المطلوب",
         cart_empty: "السلة فارغة", login_first: "يرجى تسجيل الدخول أولاً", complete_address: "أكمل معلومات العنوان", updated: "تم التحديث",
         deleted: "تم الحذف", max_stock: "الكمية القصوى", wrong_pass: "كلمة السر خاطئة", saved: "تم الحفظ", save_failed: "حدث خطأ",
-        top_only_feature: "👑 هذه الخدمة متاحة لأصحاب التاج فقط", admin_debts: "الديون", wishlist_title: "مفضلتي", points_title: "نقاط الولاء", 
+        top_only_feature: "👑 هذه الخدمة متاحة لأصحاب التاج فقط", admin_debts: "الديون", wishlist_title: "مفضلتي", points_title: "نقاط الولاء", use_points_delivery: "استبدال 200 نقطة بتوصيل مجاني", points_balance: "رصيدك", points_not_enough: "تحتاج إلى 200 نقطة على الأقل", points_redeemed: "تم استعمال 200 نقطة للحصول على توصيل مجاني", 
         coupons_tab: "كوبونات الخصم", image_ads_title: "إشهار الصور", activate_ad: "تفعيل إشهار الصور", ad_text: "نص الإشهار", ad_endtime: "وقت الانتهاء", 
         ad_images: "الصور", print_labels: "طباعة بوالص الشحن", export_orders: "تصدير الطلبات", export_customers: "تصدير الزبائن", 
         sort_default: "الترتيب الافتراضي", sort_price_asc: "السعر: من الأقل للأعلى", sort_price_desc: "السعر: من الأعلى للأقل", sort_newest: "الأحدث أولاً", 
@@ -207,7 +225,7 @@ const i18n = {
         no_requests: "Aucune demande", request_sent_success: "Demande envoyée", request_details: "Détails", cart_empty: "Panier vide", 
         login_first: "Connectez-vous", complete_address: "Complétez", updated: "Mis à jour", deleted: "Supprimé", max_stock: "Stock max", 
         wrong_pass: "Mot de passe incorrect", saved: "Sauvegardé", save_failed: "Erreur", top_only_feature: "👑 Réservé VIP", admin_debts: "Dettes", 
-        wishlist_title: "Ma Liste", points_title: "Points", coupons_tab: "Coupons", image_ads_title: "Publicité", activate_ad: "Activer", 
+        wishlist_title: "Ma Liste", points_title: "Points", use_points_delivery: "Échanger 200 points contre la livraison gratuite", points_balance: "Votre solde", points_not_enough: "Il faut au moins 200 points", points_redeemed: "200 points utilisés pour la livraison gratuite", coupons_tab: "Coupons", image_ads_title: "Publicité", activate_ad: "Activer", 
         ad_text: "Texte", ad_endtime: "Date fin", ad_images: "Images", print_labels: "Imprimer Bons", export_orders: "Exporter Commandes", 
         export_customers: "Exporter Clients", sort_default: "Défaut", sort_price_asc: "Prix +", sort_price_desc: "Prix -", sort_newest: "Nouveaux", 
         calc_delivery: "Livraison:", reviews_title: "Avis ⭐", review_placeholder: "Votre avis...", coupon_placeholder: "Code promo...", 
@@ -1227,27 +1245,34 @@ async function loadOrdersListener(options = {}) {
             if (!settingsError && settings) { state.settings = settings; save(K.settings, settings); lastSettingsFetchAt = now; } else if (settingsError) console.error('Supabase settings read failed:', settingsError.message);
         }
         
-        let query = window.supabaseClient.from('orders').select('*').order('id', { ascending: false });
         const currentFirebaseUser = Boolean(window.firebaseReady && typeof firebase !== 'undefined' && firebase.auth && firebase.auth().currentUser);
         const isFirebaseAdmin = currentFirebaseUser && firebase.auth().currentUser.uid === 'DNlHoogN8vMCsZN0hyIC6yPS64J2';
         if (state.session && state.session.role === 'customer' && !isFirebaseAdmin) {
             // Customer-private orders/messages are fetched only through the signed-session Worker.
             try {
                 const customerData = await fetchCustomerDataViaWorker(state.session.customerToken);
+                // Refresh the signed-in customer's canonical profile from the server on every private-data refresh.
+                if (customerData.customer && String(customerData.customer.id) === String(state.session.id)) {
+                    const profileIndex = state.customers.findIndex(x => String(x.id) === String(state.session.id));
+                    if (profileIndex >= 0) state.customers[profileIndex] = { ...state.customers[profileIndex], ...customerData.customer };
+                    else state.customers.push(customerData.customer);
+                    save(K.customers, state.customers);
+                    state.wishlist = Array.isArray(customerData.customer.wishlist) ? customerData.customer.wishlist : [];
+                    save(K.wishlist, state.wishlist);
+                    updateWishlistBadge();
+                    // The customer profile is a page (s-profile), not a modal.
+                    // Refresh visible fields after the server's canonical profile arrives.
+                    const profilePage = document.getElementById('s-profile');
+                    if (profilePage?.classList.contains('active')) renderProfile();
+                }
                 if (Array.isArray(customerData.orders)) { state.orders = customerData.orders; save(K.orders, customerData.orders); }
                 if (Array.isArray(customerData.messages)) { state.messages = customerData.messages; save(K.messages, customerData.messages); }
+                if (Array.isArray(customerData.requests)) { state.requests = customerData.requests; save(K.requests, customerData.requests); }
             } catch (customerDataError) {
                 console.error('Customer Worker data read failed:', customerDataError.message || customerDataError);
                 // Do not query private Supabase tables directly from the customer browser.
                 state.orders = [];
                 state.messages = [];
-            }
-            const cust = state.customers.find(x => String(x.id) === String(state.session.id));
-            if (cust && cust.phone) {
-                // Requests remain separate from the private orders/messages Worker endpoint.
-                const { data: ownRequests, error: requestsError } = await window.supabaseClient.from('requests').select('*').eq('customerPhone', cust.phone).order('id', { ascending: false });
-                if (!requestsError && ownRequests) { state.requests = ownRequests; save(K.requests, ownRequests); }
-                else if (requestsError) console.warn('Customer requests are unavailable under current database policies:', requestsError.message);
             }
         } else if (isFirebaseAdmin) {
             // Private admin order reads go through Cloudflare; never query the private table from the browser.
@@ -1539,15 +1564,25 @@ function filterShopProducts(q) {
 }
 window.filterShopProducts = filterShopProducts;
 
-function toggleWishlist(id) {
-    if (!state.session) { toast(i18n[state.currentLang].login_first, 'error'); openCustomerAuthModal(); return; }
-    const idx = state.wishlist.indexOf(id); if (idx > -1) state.wishlist.splice(idx, 1); else state.wishlist.push(id);
-    save(K.wishlist, state.wishlist); updateWishlistBadge(); renderWishlist(); renderShop();
-    const cust = state.customers.find(c => c.id === state.session.id);
-    if (cust) { cust.wishlist = state.wishlist; save(K.customers, state.customers); if (window.supabaseClient) window.supabaseClient.from('customers').update({ wishlist: state.wishlist }).eq('id', cust.id).then(); }
-    toast(idx > -1 ? '✓' : '❤️');
+async function toggleWishlist(id) {
+    if (!state.session || state.session.role !== 'customer') { toast(i18n[state.currentLang].login_first, 'error'); openCustomerAuthModal(); return; }
+    const previous = [...state.wishlist];
+    const idx = state.wishlist.indexOf(id);
+    if (idx > -1) state.wishlist.splice(idx, 1); else state.wishlist.push(id);
+    try {
+        const result = await callCustomerWorker('customerUpdateWishlist', { wishlist: state.wishlist });
+        state.wishlist = Array.isArray(result.wishlist) ? result.wishlist : state.wishlist;
+        const cust = state.customers.find(c => String(c.id) === String(state.session.id));
+        if (cust) { cust.wishlist = state.wishlist; save(K.customers, state.customers); }
+        save(K.wishlist, state.wishlist); updateWishlistBadge(); renderWishlist(); renderShop();
+        toast(idx > -1 ? '✓' : '❤️');
+    } catch (error) {
+        state.wishlist = previous; save(K.wishlist, previous); updateWishlistBadge(); renderWishlist(); renderShop();
+        toast(error.message || i18n[state.currentLang].save_failed, 'error');
+    }
 }
 window.toggleWishlist = toggleWishlist;
+
 
 function updateWishlistBadge() { const b = document.getElementById('wishlist-badge'); if (b) { b.textContent = state.wishlist.length; b.style.display = state.wishlist.length > 0 ? 'flex' : 'none'; } }
 function renderWishlist() {
@@ -1572,18 +1607,24 @@ function showProductView(id) {
 window.showProductView = showProductView;
 
 
-function submitReview() {
-    if (!state.session) return toast(i18n[state.currentLang].login_first, 'error');
-    const stars = document.getElementById('pv-review-stars').value; const text = document.getElementById('pv-review-text').value.trim(); if (!text) return toast(i18n[state.currentLang].review_placeholder, 'error');
-    const productId = document.getElementById('pv-add-to-cart').getAttribute('data-id'); const prod = state.products.find(p => p.id === Number(productId)); if (!prod) return;
-    if (!prod.reviews) prod.reviews = [];
-    const reviewer = state.customers.find(c => String(c.id) === String(state.session.id));
-    if (!reviewer) return toast(i18n[state.currentLang].login_first, 'error');
-    prod.reviews.push({ name: reviewer.name || 'زبون', stars, text, date: new Date().toISOString() });
-    save(K.products, state.products); if (window.supabaseClient) window.supabaseClient.from('products').update({ reviews: prod.reviews }).eq('id', prod.id).then();
-    document.getElementById('pv-review-text').value = ''; showProductView(prod.id); toast('✅');
+async function submitReview() {
+    if (!state.session || state.session.role !== 'customer') return toast(i18n[state.currentLang].login_first, 'error');
+    const stars = Number(document.getElementById('pv-review-stars').value);
+    const text = document.getElementById('pv-review-text').value.trim();
+    if (!text) return toast(i18n[state.currentLang].review_placeholder, 'error');
+    const productId = Number(document.getElementById('pv-add-to-cart').getAttribute('data-id'));
+    const prod = state.products.find(p => Number(p.id) === productId);
+    if (!prod) return;
+    try {
+        const result = await callCustomerWorker('customerAddReview', { productId, stars, text });
+        prod.reviews = Array.isArray(result.reviews) ? result.reviews : prod.reviews;
+        save(K.products, state.products);
+        document.getElementById('pv-review-text').value = '';
+        showProductView(prod.id); toast('✅');
+    } catch (error) { toast(error.message || i18n[state.currentLang].save_failed, 'error'); }
 }
 window.submitReview = submitReview;
+
 
 function addToCart(id) {
     const p = state.products.find(x => x.id === id); if (!p) return;
@@ -1612,6 +1653,14 @@ function openShopCheckout() {
     if (state.cart.length === 0) return toast(i18n[state.currentLang].cart_empty, 'error');
     if (!state.session || state.session.role !== 'customer') { pendingCheckout = true; toast(i18n[state.currentLang].login_first, 'error'); openCustomerAuthModal(); return; }
     document.getElementById('chk-coupon').value = ''; appliedCoupon = null;
+    const pointsToggle = document.getElementById('chk-use-points');
+    const customer = state.customers.find(x => String(x.id) === String(state.session.id));
+    // Reuse the address saved in the customer's profile instead of asking for it again.
+    const savedAddressInput = document.getElementById('chk-address');
+    if (savedAddressInput) savedAddressInput.value = customer?.address || '';
+    if (pointsToggle) { pointsToggle.checked = false; pointsToggle.disabled = Number(customer?.points || 0) < 200; }
+    const pointsBalance = document.getElementById('chk-points-balance');
+    if (pointsBalance) pointsBalance.textContent = i18n[state.currentLang].points_balance + ': ' + Number(customer?.points || 0);
     populateWilayas();
     document.getElementById('chk-courier').value = 'noest';
     document.getElementById('chk-type').value = 'home';
@@ -1671,9 +1720,9 @@ async function applyCoupon() {
             const messages = { phone_mismatch: 'هذا الكود غير مرتبط برقم هاتفك', limit_reached: 'انتهى عدد استعمالات هذا الكود', expired: 'انتهت صلاحية الكود', inactive: 'هذا الكود متوقف', not_found: 'كود غير صحيح' };
             appliedCoupon = null; updateDeliveryPrice(); return toast(messages[data?.reason] || 'كود غير صالح', 'error');
         }
-        appliedCoupon = { code: data.code, discount: Number(data.discount), phone: customer.phone, maxUses: data.maxUses, used: data.used };
+        appliedCoupon = { code: data.code, discount: Number(data.discount), phone: customer.phone };
         updateDeliveryPrice(); toast(`✓ تم تطبيق تخفيض ${data.discount}%`);
-    } catch (e) { console.error('Promo validation failed', e); appliedCoupon = null; updateDeliveryPrice(); toast('تعذر التحقق من الكود. شغّل ملف SQL الخاص بالبرومو في Supabase.', 'error'); }
+    } catch (e) { console.error('Promo validation failed', e); appliedCoupon = null; updateDeliveryPrice(); toast(state.currentLang === 'fr' ? 'Impossible de vérifier ce code pour le moment.' : 'تعذر التحقق من الكود حالياً.', 'error'); }
 }
 window.applyCoupon = applyCoupon;
 
@@ -1683,7 +1732,14 @@ function updateDeliveryPrice() {
     if (w) { delPrice = comp === 'yalidine' ? (type === 'home' ? w.yalidineHome : w.yalidineDesk) : (type === 'home' ? w.noestHome : w.noestDesk); if (state.settings.customPrices?.[wId]?.[comp]?.[type === 'home' ? 'home' : 'desk']) delPrice = state.settings.customPrices[wId][comp][type === 'home' ? 'home' : 'desk']; }
     let itemsTotal = state.cart.reduce((s, i) => s + i.price * i.qty, 0); let discountAmount = 0;
     if (appliedCoupon) { discountAmount = itemsTotal * (appliedCoupon.discount / 100); itemsTotal -= discountAmount; }
+    const customer = state.session && state.session.role === 'customer' ? state.customers.find(x => String(x.id) === String(state.session.id)) : null;
+    const usePoints = !!document.getElementById('chk-use-points')?.checked && Number(customer?.points || 0) >= 200;
+    if (usePoints) delPrice = 0;
     const total = itemsTotal + delPrice;
+    const deliveryLabel = document.getElementById('chk-delivery-label');
+    if (deliveryLabel) deliveryLabel.textContent = usePoints ? (state.currentLang === 'fr' ? 'Livraison (200 points)' : 'التوصيل (200 نقطة)') : i18n[state.currentLang].delivery_cost;
+    const pointsNote = document.getElementById('chk-points-note');
+    if (pointsNote) pointsNote.textContent = usePoints ? i18n[state.currentLang].points_redeemed : '';
     document.getElementById('chk-discount').textContent = fmtMoney(discountAmount);
     document.getElementById('chk-del-price').textContent = fmtMoney(delPrice); 
     document.getElementById('chk-items-total').textContent = fmtMoney(itemsTotal + discountAmount); 
@@ -1693,6 +1749,7 @@ window.updateDeliveryPrice = updateDeliveryPrice;
 
 async function confirmShopOrder() {
     if (!state.session || state.session.role !== 'customer') return toast(i18n[state.currentLang].login_first, 'error');
+    if (orderSubmitting) return;
     const c = state.customers.find(x => String(x.id) === String(state.session.id)); if (!c) return toast('حساب الزبون غير موجود، يرجى تحديث الصفحة', 'error');
     const wilayaCode = parseInt(document.getElementById('chk-wilaya').value); const type = document.getElementById('chk-type').value; const courier = document.getElementById('chk-courier').value;
     const commune = document.getElementById('chk-commune').value.trim(); const address = document.getElementById('chk-address').value.trim();
@@ -1728,57 +1785,46 @@ async function confirmShopOrder() {
     }
     let itemsTotal = orderItems.reduce((s, i) => s + (Number(i.price) || 0) * (Number(i.qty) || 0), 0); let discountAmount = 0;
     if (appliedCoupon) { discountAmount = itemsTotal * (appliedCoupon.discount / 100); itemsTotal -= discountAmount; }
+    const useLoyaltyPoints = !!document.getElementById('chk-use-points')?.checked;
+    if (useLoyaltyPoints && Number(c.points || 0) < 200) return toast(i18n[state.currentLang].points_not_enough, 'error');
+    if (useLoyaltyPoints) delPrice = 0;
     const total = itemsTotal + delPrice;
 
-    if (window.supabaseClient) {
+    // Stock availability, authoritative prices and coupon consumption are checked atomically by the Worker RPC.
+
+    const order = { id: (lastKnownOrderId || (lastKnownOrderId = Date.now())), customerId: state.session.id, customerName: c.name, customerPhone: c.phone, items: orderItems, itemsTotal: itemsTotal + discountAmount, discount: discountAmount, couponCode: appliedCoupon ? appliedCoupon.code : null, promoCode: appliedCoupon ? appliedCoupon.code : null, promoDiscountPercent: appliedCoupon ? appliedCoupon.discount : 0, promoDiscountAmount: discountAmount, deliveryPrice: delPrice, total: total, courier, deliveryType: type, wilaya: wData.name, commune: finalCommune, address: finalAddress, stationCode: stationCode || null, stationName: stationName || null, stationAddress: stationAddress || null, status: 'new', createdAt: new Date().toISOString(), useLoyaltyPoints };
+
+    if (state.session.customerToken) {
+        orderSubmitting = true;
         try {
-            let outOfStock = [];
-            const requiredByProduct = new Map();
-            for (const item of orderItems) {
-                requiredByProduct.set(String(item.id), (requiredByProduct.get(String(item.id)) || 0) + item.qty);
-                if (item.isPack) for (const comp of item.packItems) {
-                    const key = String(comp.id);
-                    requiredByProduct.set(key, (requiredByProduct.get(key) || 0) + (Number(comp.qty) || 0) * item.qty);
-                }
-            }
-            for (const [productId, requiredQty] of requiredByProduct) {
-                const { data, error: stockError } = await window.supabaseClient.from('products').select('id,name,qty').eq('id', productId).maybeSingle();
-                if (stockError) throw stockError;
-                if (!data || Number(data.qty) < requiredQty) outOfStock.push(`"${data?.name || orderItems.find(x => String(x.id) === productId)?.name || 'Produit'}"`);
-            }
-            if (outOfStock.length > 0) { return toast(`❌ ${i18n[state.currentLang].max_stock}: ${[...new Set(outOfStock)].join(' و ')}`, 'error'); }
-        } catch (error) { return toast(i18n[state.currentLang].error_connection, 'error'); }
-    }
-
-    const order = { id: Date.now(), customerId: state.session.id, customerName: c.name, customerPhone: c.phone, items: orderItems, itemsTotal: itemsTotal + discountAmount, discount: discountAmount, couponCode: appliedCoupon ? appliedCoupon.code : null, promoCode: appliedCoupon ? appliedCoupon.code : null, promoDiscountPercent: appliedCoupon ? appliedCoupon.discount : 0, promoDiscountAmount: discountAmount, deliveryPrice: delPrice, total: total, courier, deliveryType: type, wilaya: wData.name, commune: finalCommune, address: finalAddress, stationCode: stationCode || null, stationName: stationName || null, stationAddress: stationAddress || null, status: 'new', createdAt: new Date().toISOString() };
-
-    if (appliedCoupon && window.supabaseClient) {
-        // Recheck at submission time; the database atomically records each order ID only once.
-        const { data: check, error: checkError } = await window.supabaseClient.rpc('td_check_promo', { p_code: appliedCoupon.code, p_phone: c.phone });
-        if (checkError || !check || check.valid !== true) { appliedCoupon = null; updateDeliveryPrice(); return toast('انتهت صلاحية البرومو أو استُنفدت استعمالاته. أعد إدخال الكود.', 'error'); }
-        const freshDiscount = Number(check.discount);
-        if (freshDiscount !== Number(order.promoDiscountPercent)) return toast('تغيرت نسبة التخفيض. أعد تطبيق الكود من جديد.', 'error');
-    }
-
-    if (window.supabaseClient) {
-        try {
-            // The database RPC locks all stock rows and inserts the order + stock deductions atomically.
-            const { data: created, error } = await window.supabaseClient.rpc('td_create_order', { p_order: order });
-            if (error) throw error;
-            if (!created || created.ok !== true) throw new Error('Order creation was not confirmed by the database.');
+            // The Worker verifies the signed customer session before invoking the service-role RPC.
+            const response = await fetch(TD_CUSTOMER_API_URL, {
+                method: 'POST',
+                headers: { 'Authorization': 'Bearer ' + state.session.customerToken, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'createOrder', order }),
+                cache: 'no-store'
+            });
+            const result = await response.json().catch(() => null);
+            if (!response.ok || result?.success !== true || !result.order) throw new Error(result?.error || 'Order creation was not confirmed by the server.');
+            Object.assign(order, result.order);
+            orderSubmitting = false;
+            lastKnownOrderId = null;
+            if (result.customer) { Object.assign(c, result.customer); save(K.customers, state.customers); }
             const stockDeltas = getOrderStockDeltas(orderItems);
             for (const [productId, quantity] of stockDeltas) {
                 const prod = state.products.find(p => String(p.id) === String(productId));
                 if (prod) prod.qty = Math.max(0, Number(prod.qty) - Number(quantity));
             }
-        } catch (error) { console.error(error); return toast(i18n[state.currentLang].order_failed, 'error'); }
-    } else { return toast('يلزم الاتصال بقاعدة البيانات لإتمام الطلبية', 'error'); }
+        } catch (error) { orderSubmitting = false; console.error(error); return toast((error.message || i18n[state.currentLang].order_failed), 'error'); }
+    } else { return toast('انتهت جلسة الزبون، سجّل الدخول مجدداً لإتمام الطلبية', 'error'); }
 
-    const pointsEarned = Math.floor(total / 100); c.points = (c.points || 0) + pointsEarned;
-    if (window.supabaseClient) window.supabaseClient.from('customers').update({ points: c.points }).eq('id', c.id).then();
+    // Loyalty points are awarded only by the trusted backend after delivery confirmation.
+    // Never grant points in the browser at checkout.
 
     state.orders.unshift(order); save(K.orders, state.orders); save(K.products, state.products); save(K.customers, state.customers);
-    state.cart = []; save(K.cart, state.cart); updateCartBadge(); closeModal('m-checkout'); toast('✅ ' + i18n[state.currentLang].saved); shopGo('orders'); renderShop();
+    state.cart = []; save(K.cart, state.cart); updateCartBadge();
+    const pointsToggle = document.getElementById('chk-use-points'); if (pointsToggle) pointsToggle.checked = false;
+    closeModal('m-checkout'); toast('✅ ' + i18n[state.currentLang].saved); shopGo('orders'); renderShop();
 }
 window.confirmShopOrder = confirmShopOrder;
 function callStore() { const phone = state.settings.shopPhone ? state.settings.shopPhone.replace(/[^0-9+]/g, '') : ''; if (!phone) return toast(i18n[state.currentLang].save_failed, 'error'); window.location.href = `tel:${phone}`; }
@@ -1841,23 +1887,20 @@ async function confirmCustomerAuth() {
         }
         // 2. إنشاء حساب جديد: لا نقرأ جدول customers من المتصفح؛ يعتمد منع التكرار على قيد UNIQUE في قاعدة البيانات.
         else {
-            const hashedPass = CryptoJS.SHA256(pass).toString();
-            if (!name) throw new Error('أدخل الاسم'); 
+            if (!name) throw new Error('أدخل الاسم');
             if (!recoveryPin) throw new Error('أدخل الرقم السري');
-            
-            const newCustomer = { id: Date.now(), name, phone, password: hashedPass, isVip: false, isTop: false, isBlocked: false, points: 0, recoveryPin: recoveryPin, wishlist: [] };
-            
-            if (window.supabaseClient) { 
-                const { error } = await window.supabaseClient.from('customers').insert([newCustomer]); 
-                if (error) {
-                    if (error.code === '23505' || error.message.includes('duplicate key')) {
-                        throw new Error('❌ رقم الهاتف مسجل مسبقاً! يرجى تسجيل الدخول بدلاً من إنشاء حساب جديد.');
-                    }
-                    throw new Error(error.message); 
-                } 
+            const response = await fetch(TD_CUSTOMER_API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'customerRegister', name, phone, password: pass, recoveryPin }),
+                cache: 'no-store'
+            });
+            const registerResult = await response.json().catch(() => null);
+            if (!response.ok || registerResult?.success !== true || !registerResult.customer || !registerResult.token) {
+                throw new Error(registerResult?.error || 'تعذر إنشاء الحساب. حاول مجدداً.');
             }
-            state.customers.push(newCustomer); 
-            c = newCustomer;
+            c = registerResult.customer;
+            var customerSessionToken = registerResult.token;
             toast(`✅ ${i18n[state.currentLang].welcome_new}`);
         }
         
@@ -1892,64 +1935,64 @@ async function confirmCustomerAuth() {
 window.confirmCustomerAuth = confirmCustomerAuth;
 
 async function customerForgotPassword() {
-    const phone = prompt("أدخل رقم الهاتف الذي سجلت به:"); if (!phone) return;
-    let c = null;
-    if (window.supabaseClient) { const { data, error } = await window.supabaseClient.from('customers').select('*').eq('phone', phone.trim()).limit(1).maybeSingle(); if (error) throw new Error(error.message); if (data) c = data; }
-    if (!c) return toast("❌ هذا الرقم غير مسجل لدينا!", "error");
-    const pin = prompt("أدخل الرقم السري للاسترجاع (Recovery PIN):"); if (pin !== c.recoveryPin) return toast("❌ الرقم السري غير صحيح!", "error");
-    const newPass = prompt("✅ تم التحقق بنجاح!\nأدخل كلمة المرور الجديدة:");
-    if (newPass && newPass.trim().length >= 4) {
-        const hashedPass = CryptoJS.SHA256(newPass.trim()).toString(); c.password = hashedPass; save(K.customers, state.customers);
-        if (window.supabaseClient) await window.supabaseClient.from('customers').update({ password: hashedPass }).eq('id', c.id);
+    const phone = prompt("أدخل رقم الهاتف الذي سجلت به:");
+    if (!phone) return;
+    const pin = prompt("أدخل رمز الاسترجاع الذي اخترته عند التسجيل:");
+    if (!pin) return;
+    const newPass = prompt("أدخل كلمة المرور الجديدة (4 أحرف على الأقل):");
+    if (!newPass || newPass.trim().length < 4) return toast("❌ كلمة المرور قصيرة جداً", "error");
+    try {
+        const response = await fetch(TD_CUSTOMER_API_URL, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'customerResetPassword', phone: phone.trim(), recoveryPin: pin.trim(), password: newPass.trim() }),
+            cache: 'no-store'
+        });
+        const result = await response.json().catch(() => null);
+        if (!response.ok || result?.success !== true) throw new Error(result?.error || 'تعذر تغيير كلمة المرور.');
         toast("✅ تم تغيير كلمة المرور بنجاح!");
-        document.getElementById('auth-phone').value = c.phone; document.getElementById('auth-pass').value = ''; document.getElementById('auth-pass').focus();
-    } else if (newPass) { toast("❌ كلمة المرور قصيرة جداً", "error"); }
+        document.getElementById('auth-phone').value = phone.trim();
+        document.getElementById('auth-pass').value = '';
+        document.getElementById('auth-pass').focus();
+    } catch (error) { toast(error.message || 'تعذر تغيير كلمة المرور.', 'error'); }
 }
 window.customerForgotPassword = customerForgotPassword;
 
 function renderProfile() {
     const n = document.getElementById('p-name'), p = document.getElementById('p-phone'), a = document.getElementById('p-address'); if (!n) return;
     if (!state.session) { n.value = ''; p.value = ''; a.value = ''; return; }
-    const c = state.customers.find(x => x.id === state.session.id); if (c) { n.value = c.name || ''; p.value = c.phone || ''; a.value = c.address || ''; document.getElementById('p-points').textContent = `${c.points || 0}`; }
+    const c = state.customers.find(x => String(x.id) === String(state.session.id));
+    if (c) {
+        n.value = c.name || '';
+        p.value = c.phone || '';
+        a.value = c.address || '';
+        const pointsEl = document.getElementById('p-points');
+        if (pointsEl) pointsEl.textContent = String(c.points || 0);
+    }
 }
 window.renderProfile = renderProfile;
 
 async function updateCustomerProfile() {
-    if (!state.session) return;
+    if (!state.session || !state.session.customerToken) return toast(i18n[state.currentLang].login_first, 'error');
     const c = state.customers.find(x => String(x.id) === String(state.session.id));
     if (!c) return toast(i18n[state.currentLang].error_fetch, 'error');
     const payload = { name: document.getElementById('p-name').value.trim(), phone: document.getElementById('p-phone').value.trim(), address: document.getElementById('p-address').value.trim() };
-    if (!window.supabaseClient) return toast(i18n[state.currentLang].error_connection, 'error');
     if (!payload.name || !payload.phone) return toast(state.currentLang === 'fr' ? 'Le nom et le téléphone sont obligatoires.' : 'الاسم ورقم الهاتف إجباريان.', 'error');
-    if (payload.phone !== String(c.phone || '')) {
-        const { data: existing, error: duplicateError } = await window.supabaseClient.from('customers').select('id').eq('phone', payload.phone).neq('id', c.id).limit(1);
-        if (duplicateError) return toast(state.currentLang === 'fr' ? 'Impossible de vérifier ce numéro. Réessayez.' : 'تعذر التحقق من رقم الهاتف. حاول مجدداً.', 'error');
-        if (existing && existing.length) return toast(state.currentLang === 'fr' ? 'Ce numéro est déjà utilisé par un autre compte.' : 'هذا الهاتف مستعمل من حساب آخر', 'error');
-        const { data: priorOrders, error: ordersCheckError } = await window.supabaseClient.from('orders').select('id').eq('customerPhone', c.phone).limit(1);
-        if (ordersCheckError) return toast(state.currentLang === 'fr' ? 'Impossible de vérifier les anciennes commandes. Le téléphone n’a pas été modifié.' : 'تعذر التحقق من الطلبيات القديمة. لم يتم تغيير الهاتف.', 'error');
-        if (priorOrders && priorOrders.length) return toast(state.currentLang === 'fr' ? 'Le téléphone ne peut pas être modifié après une commande. Contactez le magasin.' : 'لا يمكن تغيير الهاتف بعد وجود طلبيات سابقة. اتصل بالمتجر للمساعدة.', 'error');
+    try {
+      const response = await fetch(TD_CUSTOMER_API_URL, {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + state.session.customerToken, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'updateCustomerProfile', ...payload }),
+        cache: 'no-store'
+      });
+      const result = await response.json().catch(() => null);
+      if (!response.ok || result?.success !== true || !result.customer) throw new Error(result?.error || 'تعذر حفظ بيانات الحساب.');
+      Object.assign(c, result.customer);
+      save(K.customers, state.customers);
+      toast('✅ ' + i18n[state.currentLang].saved);
+      setTimeout(() => shopGo('shop'), 1000);
+    } catch (error) {
+      toast(error.message || i18n[state.currentLang].save_failed, 'error');
     }
-    const { data: updatedCustomer, error } = await window.supabaseClient
-        .from('customers')
-        .update(payload)
-        .eq('id', c.id)
-        .select('id, name, phone, address')
-        .maybeSingle();
-    if (error) {
-        console.error('Customer profile update failed:', error);
-        return toast(state.currentLang === 'fr'
-            ? 'Enregistrement impossible. Vérifiez les autorisations du serveur.'
-            : 'تعذر حفظ البيانات. تحقق من صلاحيات الخادم ثم أعد المحاولة.', 'error');
-    }
-    // PostgREST may return no error but update zero rows when RLS blocks the write.
-    // Never report success or update the local profile unless the server confirms a row.
-    if (!updatedCustomer) {
-        return toast(state.currentLang === 'fr'
-            ? 'Aucune modification confirmée par le serveur. Réessayez ou contactez le magasin.'
-            : 'لم يؤكد الخادم حفظ أي تغيير. أعد المحاولة أو تواصل مع المتجر.', 'error');
-    }
-    Object.assign(c, payload); save(K.customers, state.customers);
-    toast('✅ ' + i18n[state.currentLang].saved); setTimeout(() => { shopGo('shop'); }, 1000);
 }
 window.updateCustomerProfile = updateCustomerProfile;
 
@@ -1972,10 +2015,27 @@ window.renderMyOrders = renderMyOrders;
 
 async function customerConfirmReceipt(orderId) {
     if (!confirm(i18n[state.currentLang].confirm_receipt_q)) return;
-    const o = state.orders.find(x => x.id === orderId);
-    if (o) { o.status = 'delivered'; save(K.orders, state.orders); if (window.supabaseClient) await window.supabaseClient.from('orders').update({ status: 'delivered' }).eq('id', orderId); toast(i18n[state.currentLang].receipt_confirmed); renderMyOrders(); }
+    try {
+        const result = await callCustomerWorker('customerConfirmReceipt', { id: orderId });
+        const order = result.order || { ...state.orders.find(x => String(x.id) === String(orderId)), status: 'delivered' };
+        const index = state.orders.findIndex(x => String(x.id) === String(orderId));
+        if (index >= 0) state.orders[index] = order;
+        save(K.orders, state.orders);
+        try {
+            const refreshed = await fetchCustomerDataViaWorker(state.session.customerToken);
+            if (refreshed.customer) {
+                const customerIndex = state.customers.findIndex(c => String(c.id) === String(refreshed.customer.id));
+                if (customerIndex >= 0) state.customers[customerIndex] = { ...state.customers[customerIndex], ...refreshed.customer };
+                else state.customers.push(refreshed.customer);
+                save(K.customers, state.customers);
+            }
+            if (Array.isArray(refreshed.orders)) { state.orders = refreshed.orders; save(K.orders, state.orders); }
+        } catch (_) {}
+        toast(i18n[state.currentLang].receipt_confirmed); renderMyOrders();
+    } catch (error) { toast(error.message || i18n[state.currentLang].save_failed, 'error'); }
 }
 window.customerConfirmReceipt = customerConfirmReceipt;
+
 
 function printOrderInvoice(orderId) {
     const order = state.orders.find(o => o.id === orderId); if (!order) return;
@@ -2001,14 +2061,24 @@ window.renderMyRequests = renderMyRequests;
 
 function openMessageModal() { document.getElementById('msg-text').value = ''; openModal('m-customer-message'); }
 async function submitCustomerMessage() {
-    const text = document.getElementById('msg-text').value.trim(); if (!text) return toast(i18n[state.currentLang].write_message_first, 'error');
-    let name = '', phone = '';
-    if (state.session) { const cust = state.customers.find(x => x.id === state.session.id); name = cust ? cust.name : 'زبون'; phone = cust ? cust.phone : ''; } else { name = 'زائر'; phone = 'غير متوفر'; }
-    const msg = { id: Date.now(), customerId: state.session ? state.session.id : null, name: name, phone: phone, text: text, date: new Date().toISOString() };
-    state.messages.unshift(msg); save(K.messages, state.messages); if (window.supabaseClient) await window.supabaseClient.from('messages').insert([msg]);
-    closeModal('m-customer-message'); toast(`✅ ${i18n[state.currentLang].msg_sent_success}`);
+    const text = document.getElementById('msg-text').value.trim();
+    if (!text) return toast(i18n[state.currentLang].write_message_first, 'error');
+    try {
+        let visitSessionKey = sessionStorage.getItem('td_visit_session_key_v1');
+        if (!visitSessionKey) {
+            visitSessionKey = (window.crypto?.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(16).slice(2));
+            sessionStorage.setItem('td_visit_session_key_v1', visitSessionKey.replace(/[^a-f0-9-]/gi, '').slice(0, 80));
+            visitSessionKey = sessionStorage.getItem('td_visit_session_key_v1');
+        }
+        const result = await callCustomerWorker('customerSendMessage', { text, sessionKey: visitSessionKey });
+        if (result.message) { state.messages.unshift(result.message); save(K.messages, state.messages); }
+        closeModal('m-customer-message'); toast('✅ ' + i18n[state.currentLang].msg_sent_success);
+    } catch (error) {
+        toast((state.currentLang === 'fr' ? 'Envoi impossible: ' : 'تعذر إرسال الرسالة: ') + (error.message || ''), 'error');
+    }
 }
 window.openMessageModal = openMessageModal; window.submitCustomerMessage = submitCustomerMessage;
+
 
 function renderCustomerMessages() {
     const c = document.getElementById('s-customer-messages-list'); if (!c || !state.session) return;
@@ -2041,8 +2111,19 @@ function renderAdminHome() {
 }
 window.renderAdminHome = renderAdminHome;
 
-async function adjustSales() { const val = prompt("", state.settings.manualSalesAdjustment || 0); if (val === null) return; const num = Number(val); if (isNaN(num)) return toast(i18n[state.currentLang].save_failed, 'error'); state.settings.manualSalesAdjustment = num; save(K.settings, state.settings); if (window.supabaseClient) await window.supabaseClient.from('settings').update({ manualSalesAdjustment: num }).eq('id', 1); renderAdminHome(); toast('✅ ' + i18n[state.currentLang].saved); }
+async function adjustSales() {
+    const val = prompt("", state.settings.manualSalesAdjustment || 0);
+    if (val === null) return;
+    const num = Number(val);
+    if (!Number.isFinite(num)) return toast(i18n[state.currentLang].save_failed, 'error');
+    try {
+        await callAdminWorker('adminUpdateSettings', { settings: { manualSalesAdjustment: num } });
+        state.settings.manualSalesAdjustment = num; save(K.settings, state.settings);
+        renderAdminHome(); toast('✅ ' + i18n[state.currentLang].saved);
+    } catch (error) { toast(error.message || i18n[state.currentLang].save_failed, 'error'); }
+}
 window.adjustSales = adjustSales;
+
 
 function normalizeOrderStatus(status) {
     const value = String(status || 'new').trim().toLowerCase().replace(/[ -]+/g, '_');
@@ -2081,8 +2162,18 @@ function renderAdminOrdersList() {
 window.renderAdminOrdersList = renderAdminOrdersList;
 
 
-async function saveTrackingCode(orderId) { const input = document.getElementById('track-input-' + orderId); if (!input) return; const code = input.value.trim(); const order = state.orders.find(o => o.id === orderId); if (order) { order.trackingNumber = code; save(K.orders, state.orders); if (window.supabaseClient) await window.supabaseClient.from('orders').update({ trackingNumber: code }).eq('id', orderId); toast('✅ ' + i18n[state.currentLang].saved); } }
+async function saveTrackingCode(orderId) {
+    const input = document.getElementById('track-input-' + orderId); if (!input) return;
+    const trackingNumber = input.value.trim();
+    const order = state.orders.find(o => String(o.id) === String(orderId)); if (!order) return;
+    try {
+        await callAdminWorker('adminUpdateOrderTracking', { id: orderId, trackingNumber });
+        order.trackingNumber = trackingNumber; save(K.orders, state.orders);
+        toast('✅ ' + i18n[state.currentLang].tracking_saved_success);
+    } catch (error) { toast(error.message || i18n[state.currentLang].save_failed, 'error'); }
+}
 window.saveTrackingCode = saveTrackingCode;
+
 
 function getOrderStockDeltas(items) {
     const deltas = new Map();
@@ -2121,46 +2212,30 @@ async function updateOrderStatus(id, status) {
     const nextStatus = normalizeOrderStatus(status);
     if (previousStatus === nextStatus) return;
 
-    const restored = [];
     try {
-        // When cancelling, restore stock first; if that fails, do not change order status.
-        if (nextStatus === 'cancelled' && previousStatus !== 'cancelled') {
-            if (!window.supabaseClient) throw new Error('اتصال قاعدة البيانات غير متاح');
-            for (const [productId, qtyBack] of getOrderStockDeltas(order.items)) {
-                const prod = state.products.find(p => String(p.id) === String(productId));
-                if (!prod) throw new Error('Product missing while restoring stock: ' + productId);
-                const oldQty = Number(prod.qty || 0);
-                const nextQty = oldQty + qtyBack;
-                const { error } = await window.supabaseClient.from('products').update({ qty: nextQty }).eq('id', prod.id);
-                if (error) throw error;
-                restored.push({ prod, oldQty, nextQty });
-            }
-        }
-
-        // All order-status writes go through the authenticated Cloudflare Worker.
+        // Stock restoration and the status transition are performed together by the database RPC.
+        // Never update product quantities from the browser here: that would restore stock twice.
         const result = await callAdminWorker('updateOrderStatus', { id, status: nextStatus });
         if (!result.order || String(result.order.id) !== String(id) || normalizeOrderStatus(result.order.status) !== nextStatus) {
             throw new Error(state.currentLang === 'fr' ? 'Le statut enregistré n’a pas pu être vérifié.' : 'لم نتمكن من التحقق من حفظ حالة الطلبية.');
         }
 
         order.status = nextStatus;
-        restored.forEach(x => { x.prod.qty = x.nextQty; });
         save(K.orders, state.orders);
-        save(K.products, state.products);
         toast('✓ ' + i18n[state.currentLang].updated);
     } catch (error) {
-        for (const x of restored.reverse()) {
-            try { await window.supabaseClient.from('products').update({ qty: x.oldQty }).eq('id', x.prod.id); } catch (_) {}
-        }
         order.status = previousStatus;
         save(K.orders, state.orders);
-        save(K.products, state.products);
         console.error('Order status update failed:', error);
         toast((state.currentLang === 'ar' ? 'تعذر تحديث الطلبية: ' : 'Impossible de mettre à jour : ') + (error.message || ''), 'error');
     }
 
     if (typeof loadOrdersListener === 'function') {
-        try { await loadOrdersListener({ forceWait: true }); } catch (refreshError) { console.error('Order refresh failed:', refreshError); }
+        try {
+            await loadOrdersListener({ forceWait: true, forceProducts: nextStatus === 'cancelled' });
+        } catch (refreshError) {
+            console.error('Order refresh failed:', refreshError);
+        }
     }
     renderAdminOrdersList();
     renderAdminHome();
@@ -2170,25 +2245,25 @@ async function updateOrderStatus(id, status) {
 window.updateOrderStatus = updateOrderStatus;
 
 async function deleteOrder(id) {
-    if(!confirm(i18n[state.currentLang].delete_order_confirm))return;
-    if(!window.supabaseClient)return toast(i18n[state.currentLang].error_connection,'error');
-    const order=state.orders.find(o=>String(o.id)===String(id)); if(!order)return;
-    const restored=[];
+    if (!confirm(i18n[state.currentLang].delete_order_confirm)) return;
+    const order = state.orders.find(o => String(o.id) === String(id)); if (!order) return;
+    if (normalizeOrderStatus(order.status) === 'delivered') return toast(state.currentLang === 'fr'
+        ? 'Une commande livrée ne peut pas être supprimée afin de préserver le stock et l’historique.'
+        : 'لا يمكن حذف طلبية تم تسليمها حفاظاً على المخزون وسجل النقاط.', 'error');
     try {
-        if(normalizeOrderStatus(order.status)!=='cancelled') for(const [productId, qtyBack] of getOrderStockDeltas(order.items)) {
-            const prod=state.products.find(p=>String(p.id)===productId); if(!prod) throw new Error('Product missing while restoring stock: '+productId);
-            const oldQty=Number(prod.qty||0), nextQty=oldQty+qtyBack;
-            const {error}=await window.supabaseClient.from('products').update({qty:nextQty}).eq('id',prod.id); if(error)throw error;
-            restored.push({prod,oldQty,nextQty});
-        }
-        const {error}=await window.supabaseClient.from('orders').delete().eq('id',id); if(error)throw error;
-        restored.forEach(x=>x.prod.qty=x.nextQty); state.orders=state.orders.filter(o=>String(o.id)!==String(id)); save(K.orders,state.orders);save(K.products,state.products);renderAdminOrdersList();renderAdminHome();renderShop();toast('✅ '+i18n[state.currentLang].deleted);
-    } catch(error) {
-        for(const x of restored.reverse()){try{await window.supabaseClient.from('products').update({qty:x.oldQty}).eq('id',x.prod.id);}catch(_){}}
-        console.error('Delete order failed:',error);toast((state.currentLang==='ar'?'تعذر حذف الطلبية: ':'Échec de suppression : ')+(error.message||''),'error');
+        await callAdminWorker('adminDeleteOrder', { id });
+        state.orders = state.orders.filter(o => String(o.id) !== String(id));
+        save(K.orders, state.orders);
+        await loadOrdersListener({ forceProducts: true, forceWait: true });
+        renderAdminOrdersList(); renderAdminHome(); renderShop();
+        toast('✅ ' + i18n[state.currentLang].deleted);
+    } catch (error) {
+        console.error('Delete order failed:', error);
+        toast((state.currentLang === 'ar' ? 'تعذر حذف الطلبية: ' : 'Échec de suppression : ') + (error.message || ''), 'error');
     }
 }
 window.deleteOrder = deleteOrder;
+
 
 function viewOrderDetails(orderId) {
     const order = state.orders.find(o => o.id === orderId); if (!order) return; const customer = state.customers.find(c => c.phone === order.customerPhone); const isVip = customer && customer.isVip;
@@ -2215,14 +2290,34 @@ function viewOrderDetails(orderId) {
                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     }
 window.viewOrderDetails = viewOrderDetails;
 
-async function makeDeliveryFree(orderId) { const o = state.orders.find(x => x.id === orderId); if (!o) return; o.deliveryPrice = 0; o.total = Math.max(0, (Number(o.itemsTotal) || 0) - (Number(o.discount) || 0)); save(K.orders, state.orders); if (window.supabaseClient) await window.supabaseClient.from('orders').update({ deliveryPrice: 0, total: Math.max(0, (Number(o.itemsTotal) || 0) - (Number(o.discount) || 0)) }).eq('id', orderId); toast('✅ ' + i18n[state.currentLang].saved); viewOrderDetails(orderId); renderAdminOrdersList(); }
+async function makeDeliveryFree(orderId) {
+    const order = state.orders.find(x => String(x.id) === String(orderId)); if (!order) return;
+    try {
+        await callAdminWorker('adminSetOrderFreeDelivery', { id: orderId });
+        order.deliveryPrice = 0;
+        order.total = Math.max(0, Number(order.itemsTotal || 0) - Number(order.discount || 0));
+        save(K.orders, state.orders); toast('✅ ' + i18n[state.currentLang].saved);
+        viewOrderDetails(orderId); renderAdminOrdersList();
+    } catch (error) { toast(error.message || i18n[state.currentLang].save_failed, 'error'); }
+}
 window.makeDeliveryFree = makeDeliveryFree;
+
 
 function calcDebt(orderId, totalAmount) { const paid = Number(document.getElementById(`paid-amount-${orderId}`).value) || 0; const debt = totalAmount - paid; document.getElementById(`debt-display-${orderId}`).textContent = fmtMoney(debt > 0 ? debt : 0); }
 window.calcDebt = calcDebt;
 
-async function saveOrderDebt(orderId) { const o = state.orders.find(x => x.id === orderId); if (!o) return; const paid = Number(document.getElementById(`paid-amount-${orderId}`).value) || 0; o.paidAmount = paid; save(K.orders, state.orders); if (window.supabaseClient) await window.supabaseClient.from('orders').update({ paidAmount: paid }).eq('id', orderId); toast('✅ ' + i18n[state.currentLang].saved); closeModal('m-order-details'); renderAdminOrdersList(); }
+async function saveOrderDebt(orderId) {
+    const order = state.orders.find(x => String(x.id) === String(orderId)); if (!order) return;
+    const paidAmount = Number(document.getElementById('paid-amount-' + orderId)?.value);
+    if (!Number.isFinite(paidAmount) || paidAmount < 0 || paidAmount > Number(order.total)) return toast(i18n[state.currentLang].save_failed, 'error');
+    try {
+        await callAdminWorker('adminSetOrderPaid', { id: orderId, paidAmount });
+        order.paidAmount = paidAmount; save(K.orders, state.orders);
+        toast('✅ ' + i18n[state.currentLang].saved); closeModal('m-order-details'); renderAdminOrdersList();
+    } catch (error) { toast(error.message || i18n[state.currentLang].save_failed, 'error'); }
+}
 window.saveOrderDebt = saveOrderDebt;
+
 
 function openEditOrder(orderId) {
     const o = state.orders.find(x => String(x.id) === String(orderId)); if (!o) return;
@@ -2272,35 +2367,33 @@ function recalcEditedOrder(o) {
     o.total = Math.max(0, o.itemsTotal - discount + Math.max(0,Number(o.deliveryPrice)||0));
 }
 async function saveChangesOrder() {
-    const o = state.orders.find(x => String(x.id) === String(window.editingOrderId)); if (!o || !window.supabaseClient) return toast(i18n[state.currentLang].error_connection,'error');
-    recalcEditedOrder(o);
-    const changedProducts=[];
+    const order = state.orders.find(x => String(x.id) === String(window.editingOrderId));
+    if (!order) return toast(i18n[state.currentLang].error_connection, 'error');
+    recalcEditedOrder(order);
     try {
-        // Apply the drafted stock deltas only when the order is explicitly saved.
-        for (const [id, delta] of window.pendingStockDelta.entries()) {
-            if (!delta) continue;
-            const prod=state.products.find(p=>String(p.id)===String(id)); if(!prod) throw new Error('Product missing: '+id);
-            const nextQty=Number(prod.qty||0)+Number(delta); if(nextQty<0) throw new Error('Insufficient stock for '+prod.name);
-            const {error}=await window.supabaseClient.from('products').update({qty:nextQty}).eq('id',prod.id);
-            if(error) throw error;
-            changedProducts.push({prod,oldQty:Number(prod.qty||0),nextQty});
+        const result = await callAdminWorker('adminEditOrder', { id: order.id, items: order.items });
+        if (result.order) {
+            const index = state.orders.findIndex(x => String(x.id) === String(order.id));
+            if (index >= 0) state.orders[index] = result.order;
         }
-        const {error:orderError}=await window.supabaseClient.from('orders').update({items:o.items,itemsTotal:o.itemsTotal,discount:Number(o.discount)||0,total:o.total}).eq('id',o.id);
-        if(orderError) throw orderError;
-        changedProducts.forEach(x=>x.prod.qty=x.nextQty);
-        save(K.orders,state.orders); save(K.products,state.products);
-        window.pendingStockDelta.clear(); editingOrderOriginal=null;
-        closeModal('m-edit-order'); toast('✅ '+i18n[state.currentLang].saved); renderAdminOrdersList(); renderAdminHome(); renderShop();
-        await loadOrdersListener({forceProducts:true,forceWait:true});
-    } catch(error) {
-        console.error('Order edit failed:',error);
-        for (const x of changedProducts.reverse()) { try { await window.supabaseClient.from('products').update({qty:x.oldQty}).eq('id',x.prod.id); } catch(_){} }
-        if (editingOrderOriginal) { const idx=state.orders.findIndex(x=>String(x.id)===String(window.editingOrderId)); if(idx>=0) state.orders[idx]=editingOrderOriginal; }
-        window.pendingStockDelta.clear(); save(K.orders,state.orders); save(K.products,state.products);
-        toast((state.currentLang==='ar'?'تعذر حفظ التعديلات: ':'Échec de sauvegarde : ')+(error.message||''),'error'); renderAdminOrdersList(); renderShop();
+        window.pendingStockDelta.clear(); editingOrderOriginal = null;
+        save(K.orders, state.orders);
+        closeModal('m-edit-order'); toast('✅ ' + i18n[state.currentLang].saved);
+        renderAdminOrdersList(); renderAdminHome(); renderShop();
+        await loadOrdersListener({ forceProducts: true, forceWait: true });
+    } catch (error) {
+        console.error('Order edit failed:', error);
+        if (editingOrderOriginal) {
+            const index = state.orders.findIndex(x => String(x.id) === String(window.editingOrderId));
+            if (index >= 0) state.orders[index] = editingOrderOriginal;
+        }
+        window.pendingStockDelta.clear(); save(K.orders, state.orders);
+        toast((state.currentLang === 'ar' ? 'تعذر حفظ التعديلات: ' : 'Échec de sauvegarde : ') + (error.message || ''), 'error');
+        renderAdminOrdersList(); renderShop();
     }
 }
 window.saveChangesOrder = saveChangesOrder;
+
 
 function printLabels() {
     const newOrders = state.orders.filter(o => o.status === 'new'); if (newOrders.length === 0) return toast(i18n[state.currentLang].no_orders, 'error');
@@ -2323,34 +2416,51 @@ window.renderAdminCustomers = renderAdminCustomers;
 function filterAdminCustomers(query) { renderAdminCustomers(query); }
 window.filterAdminCustomers = filterAdminCustomers;
 
-async function toggleCustomerVip(id) { const c = state.customers.find(x => x.id === id); if (c) { c.isVip = !c.isVip; save(K.customers, state.customers); if (window.supabaseClient) await window.supabaseClient.from('customers').update({ isVip: c.isVip }).eq('id', id); renderAdminCustomers(document.getElementById('admin-customer-search')?.value); toast(c.isVip ? '⭐' : '✓'); } }
+async function toggleCustomerVip(id) {
+    const c = state.customers.find(x => String(x.id) === String(id)); if (!c) return;
+    const value = !c.isVip;
+    try { await callAdminWorker('adminSetCustomerFlags', { id, flags: { isVip: value } }); c.isVip = value; save(K.customers, state.customers); renderAdminCustomers(document.getElementById('admin-customer-search')?.value); toast(value ? '⭐' : '✓'); }
+    catch (error) { toast(error.message || i18n[state.currentLang].save_failed, 'error'); }
+}
 window.toggleCustomerVip = toggleCustomerVip;
 
-async function toggleCustomerTop(id) { const c = state.customers.find(x => x.id === id); if (c) { c.isTop = !c.isTop; save(K.customers, state.customers); if (window.supabaseClient) await window.supabaseClient.from('customers').update({ isTop: c.isTop }).eq('id', id); renderAdminCustomers(document.getElementById('admin-customer-search')?.value); updateProductRequestButton(); toast(c.isTop ? '👑' : '✓'); } }
+
+async function toggleCustomerTop(id) {
+    const c = state.customers.find(x => String(x.id) === String(id)); if (!c) return;
+    const value = !c.isTop;
+    try { await callAdminWorker('adminSetCustomerFlags', { id, flags: { isTop: value } }); c.isTop = value; save(K.customers, state.customers); renderAdminCustomers(document.getElementById('admin-customer-search')?.value); updateProductRequestButton(); toast(value ? '👑' : '✓'); }
+    catch (error) { toast(error.message || i18n[state.currentLang].save_failed, 'error'); }
+}
 window.toggleCustomerTop = toggleCustomerTop;
 
-async function toggleCustomerBlock(id) { const c = state.customers.find(x => x.id === id); if (!c) return; c.isBlocked = !c.isBlocked; save(K.customers, state.customers); if (window.supabaseClient) { try { await window.supabaseClient.from('customers').update({ isBlocked: c.isBlocked }).eq('id', id); } catch (e) { toast('❌ ' + i18n[state.currentLang].save_failed, 'error'); return; } } if (c.isBlocked && state.session && state.session.id === id) { setTimeout(() => { logoutCustomer(); toast('🚫', 'error'); }, 500); } renderAdminCustomers(document.getElementById('admin-customer-search')?.value); toast(c.isBlocked ? '🚫' : '✅'); }
+
+async function toggleCustomerBlock(id) {
+    const c = state.customers.find(x => String(x.id) === String(id)); if (!c) return;
+    const value = !c.isBlocked;
+    try {
+        await callAdminWorker('adminSetCustomerFlags', { id, flags: { isBlocked: value } });
+        c.isBlocked = value; save(K.customers, state.customers);
+        if (value && state.session && String(state.session.id) === String(id)) { setTimeout(() => { logoutCustomer(); toast('🚫', 'error'); }, 500); }
+        renderAdminCustomers(document.getElementById('admin-customer-search')?.value); toast(value ? '🚫' : '✅');
+    } catch (error) { toast('❌ ' + (error.message || i18n[state.currentLang].save_failed), 'error'); }
+}
 window.toggleCustomerBlock = toggleCustomerBlock;
+
 
 async function deleteCustomer(id) {
     if (!confirm(i18n[state.currentLang].delete_customer_confirm)) return;
-    if (!window.supabaseClient) return toast(i18n[state.currentLang].error_connection, 'error');
-    const customer = state.customers.find(c => String(c.id) === String(id));
-    if (!customer) return;
+    const customer = state.customers.find(c => String(c.id) === String(id)); if (!customer) return;
     try {
-        const { data, error } = await window.supabaseClient.from('customers').delete().eq('id', id).select('id').maybeSingle();
-        if (error) throw error;
-        if (!data) throw new Error(state.currentLang === 'fr' ? 'Le serveur n’a pas confirmé la suppression.' : 'الخادم لم يؤكد حذف الزبون.');
+        await callAdminWorker('adminDeleteCustomer', { id });
         state.customers = state.customers.filter(c => String(c.id) !== String(id));
-        save(K.customers, state.customers);
-        renderAdminCustomers();
-        toast('✓ ' + i18n[state.currentLang].deleted);
+        save(K.customers, state.customers); renderAdminCustomers(); toast('✓ ' + i18n[state.currentLang].deleted);
     } catch (error) {
         console.error('Customer deletion failed:', error);
-        toast(state.currentLang === 'fr' ? 'Échec de suppression. Aucune modification locale.' : 'فشل حذف الزبون. لم يتم تغيير البيانات المحلية.', 'error');
+        toast((state.currentLang === 'fr' ? 'Échec de suppression: ' : 'فشل حذف الزبون: ') + (error.message || ''), 'error');
     }
 }
 window.deleteCustomer = deleteCustomer;
+
 
 function effectiveProductPrice(p) {
     if (!p) return 0;
@@ -2382,22 +2492,62 @@ function openPackModal() {
 }
 window.openPackModal=openPackModal;
 async function savePack() {
-    const name=document.getElementById('pack-name').value.trim(); const price=Number(document.getElementById('pack-price').value); const qty=Math.max(0,Number(document.getElementById('pack-qty').value)||0); const category=document.getElementById('pack-category').value.trim()||'Packs';
-    const packItems=[...document.querySelectorAll('.pack-product-check:checked')].map(ch=>({id:Number(ch.value),qty:Math.max(1,Number(document.querySelector(`.pack-product-qty[data-product-id="${ch.value}"]`)?.value)||1)}));
-    if(!name||!price) return toast(i18n[state.currentLang].save_failed,'error'); if(!packItems.length) return toast(i18n[state.currentLang].select_one_product,'error');
-    const description=document.getElementById('pack-desc').value.trim(); const packCost=packItems.reduce((sum,pi)=>{const component=state.products.find(cp=>String(cp.id)===String(pi.id));return sum+(Number(component?.cost)||0)*(Number(pi.qty)||0);},0); const newP={id:Date.now(),name,price,cost:packCost,qty,category,desc:description,images:(state.products.find(p=>String(p.id)===String(packItems[0].id))?.images||[]).slice(0,1),isPack:true,packItems,createdAt:new Date().toISOString()};
-    if(window.supabaseClient){const {error}=await window.supabaseClient.from('products').insert([newP]); if(error)return toast(i18n[state.currentLang].save_error+error.message,'error');}
-    state.products.push(newP); save(K.products,state.products); closeModal('m-pack-form'); renderAdminProducts(); renderCategories(); renderShop(); toast('✓ '+i18n[state.currentLang].pack_saved);
+    const name = document.getElementById('pack-name').value.trim();
+    const price = Number(document.getElementById('pack-price').value);
+    const qty = Math.max(0, Number(document.getElementById('pack-qty').value) || 0);
+    const category = document.getElementById('pack-category').value.trim() || 'Packs';
+    const packItems = [...document.querySelectorAll('.pack-product-check:checked')].map(ch => ({ id: Number(ch.value), qty: Math.max(1, Number(document.querySelector('.pack-product-qty[data-product-id="' + ch.value + '"]')?.value) || 1) }));
+    if (!name || !(price > 0)) return toast(i18n[state.currentLang].save_failed, 'error');
+    if (!packItems.length) return toast(i18n[state.currentLang].select_one_product, 'error');
+    const description = document.getElementById('pack-desc').value.trim();
+    const packCost = packItems.reduce((sum, pi) => {
+        const component = state.products.find(cp => String(cp.id) === String(pi.id));
+        return sum + (Number(component?.cost) || 0) * pi.qty;
+    }, 0);
+    const newP = { id: Date.now(), name, price, cost: packCost, qty, category, desc: description, images: (state.products.find(p => String(p.id) === String(packItems[0].id))?.images || []).slice(0,1), isPack: true, packItems, createdAt: new Date().toISOString() };
+    try {
+        await callAdminWorker('adminUpsertProduct', { product: newP });
+        state.products.push(newP); save(K.products, state.products);
+        closeModal('m-pack-form'); renderAdminProducts(); renderCategories(); renderShop();
+        toast('✓ ' + i18n[state.currentLang].pack_saved);
+    } catch (error) { toast(i18n[state.currentLang].save_error + (error.message || ''), 'error'); }
 }
 window.savePack=savePack;
+
 function openPromoModal() { const sel=document.getElementById('promo-product'); sel.innerHTML=state.products.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join(''); if(!state.products.length) return toast(i18n[state.currentLang].no_products,'error'); updatePromoOriginalPrice(); const p=state.products.find(x=>x.id===Number(sel.value)); document.getElementById('promo-price').value=p?.promoPrice||''; document.getElementById('promo-start').value=p?.promoStart||''; document.getElementById('promo-end').value=p?.promoEnd||''; openModal('m-promo-form'); }
 window.openPromoModal=openPromoModal;
 function updatePromoOriginalPrice(){const p=state.products.find(x=>x.id===Number(document.getElementById('promo-product')?.value)); const el=document.getElementById('promo-original-price'); if(el)el.value=p?.price||''; const pr=document.getElementById('promo-price'); if(p&&pr&&!pr.value&&p.promoPrice)pr.value=p.promoPrice;}
 window.updatePromoOriginalPrice=updatePromoOriginalPrice;
-async function savePromo(){const id=Number(document.getElementById('promo-product').value);const p=state.products.find(x=>x.id===id);if(!p)return;const promoPrice=Number(document.getElementById('promo-price').value);if(!(promoPrice>0&&promoPrice<Number(p.price)))return toast(i18n[state.currentLang].invalid_promo_price,'error');p.promoPrice=promoPrice;p.promoStart=document.getElementById('promo-start').value||null;p.promoEnd=document.getElementById('promo-end').value||null;if(window.supabaseClient){const {error}=await window.supabaseClient.from('products').update({promoPrice:p.promoPrice,promoStart:p.promoStart,promoEnd:p.promoEnd}).eq('id',id);if(error)return toast(i18n[state.currentLang].save_error+error.message,'error');}save(K.products,state.products);closeModal('m-promo-form');renderAdminProducts();renderShop();renderNewProducts();toast('✓ '+i18n[state.currentLang].promo_saved);}
+async function savePromo() {
+    const id = Number(document.getElementById('promo-product').value);
+    const p = state.products.find(x => x.id === id);
+    if (!p) return;
+    const promoPrice = Number(document.getElementById('promo-price').value);
+    if (!(promoPrice > 0 && promoPrice < Number(p.price))) return toast(i18n[state.currentLang].invalid_promo_price, 'error');
+    const updated = { ...p, promoPrice, promoStart: document.getElementById('promo-start').value || null, promoEnd: document.getElementById('promo-end').value || null };
+    try {
+        await callAdminWorker('adminUpsertProduct', { id, product: updated });
+        Object.assign(p, updated); save(K.products, state.products);
+        closeModal('m-promo-form'); renderAdminProducts(); renderShop(); renderNewProducts();
+        toast('✓ ' + i18n[state.currentLang].promo_saved);
+    } catch (error) { toast(i18n[state.currentLang].save_error + (error.message || ''), 'error'); }
+}
 window.savePromo=savePromo;
-async function removePromo(){const id=Number(document.getElementById('promo-product').value);const p=state.products.find(x=>x.id===id);if(!p)return;p.promoPrice=null;p.promoStart=null;p.promoEnd=null;if(window.supabaseClient){const {error}=await window.supabaseClient.from('products').update({promoPrice:null,promoStart:null,promoEnd:null}).eq('id',id);if(error)return toast(i18n[state.currentLang].save_error+error.message,'error');}save(K.products,state.products);closeModal('m-promo-form');renderAdminProducts();renderShop();renderNewProducts();toast('✓ '+i18n[state.currentLang].saved);}
+
+async function removePromo() {
+    const id = Number(document.getElementById('promo-product').value);
+    const p = state.products.find(x => x.id === id);
+    if (!p) return;
+    const updated = { ...p, promoPrice: null, promoStart: null, promoEnd: null };
+    try {
+        await callAdminWorker('adminUpsertProduct', { id, product: updated });
+        Object.assign(p, updated); save(K.products, state.products);
+        closeModal('m-promo-form'); renderAdminProducts(); renderShop(); renderNewProducts();
+        toast('✓ ' + i18n[state.currentLang].saved);
+    } catch (error) { toast(i18n[state.currentLang].save_error + (error.message || ''), 'error'); }
+}
 window.removePromo=removePromo;
+
 
 function renderAdminProducts(view = 'all', categoryFilter = null) {
     const c = document.getElementById('a-products-list'); if (!c) return;
@@ -2501,35 +2651,29 @@ async function saveProduct() {
     const cat = document.getElementById('pf-category').value.trim();
     const desc = document.getElementById('pf-desc').value.trim();
     if (!n || !(price > 0) || qty < 0) return toast(i18n[state.currentLang].save_failed, 'error');
-    if (!window.supabaseClient) return toast(state.currentLang === 'fr' ? 'Connexion à la base de données indisponible. Réessayez après actualisation.' : 'الاتصال بقاعدة البيانات غير متاح. حدّث الصفحة ثم أعد المحاولة.', 'error');
     const existingProduct = id ? state.products.find(x => String(x.id) === String(id)) : null;
-    const newP = { name: n, price, cost, qty, category: cat, desc, images: tempUploadedImages, isPack: existingProduct?.isPack || false, packItems: existingProduct?.packItems || [], isSpecial: existingProduct?.isSpecial || false, promoPrice: existingProduct?.promoPrice || null, promoStart: existingProduct?.promoStart || null, promoEnd: existingProduct?.promoEnd || null };
+    const newP = {
+        ...(existingProduct || {}),
+        name: n, price, cost, qty, category: cat, desc, images: tempUploadedImages,
+        isPack: existingProduct?.isPack || false, packItems: existingProduct?.packItems || [],
+        isSpecial: existingProduct?.isSpecial || false, promoPrice: existingProduct?.promoPrice || null,
+        promoStart: existingProduct?.promoStart || null, promoEnd: existingProduct?.promoEnd || null
+    };
+    if (id) newP.id = Number(id);
+    else { newP.id = Date.now(); newP.createdAt = new Date().toISOString(); }
     try {
-        let error;
+        await callAdminWorker('adminUpsertProduct', { ...(id ? { id: Number(id) } : {}), product: newP });
         if (id) {
-            const result = await window.supabaseClient.from('products').update(newP).eq('id', id).select('id');
-            error = result.error;
-            if (!error && (!result.data || result.data.length === 0)) error = new Error('لم يتم تحديث أي صف؛ تحقق من صلاحيات RLS ومعرّف المنتج.');
-        } else {
-            newP.id = Date.now();
-            newP.createdAt = new Date().toISOString();
-            const result = await window.supabaseClient.from('products').insert([newP]).select('id');
-            error = result.error;
-            if (!error && (!result.data || result.data.length === 0)) error = new Error('لم يؤكد الخادم حفظ المنتج.');
-        }
-        if (error) {
-            console.error('saveProduct Supabase error:', error);
-            return toast((state.currentLang === 'fr' ? 'Échec de sauvegarde: ' : 'فشل حفظ المنتج: ') + (error.message || String(error)), 'error');
-        }
-        if (id) { const idx = state.products.findIndex(x => String(x.id) === String(id)); if (idx >= 0) state.products[idx] = { ...state.products[idx], ...newP }; }
-        else state.products.push(newP);
+            const idx = state.products.findIndex(x => String(x.id) === String(id));
+            if (idx >= 0) state.products[idx] = { ...state.products[idx], ...newP };
+        } else state.products.push(newP);
         save(K.products, state.products);
         if (window.pendingRequestId) {
             const req = state.requests.find(r => String(r.id) === String(window.pendingRequestId));
             if (req) {
-                const { error: requestError } = await window.supabaseClient.from('requests').update({ status: 'fulfilled' }).eq('id', req.id);
-                if (requestError) console.warn('Could not update product request status:', requestError.message);
-                else { req.status = 'fulfilled'; save(K.requests, state.requests); await notifyCustomerProductAvailable(req); }
+                await callAdminWorker('adminSetRequestStatus', { id: req.id, status: 'fulfilled' });
+                req.status = 'fulfilled'; save(K.requests, state.requests);
+                await notifyCustomerProductAvailable(req);
             }
             window.pendingRequestId = null; renderAdminRequests(); toast('🎉');
         } else toast('✅ ' + i18n[state.currentLang].saved);
@@ -2541,8 +2685,17 @@ async function saveProduct() {
 }
 window.saveProduct = saveProduct;
 
-async function deleteProduct(id) { if (!confirm(i18n[state.currentLang].delete_product_confirm)) return; state.products = state.products.filter(p => p.id !== id); save(K.products, state.products); if (window.supabaseClient) await window.supabaseClient.from('products').delete().eq('id', id); renderCategories(); renderAdminProducts(); renderShop(); }
+
+async function deleteProduct(id) {
+    if (!confirm(i18n[state.currentLang].delete_product_confirm)) return;
+    try {
+        await callAdminWorker('adminDeleteProduct', { id });
+        state.products = state.products.filter(p => String(p.id) !== String(id));
+        save(K.products, state.products); renderCategories(); renderAdminProducts(); renderShop();
+    } catch (error) { toast(i18n[state.currentLang].save_error + (error.message || ''), 'error'); }
+}
 window.deleteProduct = deleteProduct;
+
 
 function renderAdminMessages() {
     const c = document.getElementById('a-messages-list'); if (!c) return;
@@ -2551,28 +2704,36 @@ function renderAdminMessages() {
 }
 window.renderAdminMessages = renderAdminMessages;
 
-async function replyToMessage(msgId) { const text = document.getElementById('reply-' + msgId).value.trim(); if (!text) return toast(i18n[state.currentLang].write_reply_first, 'error'); const msg = state.messages.find(m => m.id === msgId); if (msg) { msg.reply = text; msg.repliedAt = new Date().toISOString(); save(K.messages, state.messages); if (window.supabaseClient) await window.supabaseClient.from('messages').update({ reply: text, repliedAt: msg.repliedAt }).eq('id', msgId); renderAdminMessages(); toast('✅ ' + i18n[state.currentLang].reply_sent_success); } }
+async function replyToMessage(msgId) {
+    const input = document.getElementById('reply-' + msgId);
+    const reply = input?.value.trim() || '';
+    if (!reply) return toast(i18n[state.currentLang].write_reply_first, 'error');
+    const msg = state.messages.find(m => String(m.id) === String(msgId));
+    if (!msg) return;
+    try {
+        await callAdminWorker('adminReplyMessage', { id: msgId, reply });
+        msg.reply = reply; msg.repliedAt = new Date().toISOString();
+        save(K.messages, state.messages); renderAdminMessages();
+        toast('✅ ' + i18n[state.currentLang].reply_sent_success);
+    } catch (error) { toast(error.message || i18n[state.currentLang].save_failed, 'error'); }
+}
 window.replyToMessage = replyToMessage;
+
 
 async function deleteMessage(id) {
     if (!confirm(i18n[state.currentLang].delete_message_confirm)) return;
-    if (!window.supabaseClient) return toast(i18n[state.currentLang].error_connection, 'error');
-    const message = state.messages.find(m => String(m.id) === String(id));
-    if (!message) return;
+    const message = state.messages.find(m => String(m.id) === String(id)); if (!message) return;
     try {
-        const { data, error } = await window.supabaseClient.from('messages').delete().eq('id', id).select('id').maybeSingle();
-        if (error) throw error;
-        if (!data) throw new Error(state.currentLang === 'fr' ? 'Le serveur n’a pas confirmé la suppression.' : 'الخادم لم يؤكد حذف الرسالة.');
+        await callAdminWorker('adminDeleteMessage', { id });
         state.messages = state.messages.filter(m => String(m.id) !== String(id));
-        save(K.messages, state.messages);
-        renderAdminMessages();
-        toast('✓ ' + i18n[state.currentLang].deleted);
+        save(K.messages, state.messages); renderAdminMessages(); toast('✓ ' + i18n[state.currentLang].deleted);
     } catch (error) {
         console.error('Message deletion failed:', error);
-        toast(state.currentLang === 'fr' ? 'Échec de suppression. Aucune modification locale.' : 'فشل حذف الرسالة. لم يتم تغيير البيانات المحلية.', 'error');
+        toast((state.currentLang === 'fr' ? 'Échec de suppression: ' : 'فشل حذف الرسالة: ') + (error.message || ''), 'error');
     }
 }
 window.deleteMessage = deleteMessage;
+
 
 function renderAdminExpenses() {
     const c = document.getElementById('a-expenses-list'); if (!c) return;
@@ -2584,16 +2745,31 @@ function openExpenseModal() { document.getElementById('ef-title').value = ''; do
 window.openExpenseModal = openExpenseModal;
 
 async function saveExpense() {
-    const t = document.getElementById('ef-title').value.trim(); const a = Number(document.getElementById('ef-amount').value); const d = document.getElementById('ef-date').value;
-    if (!t || !a) return toast(i18n[state.currentLang].save_failed, 'error');
-    const exp = { id: Date.now(), title: t, amount: a, date: d };
-    state.expenses.push(exp); save(K.expenses, state.expenses); if (window.supabaseClient) await window.supabaseClient.from('expenses').insert([exp]);
-    closeModal('m-expense-form'); renderAdminExpenses(); renderAdminHome(); toast('✅ ' + i18n[state.currentLang].saved);
+    const title = document.getElementById('ef-title').value.trim();
+    const amount = Number(document.getElementById('ef-amount').value);
+    const date = document.getElementById('ef-date').value;
+    if (!title || !Number.isFinite(amount) || amount <= 0) return toast(i18n[state.currentLang].save_failed, 'error');
+    const expense = { id: Date.now(), title, amount, date };
+    try {
+        await callAdminWorker('adminCreateExpense', { expense });
+        state.expenses.push(expense); save(K.expenses, state.expenses);
+        closeModal('m-expense-form'); renderAdminExpenses(); renderAdminHome();
+        toast('✅ ' + i18n[state.currentLang].saved);
+    } catch (error) { toast(error.message || i18n[state.currentLang].save_failed, 'error'); }
 }
 window.saveExpense = saveExpense;
 
-async function deleteExpense(id) { if (!confirm(i18n[state.currentLang].delete_expense_confirm)) return; state.expenses = state.expenses.filter(e => e.id !== id); save(K.expenses, state.expenses); if (window.supabaseClient) await window.supabaseClient.from('expenses').delete().eq('id', id); renderAdminExpenses(); renderAdminHome(); }
+
+async function deleteExpense(id) {
+    if (!confirm(i18n[state.currentLang].delete_expense_confirm)) return;
+    try {
+        await callAdminWorker('adminDeleteExpense', { id });
+        state.expenses = state.expenses.filter(e => String(e.id) !== String(id));
+        save(K.expenses, state.expenses); renderAdminExpenses(); renderAdminHome();
+    } catch (error) { toast(error.message || i18n[state.currentLang].save_failed, 'error'); }
+}
 window.deleteExpense = deleteExpense;
+
 
 function renderAdminReports() {
     const now = new Date(); const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime(); const startOfWeek = now.getTime() - (7 * 24 * 60 * 60 * 1000);
@@ -2630,16 +2806,28 @@ window.renderAdminSettings = renderAdminSettings;
 document.addEventListener('input', event => { if (event.target && event.target.id === 'set-ad-text') renderAdPreviews(); });
 
 async function saveSettingsToCloud() {
-    state.settings.shopName = document.getElementById('set-shop').value.trim() || 'Thier Décor'; state.settings.shopPhone = document.getElementById('set-phone').value.trim(); const addressInput = document.getElementById('set-address'); if (addressInput) state.settings.shopAddress = addressInput.value.trim();
-    state.settings.promoText = document.getElementById('set-promo-text').value; state.settings.promoActive = document.getElementById('set-promo-active').checked;
-    state.settings.adActive = document.getElementById('set-ad-active').checked; state.settings.adText = document.getElementById('set-ad-text').value.trim();
-    state.settings.adEndTime = document.getElementById('set-ad-endtime').value; state.settings.adImages = [...tempAdImages];
-    if (!window.supabaseClient) return toast(i18n[state.currentLang].error_connection, 'error');
-    const { error } = await window.supabaseClient.from('settings').update({ shopName: state.settings.shopName, shopPhone: state.settings.shopPhone, shopAddress: state.settings.shopAddress || '', promoText: state.settings.promoText, promoActive: state.settings.promoActive, adActive: state.settings.adActive, adText: state.settings.adText, adEndTime: state.settings.adEndTime, adImages: state.settings.adImages }).eq('id', 1);
-    if (error) { console.error('Settings save failed:', error); return toast('❌ ' + error.message, 'error'); }
-    save(K.settings, state.settings); updateStoreBranding(); renderPromoBanner(); renderSliderAd(); toast('✅ ' + i18n[state.currentLang].saved); setTimeout(() => { adminGo('dashboard'); }, 1000);
+    state.settings.shopName = document.getElementById('set-shop').value.trim() || 'Thier Décor';
+    state.settings.shopPhone = document.getElementById('set-phone').value.trim();
+    const addressInput = document.getElementById('set-address');
+    if (addressInput) state.settings.shopAddress = addressInput.value.trim();
+    state.settings.promoText = document.getElementById('set-promo-text').value;
+    state.settings.promoActive = document.getElementById('set-promo-active').checked;
+    state.settings.adActive = document.getElementById('set-ad-active').checked;
+    state.settings.adText = document.getElementById('set-ad-text').value.trim();
+    state.settings.adEndTime = document.getElementById('set-ad-endtime').value;
+    state.settings.adImages = [...tempAdImages];
+    try {
+        await callAdminWorker('adminUpdateSettings', { settings: {
+            shopName: state.settings.shopName, shopPhone: state.settings.shopPhone, shopAddress: state.settings.shopAddress || '',
+            promoText: state.settings.promoText, promoActive: state.settings.promoActive, adActive: state.settings.adActive,
+            adText: state.settings.adText, adEndTime: state.settings.adEndTime, adImages: state.settings.adImages
+        }});
+        save(K.settings, state.settings); updateStoreBranding(); renderPromoBanner(); renderSliderAd();
+        toast('✅ ' + i18n[state.currentLang].saved); setTimeout(() => adminGo('dashboard'), 1000);
+    } catch (error) { console.error('Settings save failed:', error); toast('❌ ' + (error.message || ''), 'error'); }
 }
 window.saveSettingsToCloud = saveSettingsToCloud;
+
 
 function renderYalidinePricesTab() {
     const tbody = document.getElementById('yalidine-prices-body'); if (!tbody) return;
@@ -2651,13 +2839,24 @@ function renderYalidinePricesTab() {
 }
 window.renderYalidinePricesTab = renderYalidinePricesTab;
 async function saveYalidinePrices() {
-    const inputs = document.querySelectorAll('#yalidine-prices-body input'); const newPrices = JSON.parse(JSON.stringify(state.settings.customPrices || {}));
-    inputs.forEach(input => { const wilaya=input.dataset.wilaya, type=input.dataset.type, val=input.value.trim(); if(!newPrices[wilaya]) newPrices[wilaya]={}; if(!newPrices[wilaya].yalidine) newPrices[wilaya].yalidine={}; if(val!=='') newPrices[wilaya].yalidine[type]=Number(val); else delete newPrices[wilaya].yalidine[type]; if(Object.keys(newPrices[wilaya].yalidine).length===0) delete newPrices[wilaya].yalidine; if(Object.keys(newPrices[wilaya]).length===0) delete newPrices[wilaya]; });
-    state.settings.customPrices=newPrices; save(K.settings,state.settings);
-    if(window.supabaseClient){ const {error}=await window.supabaseClient.from('settings').update({customPrices:newPrices}).eq('id',1); if(error){toast('❌ '+i18n[state.currentLang].save_failed,'error');return;} }
-    toast('✅ '+i18n[state.currentLang].saved);
+    const inputs = document.querySelectorAll('#yalidine-prices-body input');
+    const newPrices = JSON.parse(JSON.stringify(state.settings.customPrices || {}));
+    inputs.forEach(input => {
+        const wilaya = input.dataset.wilaya, type = input.dataset.type, val = input.value.trim();
+        if (!newPrices[wilaya]) newPrices[wilaya] = {};
+        if (!newPrices[wilaya].yalidine) newPrices[wilaya].yalidine = {};
+        if (val !== '') newPrices[wilaya].yalidine[type] = Number(val); else delete newPrices[wilaya].yalidine[type];
+        if (!Object.keys(newPrices[wilaya].yalidine).length) delete newPrices[wilaya].yalidine;
+        if (!Object.keys(newPrices[wilaya]).length) delete newPrices[wilaya];
+    });
+    try {
+        await callAdminWorker('adminUpdateSettings', { settings: { customPrices: newPrices } });
+        state.settings.customPrices = newPrices; save(K.settings, state.settings);
+        toast('✅ ' + i18n[state.currentLang].saved);
+    } catch (error) { toast('❌ ' + (error.message || i18n[state.currentLang].save_failed), 'error'); }
 }
 window.saveYalidinePrices = saveYalidinePrices;
+
 
 function renderNoestPricesTab() {
     const tbody = document.getElementById('noest-prices-body'); if (!tbody) return;
@@ -2670,11 +2869,24 @@ function renderNoestPricesTab() {
 window.renderNoestPricesTab = renderNoestPricesTab;
 
 async function saveNoestPrices() {
-    const inputs = document.querySelectorAll('#noest-prices-body input'); const newPrices = JSON.parse(JSON.stringify(state.settings.customPrices || {}));
-    inputs.forEach(input => { const wilaya = input.dataset.wilaya; const type = input.dataset.type; const val = input.value.trim(); if (!newPrices[wilaya]) newPrices[wilaya] = {}; if (!newPrices[wilaya].noest) newPrices[wilaya].noest = {}; if (val !== '') newPrices[wilaya].noest[type] = Number(val); else delete newPrices[wilaya].noest[type]; if (Object.keys(newPrices[wilaya].noest).length === 0) delete newPrices[wilaya].noest; if (Object.keys(newPrices[wilaya]).length === 0) delete newPrices[wilaya]; });
-    state.settings.customPrices = newPrices; save(K.settings, state.settings); if (window.supabaseClient) { try { await window.supabaseClient.from('settings').update({ customPrices: newPrices }).eq('id', 1); } catch (e) { toast('❌ ' + i18n[state.currentLang].save_failed, 'error'); return; } } toast('✅ ' + i18n[state.currentLang].saved);
+    const inputs = document.querySelectorAll('#noest-prices-body input');
+    const newPrices = JSON.parse(JSON.stringify(state.settings.customPrices || {}));
+    inputs.forEach(input => {
+        const wilaya = input.dataset.wilaya, type = input.dataset.type, val = input.value.trim();
+        if (!newPrices[wilaya]) newPrices[wilaya] = {};
+        if (!newPrices[wilaya].noest) newPrices[wilaya].noest = {};
+        if (val !== '') newPrices[wilaya].noest[type] = Number(val); else delete newPrices[wilaya].noest[type];
+        if (!Object.keys(newPrices[wilaya].noest).length) delete newPrices[wilaya].noest;
+        if (!Object.keys(newPrices[wilaya]).length) delete newPrices[wilaya];
+    });
+    try {
+        await callAdminWorker('adminUpdateSettings', { settings: { customPrices: newPrices } });
+        state.settings.customPrices = newPrices; save(K.settings, state.settings);
+        toast('✅ ' + i18n[state.currentLang].saved);
+    } catch (error) { toast('❌ ' + (error.message || i18n[state.currentLang].save_failed), 'error'); }
 }
 window.saveNoestPrices = saveNoestPrices;
+
 
 async function handleAdImageUpload(event) {
     const files = Array.from(event.target.files || []);
@@ -2725,10 +2937,12 @@ function renderSliderAd() {
 window.renderSliderAd = renderSliderAd;
 
 let editingCouponIndex = -1;
-function saveCouponsToSettings() {
-    save(K.settings, state.settings);
-    if (window.supabaseClient) return window.supabaseClient.from('settings').update({ coupons: state.settings.coupons || [] }).eq('id', 1);
-    return Promise.resolve({ error: null });
+async function saveCouponsToSettings() {
+    try {
+        await callAdminWorker('adminUpdateSettings', { settings: { coupons: state.settings.coupons || [] } });
+        save(K.settings, state.settings);
+        return { error: null };
+    } catch (error) { return { error }; }
 }
 async function addCoupon() {
     const code = document.getElementById('new-coupon-code').value.trim().toUpperCase();
@@ -2737,7 +2951,6 @@ async function addCoupon() {
     const maxUses = Number.parseInt(document.getElementById('new-coupon-max-uses').value, 10);
     const expiry = document.getElementById('new-coupon-expiry').value;
     if (!code || !phone || !normalizePromoPhone(phone) || !(disc > 0 && disc <= 100) || !(maxUses >= 1)) return toast('أكمل الكود والهاتف والنسبة وعدد الطلبيات بشكل صحيح', 'error');
-    if (!window.supabaseClient) return toast('اتصل بقاعدة البيانات قبل حفظ البرومو', 'error');
     if (!Array.isArray(state.settings.coupons)) state.settings.coupons = [];
     const duplicate = state.settings.coupons.some((x, i) => x.code === code && i !== editingCouponIndex);
     if (duplicate) return toast('هذا الكود موجود مسبقًا', 'error');
@@ -2745,7 +2958,7 @@ async function addCoupon() {
     const cp = { code, phone, discount: disc, maxUses, expiresAt: expiry ? new Date(expiry + 'T23:59:59').toISOString() : null, active: existing ? existing.active !== false : true, createdAt: existing?.createdAt || new Date().toISOString() };
     if (existing) state.settings.coupons[editingCouponIndex] = cp; else state.settings.coupons.push(cp);
     const { error } = await saveCouponsToSettings();
-    if (error) { if (existing) state.settings.coupons[editingCouponIndex] = existing; else state.settings.coupons.pop(); return toast('تعذر حفظ البرومو في Supabase', 'error'); }
+    if (error) { if (existing) state.settings.coupons[editingCouponIndex] = existing; else state.settings.coupons.pop(); return toast(state.currentLang === 'fr' ? 'Impossible d’enregistrer le coupon sur le serveur.' : 'تعذر حفظ الكوبون عبر الخادم.', 'error'); }
     editingCouponIndex = -1; document.getElementById('coupon-save-btn').textContent = 'إضافة / حفظ البرومو';
     ['new-coupon-code','new-coupon-phone','new-coupon-expiry'].forEach(id => document.getElementById(id).value = '');
     document.getElementById('new-coupon-discount').value = '10'; document.getElementById('new-coupon-max-uses').value = '5';
@@ -2753,17 +2966,21 @@ async function addCoupon() {
 }
 window.addCoupon = addCoupon;
 async function renderCouponsList() {
-    const c = document.getElementById('coupons-list'); if (!c) return;
+    const container = document.getElementById('coupons-list'); if (!container) return;
     let usage = {};
-    if (window.supabaseClient) { try { const { data, error } = await window.supabaseClient.rpc('td_promo_usage_stats'); if (!error && data) usage = data; } catch (_) {} }
-    c.innerHTML = (state.settings.coupons || []).map((cp, i) => {
-        const used = Number(usage[String(cp.code).toUpperCase()] || 0), max = Math.max(1, Number(cp.maxUses || 1)), remaining = Math.max(0, max-used);
+    try {
+        const result = await callAdminWorker('adminCouponUsage');
+        if (result.usage && typeof result.usage === 'object') usage = result.usage;
+    } catch (error) { console.warn('Coupon usage stats unavailable:', error.message || error); }
+    container.innerHTML = (state.settings.coupons || []).map((cp, i) => {
+        const used = Number(usage[String(cp.code).toUpperCase()] || 0), max = Math.max(1, Number(cp.maxUses || 1)), remaining = Math.max(0, max - used);
         const expired = cp.expiresAt && new Date(cp.expiresAt).getTime() < Date.now();
         const active = cp.active !== false && !expired && remaining > 0;
         return `<div style="display:block;background:var(--bg-light);padding:12px;border-radius:8px;margin-bottom:8px;border:1px solid var(--border);"><div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><strong>${esc(cp.code)} — ${Number(cp.discount)}%</strong><span style="font-weight:bold;color:${active?'#059669':'#dc2626'}">${active?'نشط':'متوقف / منتهي'}</span></div><div style="font-size:.88rem;margin:6px 0;line-height:1.8">الهاتف: <b>${esc(cp.phone || '—')}</b><br>الطلبيات: ${used} / ${max} — المتبقي: ${remaining}<br>الانتهاء: ${cp.expiresAt ? new Date(cp.expiresAt).toLocaleDateString() : 'بدون تاريخ'}</div><div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn-secondary" onclick="editCoupon(${i})" style="padding:5px 9px">تعديل / تجديد</button><button class="btn-secondary" onclick="toggleCoupon(${i})" style="padding:5px 9px">${cp.active === false ? 'تفعيل' : 'إيقاف'}</button><button class="btn-danger" onclick="removeCoupon(${i})" style="padding:5px 9px">${i18n[state.currentLang].delete}</button></div></div>`;
     }).join('') || '<p style="padding:10px">لا توجد أكواد برومو بعد.</p>';
 }
 window.renderCouponsList = renderCouponsList;
+
 function editCoupon(index) {
     const cp = state.settings.coupons[index]; if (!cp) return;
     editingCouponIndex = index;
@@ -2795,18 +3012,37 @@ window.convertRequestToProduct = function(reqId) {
     window.pendingRequestId = reqId; document.getElementById('pf-title').textContent = i18n[state.currentLang].add_product; document.getElementById('pf-id').value = ''; document.getElementById('pf-name').value = req.productName; document.getElementById('pf-desc').value = req.details || ''; document.getElementById('pf-qty').value = req.qty || 1; document.getElementById('pf-price').value = ''; document.getElementById('pf-cost').value = ''; document.getElementById('pf-category').value = ''; tempUploadedImages = []; renderImagePreviews(); openModal('m-product-form');
 };
 
-async function rejectRequest(reqId) { if (!confirm(i18n[state.currentLang].reject_request_confirm)) return; const req = state.requests.find(r => r.id === reqId); if (!req) return; req.status = 'rejected'; save(K.requests, state.requests); if (window.supabaseClient) await window.supabaseClient.from('requests').update({ status: 'rejected' }).eq('id', reqId); renderAdminRequests(); toast('✓'); }
+async function rejectRequest(reqId) {
+    if (!confirm(i18n[state.currentLang].reject_request_confirm)) return;
+    const request = state.requests.find(r => String(r.id) === String(reqId)); if (!request) return;
+    try {
+        await callAdminWorker('adminSetRequestStatus', { id: reqId, status: 'rejected' });
+        request.status = 'rejected'; save(K.requests, state.requests); renderAdminRequests(); toast('✓');
+    } catch (error) { toast(error.message || i18n[state.currentLang].save_failed, 'error'); }
+}
 window.rejectRequest = rejectRequest;
 
-async function deleteRequest(reqId) { if (!confirm(i18n[state.currentLang].delete_request_confirm)) return; state.requests = state.requests.filter(r => r.id !== reqId); save(K.requests, state.requests); if (window.supabaseClient) await window.supabaseClient.from('requests').delete().eq('id', reqId); renderAdminRequests(); toast('✓'); }
+
+async function deleteRequest(reqId) {
+    if (!confirm(i18n[state.currentLang].delete_request_confirm)) return;
+    try {
+        await callAdminWorker('adminDeleteRequest', { id: reqId });
+        state.requests = state.requests.filter(r => String(r.id) !== String(reqId));
+        save(K.requests, state.requests); renderAdminRequests(); toast('✓');
+    } catch (error) { toast(error.message || i18n[state.currentLang].save_failed, 'error'); }
+}
 window.deleteRequest = deleteRequest;
 
+
 async function notifyCustomerProductAvailable(req) {
-    const msg = { id: Date.now(), customerId: null, name: req.customerName, phone: req.customerPhone, text: `🎉 ${req.productName}`, date: new Date().toISOString(), reply: null };
-    const cust = state.customers.find(c => c.phone === req.customerPhone); if (cust) msg.customerId = cust.id;
-    state.messages.unshift(msg); save(K.messages, state.messages); if (window.supabaseClient) await window.supabaseClient.from('messages').insert([msg]);
+    if (!req) return;
+    try {
+        const result = await callAdminWorker('adminNotifyCustomerProductAvailable', { requestId: req.id });
+        if (result.message) { state.messages.unshift(result.message); save(K.messages, state.messages); }
+    } catch (error) { console.error('Customer availability notification failed:', error); toast(error.message || i18n[state.currentLang].save_failed, 'error'); }
 }
 window.notifyCustomerProductAvailable = notifyCustomerProductAvailable;
+
 
 // Missing HTML handlers restored for product requests and exports.
 function openProductRequestModal() {
@@ -2821,18 +3057,16 @@ function openProductRequestModal() {
 window.openProductRequestModal = openProductRequestModal;
 
 async function submitProductRequest() {
-    const cust = state.session && state.customers.find(x => String(x.id) === String(state.session.id));
+    const cust = state.session && state.session.role === 'customer' && state.customers.find(x => String(x.id) === String(state.session.id));
     if (!cust) return toast(i18n[state.currentLang].login_first, 'error');
     const productName = document.getElementById('req-name').value.trim();
     const qty = Math.max(1, Number(document.getElementById('req-qty').value) || 1);
     const details = document.getElementById('req-desc').value.trim();
     if (!productName) return toast(state.currentLang === 'fr' ? 'Indiquez le nom du produit.' : 'أدخل اسم المنتج المطلوب.', 'error');
-    if (!window.supabaseClient) return toast(i18n[state.currentLang].error_connection, 'error');
-    const request = { id: Date.now(), customerId: cust.id, customerName: cust.name || '', customerPhone: cust.phone || '', productName, qty, details, date: new Date().toISOString(), status: 'pending', isTopCustomer: cust.isTop === true };
     try {
-        const { error } = await window.supabaseClient.from('requests').insert([request]);
-        if (error) throw error;
-        state.requests.unshift(request); save(K.requests, state.requests);
+        const result = await callCustomerWorker('customerCreateRequest', { productName, qty, details });
+        if (result.request) state.requests.unshift(result.request);
+        save(K.requests, state.requests);
         closeModal('m-product-request');
         toast(state.currentLang === 'fr' ? 'Demande envoyée.' : 'تم إرسال طلب المنتج بنجاح.');
         renderMyRequests();
@@ -2842,6 +3076,7 @@ async function submitProductRequest() {
     }
 }
 window.submitProductRequest = submitProductRequest;
+
 
 function csvCell(value) {
     const str = value == null ? '' : String(value);

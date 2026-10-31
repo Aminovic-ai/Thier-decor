@@ -11,7 +11,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&family=Tajawal:wght@400;700;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="style.css">
-    <link rel="stylesheet" href="custom.css?v=39">
+    <link rel="stylesheet" href="custom.css?v=40">
 </head>
 <body>
     <div class="screen active" id="screen-shop">
@@ -347,10 +347,14 @@
                     <input type="text" id="chk-coupon" placeholder="كود الخصم..." data-i18n-placeholder="coupon_placeholder" style="flex:1; padding:8px; border-radius:6px; border:1px solid var(--border);">
                     <button class="btn-secondary" onclick="applyCoupon()" style="width:auto; padding:8px 15px; background:var(--primary);" data-i18n="apply">تطبيق</button>
                 </div>
+                <div class="form-group" style="display:flex; flex-direction:column; gap:6px; background:#f0f9ff; padding:10px; border-radius:8px; border:1px solid #bae6fd;">
+                    <label style="display:flex; align-items:center; gap:8px; font-weight:700; margin:0;"><input type="checkbox" id="chk-use-points" onchange="updateDeliveryPrice()"> <i class="fas fa-gift"></i> <span data-i18n="use_points_delivery">استبدال 200 نقطة بتوصيل مجاني</span></label>
+                    <small id="chk-points-balance"></small><small id="chk-points-note" style="color:#047857;font-weight:700;"></small>
+                </div>
                 <div class="checkout-summary">
                     <div class="summary-row"><span data-i18n="products_price">المنتجات:</span><span id="chk-items-total">0</span></div>
                     <div class="summary-row" style="color: var(--danger);"><span data-i18n="discount">الخصم:</span><span id="chk-discount">0</span></div>
-                    <div class="summary-row" style="color: var(--primary); font-weight: bold;"><span data-i18n="delivery_cost">التوصيل:</span><span id="chk-del-price">0</span></div>
+                    <div class="summary-row" style="color: var(--primary); font-weight: bold;"><span id="chk-delivery-label" data-i18n="delivery_cost">التوصيل:</span><span id="chk-del-price">0</span></div>
                     <div class="summary-total"><span data-i18n="total_price">المجموع:</span><span id="chk-total-price">0</span></div>
                 </div>
                 <button class="btn-primary" onclick="confirmShopOrder()" style="padding: 15px; font-size: 1.1rem; border-radius: 10px; width:100%;" data-i18n="confirm_order">تأكيد الطلب</button>

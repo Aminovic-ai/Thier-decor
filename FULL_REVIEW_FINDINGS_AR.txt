@@ -1,0 +1,103 @@
+THIER DECOR — FULL REVIEW REPORT (worker-v2-review)
+Date: 2026-10-31
+Scope: static review of current branch files through GitHub connector.
+This report is not a live security test. No Supabase SQL was executed and no Worker was deployed.
+
+BRANCH STATUS
+- worker-v2-review is 31 commits ahead of main and 0 commits behind main at review time.
+- Keep all work on worker-v2-review until final review and explicit release approval.
+
+BLOCKERS BEFORE DEPLOYMENT
+
+1) ADMIN CRUD STILL BYPASSES THE FIREBASE-VERIFIED WORKER (CRITICAL)
+app.js contains direct Supabase browser mutations for admin operations including:
+- product create/update/delete, packs and product promotions;
+- order delete, manual order edits, tracking code, delivery-free override and paidAmount;
+- customer VIP/top/block flags and customer deletion;
+- message replies/deletion;
+- expenses create/delete;
+- settings, delivery prices, coupons;
+- requests fulfil/reject/delete and notification message creation.
+The V2 Worker currently exposes admin reads (listOrders/listAdminData) and status updates only. Firebase verification therefore does not protect most admin writes. The publishable Supabase key is correctly public by design, so RLS must deny all privileged writes from anon/authenticated and the UI must route them through Firebase-verified Worker actions.
+
+2) SECURITY MIGRATION BREAKS COUPON USAGE DISPLAY (HIGH)
+THIER_DECOR_ORDER_SECURITY_REVIEW.sql revokes anon/authenticated EXECUTE on td_promo_usage_stats(), but app.js renderCouponsList() still calls that RPC directly from the browser. Add a Firebase-admin-verified Worker action for coupon usage stats and change the UI to use it before applying the migration.
+
+3) VISIT ANALYTICS FUNCTIONS ARE STILL PUBLIC (HIGH)
+The base schema grants anon/authenticated EXECUTE on td_get_visit_stats() and td_record_visit(). analytics-notifications.js calls both directly. Stats should be moved behind an admin-verified Worker route and public execution revoked. Visitor recording needs abuse controls/rate limiting or a carefully bounded public route; sessionStorage alone is not a server-side abuse control.
+
+4) ORDER PAYLOAD TRUST AND PACK STOCK (CRITICAL)
+Worker createCustomerOrder overwrites customer identity fields but spreads all other client fields into trustedOrder. The current loyalty RPC still derives stock requirements from client-supplied isPack/packItems. The insert trigger computes prices from database product rows but does not rebuild the stored order.items JSON from canonical DB data. Client-provided status, paidAmount, tracking fields, product names/costs/pack definitions must not be trusted. Rebuild order lines and pack requirements from public.products inside the transaction; set initial status and payment/tracking fields server-side. Cancellation/restock must use the canonical stored snapshot created by that transaction.
+
+5) CUSTOMER PASSWORD AND RECOVERY (CRITICAL)
+Worker stores password as unsalted SHA-256 and recoveryPin in plaintext. customerResetPassword is an unauthenticated public endpoint with no visible rate limiting or attempt throttling. Migrate to a password KDF (PBKDF2/WebCrypto or equivalent), store a salted verifier, hash recovery PIN, add rate limiting/lockout, and ensure migration compatibility without locking out existing customers. Do not log secrets.
+
+6) CUSTOMER ACTIONS STILL WRITE DIRECTLY FROM BROWSER (HIGH)
+app.js directly updates customer wishlist and product reviews; customer receipt confirmation directly changes orders; requests are queried by customerPhone in the browser; messages are inserted from the browser. These require signed customer-session Worker routes or narrow, validated public insert policies. Do not expose private customer records by filtering only on a client-supplied phone number.
+
+7) ORDER EDIT/DELETE STOCK OPERATIONS ARE NOT ATOMIC (HIGH)
+Admin deleteOrder and saveChangesOrder update multiple product rows and order rows as separate browser requests with best-effort rollback. Concurrent requests/failures can leave order and stock inconsistent. Move edit/delete/restock into transaction-backed service_role RPCs called only by the admin-verified Worker. Keep delivered orders and points history protected.
+
+8) CUSTOMER DATA PAGINATION / SCALE (MEDIUM-HIGH)
+Worker listOrders caps at 1,000 and listAdminData caps each table at 2,000 with no pagination. Counts and admin views will silently omit data beyond those limits. Add cursor/range pagination or dedicated aggregate RPCs and avoid loading all customer rows for routine dashboard refreshes.
+
+9) COUPON VALIDATION AND USAGE
+td_check_promo remains public and reveals validity/discount/usage/maximum-use details for a supplied code+phone. Review enumeration/privacy risk and return only the minimum storefront fields. Consumption must remain service_role-only and transactionally coupled to order creation. The current UI's usage count must move to the admin Worker before the security migration is applied.
+
+10) VISITOR EVENT INTEGRITY
+td_record_visit is public and can be called repeatedly outside the app. Add a server-side rate limit/deduplication strategy before relying on visit counts for analytics. td_get_visit_stats must be admin-only.
+
+11) SERVICE WORKER CACHE VERSION
+sw.js still uses CACHE_NAME thier-decor-v32 while index.html references custom.css?v=39. Bump the service-worker cache version as part of release and ensure the worker asset list matches the actual project files, so mobile clients do not keep stale JS/CSS after deployment.
+
+12) DEPLOYMENT CONFIGURATION
+No wrangler.toml, wrangler.json, wrangler.jsonc or package.json exists on this branch at review time. Worker deploy method and GitHub integration are not yet codified. Add a minimal wrangler configuration and deployment workflow only after code is stable; secrets must be Cloudflare Worker secrets, never repository files. Confirm exact Cloudflare account/Worker target before deploy.
+
+13) DATABASE MIGRATION ORDER / SAFETY
+- The base schema explicitly warns that it does not secure the current Firebase + anon-key direct CRUD architecture.
+- It grants anon/authenticated EXECUTE on td_create_order and td_consume_promo.
+- It grants public EXECUTE on visitor stats/record functions.
+- The order-security migration must be applied after all function-definition migrations, and the base schema must never be rerun afterward because it restores public grants.
+- The current order-security migration must be updated to account for the browser call to td_promo_usage_stats and analytics-notifications.js calls to visitor RPCs.
+- The customer points/address migration should be wrapped in a transaction and reviewed with the actual schema before application.
+- Do not apply phone unique index until canonical duplicate report is checked against real customer data.
+- No SQL in this report has been executed.
+
+POSITIVE FINDINGS
+- Firebase admin sign-in uses a fixed ADMIN_UID in the browser and Worker verifies the Firebase ID token via Identity Toolkit and checks localId + disabled state.
+- Worker uses SUPABASE_SERVICE_ROLE_KEY server-side; it is not in app.js.
+- Customer login and private customer data reads are routed through a signed HMAC customer session token and safeCustomer removes password/recoveryPin from returned customer objects.
+- Product images are compressed client-side before storing, with a 15 MB source limit and target <=480 KB for product images.
+- Product catalog/settings caching and Realtime/fallback refresh exist; however public/private RLS and admin writes must be secured before release.
+- Admin order status transition is routed through the Worker and a database RPC; cancellation restock is intended to occur in the DB transaction.
+- Delivered orders are blocked from deletion in the UI, but server-side enforcement is also required.
+
+RELEASE GATES
+A) Complete all Worker CRUD routes and remove privileged direct Supabase writes from app.js.
+B) Complete customer-auth hardening and signed customer action routes.
+C) Rebuild canonical order/pack snapshots and transactional order edit/delete/restock.
+D) Update RLS/grants and all dependent UI calls (coupon stats + visit analytics included).
+E) Add pagination/aggregate stats and bump service-worker cache version.
+F) Add deployment config/workflow; deploy only to a separate V2 Worker first, test, then connect GitHub.
+G) Apply reviewed Supabase migrations in documented order only after backup/staging validation and explicit approval.
+H) Run browser smoke tests for Arabic/French, customer lifecycle, admin CRUD, checkout, packs, stock concurrency, coupons, points, order cancellation, reports, notifications and mobile/PWA cache.
+
+No production changes were made during this review.
+
+
+حالة التنفيذ بعد بدء معالجة جميع النقاط (2026-10-31):
+- أُضيفت مسارات Worker محمية بـ Firebase Admin لعمليات CRUD الإدارية المذكورة، وتحوّلت app.js لاستخدامها. بقيت قراءات المنتجات/الإعدادات العامة وRPC التحقق العام من الكوبون فقط عبر anon client؛ لا توجد عمليات كتابة Supabase مباشرة متبقية في app.js بحسب فحص الاستدعاءات النصي الأخير.
+- أُضيفت مسارات جلسة الزبون الموقعة للمفضلة والتقييم والرسائل والطلبات الخاصة وتأكيد الاستلام، وأزيلت قراءة طلبات الزبون المباشرة حسب الهاتف.
+- أُضيفت مسارات Worker للعمليات الذرية لتعديل/حذف الطلبات، وأُنشئ ملف SQL نهائي يعرّف الدوال اللازمة، لكن لم يتم تطبيقه أو التحقق منه على PostgreSQL.
+- أُضيف PBKDF2 وترقية تدريجية للبيانات القديمة، وحدود محاولات عبر جدول يحتاج migration.
+- نُقلت إحصائيات الكوبونات والزيارات إلى Worker، وأضيفت حماية deduplication/حدود زيارة تعتمد على سر Worker.
+- أُضيفت pagination لقراءات Worker وجرى تحديث cache PWA.
+- هذه إنجازات على مستوى الكود والملفات فقط، وليست دليلاً على اختبار حي. تبقى بوابات الإصدار: مراجعة SQL syntax/schema، اختبارات staging، إكمال deployment config، إنشاء Worker مستقل V2 واختباره، ثم فقط التفكير في تطبيق migrations بعد موافقة المستخدم.
+- لا تغيّر endpoint الحالي، ولا تنشر، ولا تشغّل SQL خلال مرحلة المراجعة.
+
+
+تحديث فحص الإصدار:
+- GitHub Actions نجح في فحص JavaScript وWorker syntax وتحليل SQL statements لملفات المراجعة المحددة.
+- أضيف wrangler.toml مستقل لـ thier-decor-api-v2 دون نشر.
+- تمت إضافة حماية من حذف منتجات مرتبطة بطلبات سابقة أو تغيير مكونات Pack ذات تاريخ طلبات.
+- لم يتم اختبار SQL على PostgreSQL فعلياً ولم يتم تشغيل Worker على Cloudflare؛ لذلك لا تزال النسخة غير معتمدة للنشر.

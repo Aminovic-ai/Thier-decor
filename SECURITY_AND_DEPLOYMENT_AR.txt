@@ -13,3 +13,105 @@ SQL المرفق:
 راجع أسماء الأعمدة وأنواعها في مشروعك قبل تشغيلها، وخذ نسخة احتياطية أولاً.
 
 الاختبارات الآلية التي أُجريت: فحص صياغة JavaScript فقط. لم يُجر اختبار متصفح أو اتصال حي بقاعدة بيانات Supabase، لذلك لا تعتبر هذه الحزمة اعتماداً أمنياً أو ضماناً أن كل السياسات/الميزات تعمل على قاعدة بياناتك.
+
+
+ملاحظات مراجعة V2 (لم يتم النشر):
+- ملف Worker الجديد هو thier-decor-api.js، وعنوانه المتوقع بعد إنشائه باسم thier-decor-api هو https://thier-decor-api.amindrody.workers.dev/ .
+- واجهة الموقع في فرع worker-v2-review موجهة إلى Worker V2؛ لا تغيّر أو تنشر Worker القديم thier-decor-admin-api.
+- يجب ضبط متغيرات Worker V2: SUPABASE_URL وSUPABASE_SERVICE_ROLE_KEY (Secret) وFIREBASE_API_KEY وADMIN_UID وCUSTOMER_SESSION_SECRET (Secret).
+- إنشاء الطلبية أصبح يمر عبر رمز جلسة الزبون الموقّع؛ Worker يتحقق من أن customerId يطابق صاحب الجلسة، ثم يستدعي td_create_order بمفتاح service_role من الخادم.
+- ملف THIER_DECOR_LOYALTY_REDEMPTION_ATOMIC_REVIEW.sql يضيف سجل استبدال النقاط ويجعل خصم 200 نقطة والتوصيل المجاني واستهلاك الكوبون وخصم المخزون ضمن معاملة واحدة. كما يقصر EXECUTE لدالة td_create_order على service_role.
+- ملف THIER_DECOR_CUSTOMER_POINTS_ADDRESS_MIGRATION_REVIEW.sql يمنح 40 نقطة مرة واحدة عند تسليم طلبية total > 10000، ويمنع إعادة فتح الطلبية الملغاة أو تغيير حالة الطلبية المسلّمة.
+- ملف THIER_DECOR_CUSTOMER_PHONE_UNIQUE_REVIEW.sql (أُضيف في مراجعة V2): يوحّد صيغ أرقام الهاتف الجزائرية، ويوقف الترحيل إذا وجد أرقام مكررة بصيغ مختلفة، ثم ينشئ قيداً فريداً ودالة بحث لا يستطيع استدعاءها إلا service_role. لا يحذف أو يدمج أي حساب. يجب مراجعة التكرارات يدوياً قبل التفكير في تشغيله.
+- ترتيب ملفات SQL عند إعداد نسخة تجريبية: المخطط الأساسي أولاً، ثم ملف العنوان/النقاط والحالات، ثم ملف الاستبدال الذري للنقاط، ثم ملف توحيد الهاتف. لا تُعد تشغيل المخطط الأساسي بعد ملفات المراجعة؛ لأنه يعيد تعريف td_create_order ويمنح EXECUTE لـ anon/authenticated من جديد.
+- Worker V2 بعد هذا التعديل يستخدم td_find_customer_by_phone؛ لذلك لن يعمل تسجيل الدخول/التسجيل والبحث عن الهاتف حتى تُطبّق مراجعة الهاتف على قاعدة تجريبية أولاً.
+- لا تشغّل أي ملف SQL ولا تنشر Worker قبل مراجعة مخطط قاعدة البيانات الفعلي وتشغيل قائمة الاختبار على مشروع تجريبي. لم يتم إجراء اتصال حي بقاعدة Supabase أو اختبار عمليات فعلية.
+
+
+مراجعة أمنية إضافية لـ V2 (ملف مراجعة فقط — لم يُشغّل):
+- الملف THIER_DECOR_ORDER_SECURITY_REVIEW.sql يقصر EXECUTE للدوال الحساسة td_create_order(jsonb) وtd_consume_promo(text,text,text) وtd_promo_usage_stats() وtd_admin_update_order_status(bigint,text) على service_role فقط.
+- تبقى td_check_promo(text,text) متاحة لـ anon/authenticated لأنها مسار تحقق كوبون للواجهة الحالية؛ لا تستخدمها لتنفيذ/استهلاك الكوبون.
+- Worker V2 يجب أن يستدعي الدوال الإدارية/الحساسة عبر dbRequest باستخدام SUPABASE_SERVICE_ROLE_KEY الموجود كـ Secret في بيئة Worker فقط. لا تضع هذا المفتاح في app.js أو أي ملف واجهة.
+- الترتيب التجريبي: المخطط الأساسي، ثم THIER_DECOR_CUSTOMER_POINTS_ADDRESS_MIGRATION_REVIEW.sql، ثم THIER_DECOR_LOYALTY_REDEMPTION_ATOMIC_REVIEW.sql، ثم THIER_DECOR_CUSTOMER_PHONE_UNIQUE_REVIEW.sql، ثم THIER_DECOR_ORDER_SECURITY_REVIEW.sql.
+- تحذير مهم: لا تُعد تشغيل THIER_DECOR_SUPABASE_SCHEMA_FIXED_V2.sql بعد ملف الأمان؛ فهو يعيد منح EXECUTE لـ anon/authenticated على td_create_order وtd_consume_promo. لا تشغّل أي ملف على الإنتاج قبل مراجعة المخطط الفعلي والنسخة التجريبية.
+- هذه التغييرات ملفات في فرع worker-v2-review فقط. لم يتم تنفيذ SQL، ولم يتم اختبار اتصال حي، ولم يتم نشر Worker.
+
+تنبيه مراجعة شامل (2026-10-31):
+- لا تطبّق THIER_DECOR_ORDER_SECURITY_REVIEW.sql الآن؛ واجهة app.js ما زالت تستدعي td_promo_usage_stats() مباشرة من المتصفح داخل renderCouponsList(). بعد سحب الصلاحية سيتوقف عرض عدد استعمالات الكوبونات. يجب أولاً إضافة مسار Worker محمي بـ Firebase Admin وتعديل الواجهة لاستخدامه.
+- كذلك analytics-notifications.js يستدعي td_get_visit_stats() وtd_record_visit() مباشرة. لم يتم نقل هذه الاستدعاءات إلى Worker بعد؛ لا تسحب صلاحياتها قبل نقل المسارات المطلوبة وإضافة حماية مناسبة لتسجيل الزيارات.
+- الأهم: معظم عمليات CRUD الإدارية في app.js ما زالت تستخدم Supabase anon client مباشرة، رغم أن قراءة بيانات الإدارة وتحديث حالة الطلبية فقط تمر عبر Worker. لذلك لا تعتبر حماية الإدارة مكتملة ولا تنشر Worker كنسخة نهائية حتى نقل كل عمليات الإدارة الحساسة إلى Worker والتحقق من RLS.
+- راجع FULL_REVIEW_FINDINGS_AR.txt للحصول على قائمة موانع النشر وبوابات الإصدار.
+
+
+مستجدات تنفيذ المراجعة الشاملة — 2026-10-31 (ملفات فرع worker-v2-review فقط):
+
+1) نقل عمليات الإدارة:
+- أضيفت مسارات Firebase Admin محمية في thier-decor-api.js لعمليات المنتجات (إضافة/تعديل/حذف)، حالات الزبائن، حذف الزبائن، الرد/حذف الرسائل، المصروفات، إعدادات المتجر وأسعار التوصيل والكوبونات، التتبع والدفع والتوصيل المجاني، الطلبات الخاصة، إحصائيات استعمال الكوبونات، وإشعارات توفر المنتج.
+- app.js أصبح يستدعي Worker لهذه العمليات بدلاً من Supabase anon writes.
+- لا تعتبر العملية مختبرة على Worker حي؛ التعديلات كود على الفرع فقط.
+
+2) عمليات الزبون:
+- أضيفت مسارات موقعة لجلب الطلبات والرسائل والطلبات الخاصة، تحديث المفضلة، إضافة تقييم بعد طلبية مسلّمة، إرسال طلب خاص، إرسال رسالة، وتأكيد الاستلام مع التحقق من ملكية الطلبية.
+- أزيلت قراءة الطلبات الخاصة المباشرة باستخدام customerPhone من المتصفح.
+
+3) الطلبات والمخزون:
+- أضيف Worker لعمليات تعديل وحذف الطلبية، لكنهما يعتمدان على الدالتين الجديدتين td_admin_edit_order وtd_admin_delete_order في ملف THIER_DECOR_FINAL_SECURITY_AND_ORDER_MUTATIONS_REVIEW.sql.
+- الملف الجديد يعيد بناء عناصر الطلب والـ Packs من products داخل المعاملة، ويمنع تعديل/حذف طلبية ذات سجل نقاط، ويرفض استعادة مخزون طلبية قديمة إذا تعذر التحقق من snapshot المخزون.
+- إلغاء الطلبية يعيد المخزون مرة واحدة، ويعيد نقاط الاستبدال مرة واحدة، ويحرر استعمال الكوبون. تسليم طلبية مؤهلة يمنح 40 نقطة مرة واحدة.
+- Worker createOrder يمرر فقط product IDs والكميات ومعلومات التوصيل/الكوبون؛ لا يثق في اسم المنتج أو سعره أو تكلفته أو packItems أو الحالة أو مبلغ الدفع أو tracking القادم من المتصفح.
+
+4) كلمات المرور والاسترجاع:
+- Worker الجديد يستخدم PBKDF2 مع salt و310,000 iterations لكلمات المرور ورمز الاسترجاع.
+- عند أول دخول ناجح، يرقّي التحقق القديم SHA-256 أو PIN النصي إلى PBKDF2 دون إجبار الزبون على تغيير كلمة المرور.
+- أضيفت محاولات throttling عبر جدول td_customer_auth_attempts، ويخزن الجدول HMAC hashes فقط ولا يخزن الهاتف أو IP الخام.
+- يتطلب Worker secret إضافياً باسم AUTH_RATE_SECRET.
+
+5) الكوبونات والزيارات:
+- إحصائيات استعمال الكوبونات وإحصائيات الزيارات أصبحت عبر Worker Admin.
+- ملف SQL النهائي يقلل حقول رد td_check_promo العامة، ويقصر td_promo_usage_stats وtd_get_visit_stats وtd_consume_promo على service_role.
+- تسجيل الزيارة يمر عبر Worker، مع HMAC لـ CF-Connecting-IP ودعم deduplication وحد 40 زيارة لكل IP hash خلال 24 ساعة. لا يُحفظ IP الخام.
+- يتطلب Worker secret إضافياً باسم VISIT_RATE_SECRET.
+
+6) الأداء وPWA:
+- Worker reads أصبحت تستخدم Range pagination حتى 50,000 صف بدلاً من حد ثابت 1,000/2,000، وترفض تجاوز الحد برسالة واضحة بدلاً من الإخفاء الصامت.
+- تم رفع CACHE_NAME إلى thier-decor-v40 وإضافة admin.html إلى قائمة أصول PWA، وتحديث custom.css?v=40.
+
+ترتيب ملفات SQL المقترح للنسخة التجريبية:
+- المخطط الأساسي ثم migrations الخاصة بالـ Packs/Promos، العنوان/النقاط، استبدال النقاط، وتوحيد الهاتف.
+- ملف THIER_DECOR_FINAL_SECURITY_AND_ORDER_MUTATIONS_REVIEW.sql هو ملف المراجعة النهائي ويجب تطبيقه أخيراً بعد التأكد من وجود كل الدوال والجداول السابقة.
+- هذا الملف النهائي يتضمن صلاحيات الأمان، لذلك لا حاجة لتشغيل THIER_DECOR_ORDER_SECURITY_REVIEW.sql بعده. لا تُعد تشغيل المخطط الأساسي بعده.
+- لا تشغّل أي SQL قبل فحص بنية قاعدة تجريبية ونسخة احتياطية وموافقة صريحة.
+
+إعدادات Worker الإضافية المطلوبة قبل الاختبار:
+- AUTH_RATE_SECRET: سر عشوائي طويل مستقل لحماية حدود محاولات تسجيل الدخول/التسجيل/الاسترجاع.
+- VISIT_RATE_SECRET: سر عشوائي طويل مستقل لعمل HMAC لعنوان IP دون حفظه خاماً.
+- لا تضع هذين السرّين أو SUPABASE_SERVICE_ROLE_KEY في GitHub أو ملفات الواجهة.
+
+نقاط ما زالت تحتاج استكمال/تحقق قبل النشر:
+- اختبار syntax فعلي للـ JavaScript وSQL على نسخة قاعدة بيانات تجريبية، واختبار متصفح كامل.
+- مراجعة schema الفعلي وأنواع أعمدة requests/expenses/orders قبل تطبيق migration.
+- مراجعة وتحديد سياسة guest messages ومكافحة spam.
+- استكمال pagination/search واجهة الإدارة بحيث لا تضطر إلى تحميل جميع الزبائن دورياً عند التوسع الكبير.
+- إضافة wrangler config وGitHub deployment workflow، ثم إنشاء Worker مستقل thier-decor-api-v2.
+- عدم تغيير endpoint الحالي في app.js أو نشر Worker حتى يتم نشر V2 مستقلاً واختباره.
+- لا توجد أي عملية SQL أو نشر Worker منفذة حتى تاريخ هذه الملاحظة.
+
+تصحيح لحالة التحذيرات السابقة أعلاه:
+الفقرة السابقة التي تقول إن app.js ما زال يستدعي td_promo_usage_stats مباشرة وإن analytics-notifications.js ما زال يستدعي دوال الزيارات مباشرة كانت صحيحة وقت كتابة المراجعة الأولية، لكنها لم تعد تصف آخر نسخة من الفرع. في آخر نسخة، إحصائيات الكوبونات والزيارات تمر عبر Worker، وعمليات الكتابة الإدارية المباشرة أزيلت من app.js. يبقى تنفيذ migration النهائي واختباره على قاعدة تجريبية شرطاً قبل سحب صلاحيات anon/authenticated.
+
+
+تحديث بعد نجاح فحص GitHub Actions — 2026-10-31:
+- نجح فحص JavaScript للواجهة وملفات الإشعارات وPWA وWorker.
+- نجح محلل PostgreSQL pglast في تحليل ملفات SQL الأربعة المحددة نحوياً. هذا لا يثبت صحة أسماء الأعمدة/الجداول أو سلوك PL/pgSQL وقت التنفيذ؛ يلزم تشغيلها على قاعدة staging مماثلة بعد backup ومراجعة schema.
+- أضيف wrangler.toml باسم Worker مستقل thier-decor-api-v2، دون أي deploy workflow تلقائي ودون نشر.
+- endpoint في app.js لا يزال يشير إلى Worker الحالي؛ لا تغيّره قبل اختبار V2.
+- أضيف منع حذف أي منتج له تاريخ في الطلبات، ومنع تغيير مكونات Pack بعد استعمالها في طلبات سابقة، لحماية snapshots والمخزون التاريخي.
+- لا تزال هناك حاجة إلى اختبار runtime على Worker/قاعدة staging، خصوصاً معاملات المخزون والكوبونات والنقاط وتوافق الأعمدة والـ RLS.
+
+
+تجهيز النشر اليدوي (لم يتم تشغيله):
+- أضيف .github/workflows/deploy-v2.yml ويعمل فقط عند اختيار Run workflow يدوياً؛ لا يوجد نشر تلقائي مع كل commit.
+- قبل تشغيله يجب إضافة GitHub secret باسم CLOUDFLARE_API_TOKEN وGitHub variable باسم CLOUDFLARE_ACCOUNT_ID، مع صلاحية Workers Scripts:Edit.
+- بعد إنشاء Worker V2 يجب ضبط Worker secrets: SUPABASE_SERVICE_ROLE_KEY وFIREBASE_API_KEY وCUSTOMER_SESSION_SECRET وAUTH_RATE_SECRET وVISIT_RATE_SECRET، وضبط ADMIN_UID كـ variable.
+- يجب اختبار / health أو مسار فحص مخصص، تسجيل الدخول، إنشاء طلب تجريبي، تعديل حالة، الكوبونات والزيارات قبل تغيير endpoint في app.js.
+- لا تضغط Run workflow ولا تغيّر endpoint قبل موافقة المستخدم الصريحة في مرحلة النشر.
