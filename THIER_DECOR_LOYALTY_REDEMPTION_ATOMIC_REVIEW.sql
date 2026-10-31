@@ -26,7 +26,7 @@ declare
   inserted_id bigint; promo_code text; promo_phone text; promo_result jsonb;
   use_points boolean:=coalesce((p_order->>'useLoyaltyPoints')::boolean,false);
   customer_points integer; points_redeemed integer:=0;
-  final_delivery numeric; final_total numeric;
+  final_delivery numeric; final_total numeric; existing_order public.orders%rowtype; existing_redeemed integer:=0;
 begin
   if jsonb_typeof(p_order) <> 'object' then raise exception 'Order payload must be a JSON object'; end if;
   if nullif(p_order->>'id','') is null or nullif(p_order->>'customerPhone','') is null then
@@ -35,6 +35,30 @@ begin
   if jsonb_typeof(coalesce(p_order->'items','[]'::jsonb)) <> 'array'
      or jsonb_array_length(coalesce(p_order->'items','[]'::jsonb)) = 0 then
     raise exception 'Order items must be a non-empty JSON array';
+  end if;
+
+  -- Repeated network submissions with the same order ID return the first result
+  -- without charging stock, coupon usage or loyalty points a second time.
+  perform pg_advisory_xact_lock(hashtext('td-order:' || (p_order->>'id')));
+  select * into existing_order
+    from public.orders
+    where id=(p_order->>'id')::bigint
+    for update;
+  if found then
+    if existing_order."customerId" is distinct from nullif(p_order->>'customerId','')::bigint then
+      raise exception 'Order ID already belongs to another customer';
+    end if;
+    select points into existing_redeemed
+      from public.td_loyalty_redemptions
+      where order_id=existing_order.id;
+    return jsonb_build_object(
+      'ok',true,
+      'order_id',existing_order.id,
+      'points_redeemed',coalesce(existing_redeemed,0),
+      'delivery_price',existing_order."deliveryPrice",
+      'total',existing_order.total,
+      'already_created',true
+    );
   end if;
 
   -- Aggregate product and pack component quantities before locking anything.
