@@ -39,6 +39,19 @@ async function fetchCustomerDataViaWorker(token) {
     return result;
 }
 
+
+async function callCustomerWorker(action, payload = {}) {
+    const token = state.session?.role === 'customer' ? state.session.customerToken : null;
+    if (state.session?.role === 'customer' && !token) throw new Error(state.currentLang === 'fr' ? 'Session client expirée.' : 'انتهت جلسة الزبون، يرجى تسجيل الدخول مجدداً.');
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) headers.Authorization = 'Bearer ' + token;
+    const response = await fetch(TD_CUSTOMER_API_URL, { method: 'POST', headers, body: JSON.stringify({ action, ...payload }), cache: 'no-store' });
+    let result;
+    try { result = await response.json(); } catch (_) { throw new Error(state.currentLang === 'fr' ? 'Réponse serveur invalide.' : 'ردّ الخادم غير صالح.'); }
+    if (!response.ok || result?.success !== true) throw new Error(result?.error || (state.currentLang === 'fr' ? 'Opération impossible.' : 'تعذر تنفيذ العملية.'));
+    return result;
+}
+
 async function callAdminWorker(action, payload = {}) {
     if (!window.firebaseReady || typeof firebase === 'undefined' || !firebase.auth) {
         throw new Error(state.currentLang === 'fr' ? 'La session Firebase administrateur est indisponible.' : 'جلسة Firebase الخاصة بالمسؤول غير متاحة.');
@@ -1555,15 +1568,25 @@ function filterShopProducts(q) {
 }
 window.filterShopProducts = filterShopProducts;
 
-function toggleWishlist(id) {
-    if (!state.session) { toast(i18n[state.currentLang].login_first, 'error'); openCustomerAuthModal(); return; }
-    const idx = state.wishlist.indexOf(id); if (idx > -1) state.wishlist.splice(idx, 1); else state.wishlist.push(id);
-    save(K.wishlist, state.wishlist); updateWishlistBadge(); renderWishlist(); renderShop();
-    const cust = state.customers.find(c => c.id === state.session.id);
-    if (cust) { cust.wishlist = state.wishlist; save(K.customers, state.customers); if (window.supabaseClient) window.supabaseClient.from('customers').update({ wishlist: state.wishlist }).eq('id', cust.id).then(); }
-    toast(idx > -1 ? '✓' : '❤️');
+async function toggleWishlist(id) {
+    if (!state.session || state.session.role !== 'customer') { toast(i18n[state.currentLang].login_first, 'error'); openCustomerAuthModal(); return; }
+    const previous = [...state.wishlist];
+    const idx = state.wishlist.indexOf(id);
+    if (idx > -1) state.wishlist.splice(idx, 1); else state.wishlist.push(id);
+    try {
+        const result = await callCustomerWorker('customerUpdateWishlist', { wishlist: state.wishlist });
+        state.wishlist = Array.isArray(result.wishlist) ? result.wishlist : state.wishlist;
+        const cust = state.customers.find(c => String(c.id) === String(state.session.id));
+        if (cust) { cust.wishlist = state.wishlist; save(K.customers, state.customers); }
+        save(K.wishlist, state.wishlist); updateWishlistBadge(); renderWishlist(); renderShop();
+        toast(idx > -1 ? '✓' : '❤️');
+    } catch (error) {
+        state.wishlist = previous; save(K.wishlist, previous); updateWishlistBadge(); renderWishlist(); renderShop();
+        toast(error.message || i18n[state.currentLang].save_failed, 'error');
+    }
 }
 window.toggleWishlist = toggleWishlist;
+
 
 function updateWishlistBadge() { const b = document.getElementById('wishlist-badge'); if (b) { b.textContent = state.wishlist.length; b.style.display = state.wishlist.length > 0 ? 'flex' : 'none'; } }
 function renderWishlist() {
@@ -1588,18 +1611,24 @@ function showProductView(id) {
 window.showProductView = showProductView;
 
 
-function submitReview() {
-    if (!state.session) return toast(i18n[state.currentLang].login_first, 'error');
-    const stars = document.getElementById('pv-review-stars').value; const text = document.getElementById('pv-review-text').value.trim(); if (!text) return toast(i18n[state.currentLang].review_placeholder, 'error');
-    const productId = document.getElementById('pv-add-to-cart').getAttribute('data-id'); const prod = state.products.find(p => p.id === Number(productId)); if (!prod) return;
-    if (!prod.reviews) prod.reviews = [];
-    const reviewer = state.customers.find(c => String(c.id) === String(state.session.id));
-    if (!reviewer) return toast(i18n[state.currentLang].login_first, 'error');
-    prod.reviews.push({ name: reviewer.name || 'زبون', stars, text, date: new Date().toISOString() });
-    save(K.products, state.products); if (window.supabaseClient) window.supabaseClient.from('products').update({ reviews: prod.reviews }).eq('id', prod.id).then();
-    document.getElementById('pv-review-text').value = ''; showProductView(prod.id); toast('✅');
+async function submitReview() {
+    if (!state.session || state.session.role !== 'customer') return toast(i18n[state.currentLang].login_first, 'error');
+    const stars = Number(document.getElementById('pv-review-stars').value);
+    const text = document.getElementById('pv-review-text').value.trim();
+    if (!text) return toast(i18n[state.currentLang].review_placeholder, 'error');
+    const productId = Number(document.getElementById('pv-add-to-cart').getAttribute('data-id'));
+    const prod = state.products.find(p => Number(p.id) === productId);
+    if (!prod) return;
+    try {
+        const result = await callCustomerWorker('customerAddReview', { productId, stars, text });
+        prod.reviews = Array.isArray(result.reviews) ? result.reviews : prod.reviews;
+        save(K.products, state.products);
+        document.getElementById('pv-review-text').value = '';
+        showProductView(prod.id); toast('✅');
+    } catch (error) { toast(error.message || i18n[state.currentLang].save_failed, 'error'); }
 }
 window.submitReview = submitReview;
+
 
 function addToCart(id) {
     const p = state.products.find(x => x.id === id); if (!p) return;
@@ -1990,10 +2019,17 @@ window.renderMyOrders = renderMyOrders;
 
 async function customerConfirmReceipt(orderId) {
     if (!confirm(i18n[state.currentLang].confirm_receipt_q)) return;
-    const o = state.orders.find(x => x.id === orderId);
-    if (o) { o.status = 'delivered'; save(K.orders, state.orders); if (window.supabaseClient) await window.supabaseClient.from('orders').update({ status: 'delivered' }).eq('id', orderId); toast(i18n[state.currentLang].receipt_confirmed); renderMyOrders(); }
+    try {
+        const result = await callCustomerWorker('customerConfirmReceipt', { id: orderId });
+        const order = result.order || { ...state.orders.find(x => String(x.id) === String(orderId)), status: 'delivered' };
+        const index = state.orders.findIndex(x => String(x.id) === String(orderId));
+        if (index >= 0) state.orders[index] = order;
+        save(K.orders, state.orders);
+        toast(i18n[state.currentLang].receipt_confirmed); renderMyOrders();
+    } catch (error) { toast(error.message || i18n[state.currentLang].save_failed, 'error'); }
 }
 window.customerConfirmReceipt = customerConfirmReceipt;
+
 
 function printOrderInvoice(orderId) {
     const order = state.orders.find(o => o.id === orderId); if (!order) return;
@@ -2019,14 +2055,18 @@ window.renderMyRequests = renderMyRequests;
 
 function openMessageModal() { document.getElementById('msg-text').value = ''; openModal('m-customer-message'); }
 async function submitCustomerMessage() {
-    const text = document.getElementById('msg-text').value.trim(); if (!text) return toast(i18n[state.currentLang].write_message_first, 'error');
-    let name = '', phone = '';
-    if (state.session) { const cust = state.customers.find(x => x.id === state.session.id); name = cust ? cust.name : 'زبون'; phone = cust ? cust.phone : ''; } else { name = 'زائر'; phone = 'غير متوفر'; }
-    const msg = { id: Date.now(), customerId: state.session ? state.session.id : null, name: name, phone: phone, text: text, date: new Date().toISOString() };
-    state.messages.unshift(msg); save(K.messages, state.messages); if (window.supabaseClient) await window.supabaseClient.from('messages').insert([msg]);
-    closeModal('m-customer-message'); toast(`✅ ${i18n[state.currentLang].msg_sent_success}`);
+    const text = document.getElementById('msg-text').value.trim();
+    if (!text) return toast(i18n[state.currentLang].write_message_first, 'error');
+    try {
+        const result = await callCustomerWorker('customerSendMessage', { text });
+        if (result.message) { state.messages.unshift(result.message); save(K.messages, state.messages); }
+        closeModal('m-customer-message'); toast('✅ ' + i18n[state.currentLang].msg_sent_success);
+    } catch (error) {
+        toast((state.currentLang === 'fr' ? 'Envoi impossible: ' : 'تعذر إرسال الرسالة: ') + (error.message || ''), 'error');
+    }
 }
 window.openMessageModal = openMessageModal; window.submitCustomerMessage = submitCustomerMessage;
+
 
 function renderCustomerMessages() {
     const c = document.getElementById('s-customer-messages-list'); if (!c || !state.session) return;
@@ -2828,18 +2868,16 @@ function openProductRequestModal() {
 window.openProductRequestModal = openProductRequestModal;
 
 async function submitProductRequest() {
-    const cust = state.session && state.customers.find(x => String(x.id) === String(state.session.id));
+    const cust = state.session && state.session.role === 'customer' && state.customers.find(x => String(x.id) === String(state.session.id));
     if (!cust) return toast(i18n[state.currentLang].login_first, 'error');
     const productName = document.getElementById('req-name').value.trim();
     const qty = Math.max(1, Number(document.getElementById('req-qty').value) || 1);
     const details = document.getElementById('req-desc').value.trim();
     if (!productName) return toast(state.currentLang === 'fr' ? 'Indiquez le nom du produit.' : 'أدخل اسم المنتج المطلوب.', 'error');
-    if (!window.supabaseClient) return toast(i18n[state.currentLang].error_connection, 'error');
-    const request = { id: Date.now(), customerId: cust.id, customerName: cust.name || '', customerPhone: cust.phone || '', productName, qty, details, date: new Date().toISOString(), status: 'pending', isTopCustomer: cust.isTop === true };
     try {
-        const { error } = await window.supabaseClient.from('requests').insert([request]);
-        if (error) throw error;
-        state.requests.unshift(request); save(K.requests, state.requests);
+        const result = await callCustomerWorker('customerCreateRequest', { productName, qty, details });
+        if (result.request) state.requests.unshift(result.request);
+        save(K.requests, state.requests);
         closeModal('m-product-request');
         toast(state.currentLang === 'fr' ? 'Demande envoyée.' : 'تم إرسال طلب المنتج بنجاح.');
         renderMyRequests();
@@ -2849,6 +2887,7 @@ async function submitProductRequest() {
     }
 }
 window.submitProductRequest = submitProductRequest;
+
 
 function csvCell(value) {
     const str = value == null ? '' : String(value);
