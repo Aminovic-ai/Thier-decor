@@ -35,3 +35,9 @@ SQL المرفق:
 - الترتيب التجريبي: المخطط الأساسي، ثم THIER_DECOR_CUSTOMER_POINTS_ADDRESS_MIGRATION_REVIEW.sql، ثم THIER_DECOR_LOYALTY_REDEMPTION_ATOMIC_REVIEW.sql، ثم THIER_DECOR_CUSTOMER_PHONE_UNIQUE_REVIEW.sql، ثم THIER_DECOR_ORDER_SECURITY_REVIEW.sql.
 - تحذير مهم: لا تُعد تشغيل THIER_DECOR_SUPABASE_SCHEMA_FIXED_V2.sql بعد ملف الأمان؛ فهو يعيد منح EXECUTE لـ anon/authenticated على td_create_order وtd_consume_promo. لا تشغّل أي ملف على الإنتاج قبل مراجعة المخطط الفعلي والنسخة التجريبية.
 - هذه التغييرات ملفات في فرع worker-v2-review فقط. لم يتم تنفيذ SQL، ولم يتم اختبار اتصال حي، ولم يتم نشر Worker.
+
+تنبيه مراجعة شامل (2026-10-31):
+- لا تطبّق THIER_DECOR_ORDER_SECURITY_REVIEW.sql الآن؛ واجهة app.js ما زالت تستدعي td_promo_usage_stats() مباشرة من المتصفح داخل renderCouponsList(). بعد سحب الصلاحية سيتوقف عرض عدد استعمالات الكوبونات. يجب أولاً إضافة مسار Worker محمي بـ Firebase Admin وتعديل الواجهة لاستخدامه.
+- كذلك analytics-notifications.js يستدعي td_get_visit_stats() وtd_record_visit() مباشرة. لم يتم نقل هذه الاستدعاءات إلى Worker بعد؛ لا تسحب صلاحياتها قبل نقل المسارات المطلوبة وإضافة حماية مناسبة لتسجيل الزيارات.
+- الأهم: معظم عمليات CRUD الإدارية في app.js ما زالت تستخدم Supabase anon client مباشرة، رغم أن قراءة بيانات الإدارة وتحديث حالة الطلبية فقط تمر عبر Worker. لذلك لا تعتبر حماية الإدارة مكتملة ولا تنشر Worker كنسخة نهائية حتى نقل كل عمليات الإدارة الحساسة إلى Worker والتحقق من RLS.
+- راجع FULL_REVIEW_FINDINGS_AR.txt للحصول على قائمة موانع النشر وبوابات الإصدار.
