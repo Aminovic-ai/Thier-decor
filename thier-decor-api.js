@@ -1069,6 +1069,9 @@ export default {
 
     try {
       switch (action) {
+        case "health":
+          return json({ success: true, service: "thier-decor-api-v2", version: 2 });
+
         case "customerLogin":
           return await customerLogin(request, body, env);
 
