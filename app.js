@@ -2936,7 +2936,6 @@ async function addCoupon()
     const maxUses = Number.parseInt(document.getElementById('new-coupon-max-uses').value, 10);
     const expiry = document.getElementById('new-coupon-expiry').value;
     if (!code || !phone || !normalizePromoPhone(phone) || !(disc > 0 && disc <= 100) || !(maxUses >= 1)) return toast('أكمل الكود والهاتف والنسبة وعدد الطلبيات بشكل صحيح', 'error');
-    if (!window.supabaseClient) return toast('اتصل بقاعدة البيانات قبل حفظ البرومو', 'error');
     if (!Array.isArray(state.settings.coupons)) state.settings.coupons = [];
     const duplicate = state.settings.coupons.some((x, i) => x.code === code && i !== editingCouponIndex);
     if (duplicate) return toast('هذا الكود موجود مسبقًا', 'error');
@@ -2944,7 +2943,7 @@ async function addCoupon()
     const cp = { code, phone, discount: disc, maxUses, expiresAt: expiry ? new Date(expiry + 'T23:59:59').toISOString() : null, active: existing ? existing.active !== false : true, createdAt: existing?.createdAt || new Date().toISOString() };
     if (existing) state.settings.coupons[editingCouponIndex] = cp; else state.settings.coupons.push(cp);
     const { error } = await saveCouponsToSettings();
-    if (error) { if (existing) state.settings.coupons[editingCouponIndex] = existing; else state.settings.coupons.pop(); return toast('تعذر حفظ البرومو في Supabase', 'error'); }
+    if (error) { if (existing) state.settings.coupons[editingCouponIndex] = existing; else state.settings.coupons.pop(); return toast(state.currentLang === 'fr' ? 'Impossible d’enregistrer le coupon sur le serveur.' : 'تعذر حفظ الكوبون عبر الخادم.', 'error'); }
     editingCouponIndex = -1; document.getElementById('coupon-save-btn').textContent = 'إضافة / حفظ البرومو';
     ['new-coupon-code','new-coupon-phone','new-coupon-expiry'].forEach(id => document.getElementById(id).value = '');
     document.getElementById('new-coupon-discount').value = '10'; document.getElementById('new-coupon-max-uses').value = '5';
