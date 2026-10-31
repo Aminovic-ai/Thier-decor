@@ -94,3 +94,10 @@ No production changes were made during this review.
 - أُضيفت pagination لقراءات Worker وجرى تحديث cache PWA.
 - هذه إنجازات على مستوى الكود والملفات فقط، وليست دليلاً على اختبار حي. تبقى بوابات الإصدار: مراجعة SQL syntax/schema، اختبارات staging، إكمال deployment config، إنشاء Worker مستقل V2 واختباره، ثم فقط التفكير في تطبيق migrations بعد موافقة المستخدم.
 - لا تغيّر endpoint الحالي، ولا تنشر، ولا تشغّل SQL خلال مرحلة المراجعة.
+
+
+تحديث فحص الإصدار:
+- GitHub Actions نجح في فحص JavaScript وWorker syntax وتحليل SQL statements لملفات المراجعة المحددة.
+- أضيف wrangler.toml مستقل لـ thier-decor-api-v2 دون نشر.
+- تمت إضافة حماية من حذف منتجات مرتبطة بطلبات سابقة أو تغيير مكونات Pack ذات تاريخ طلبات.
+- لم يتم اختبار SQL على PostgreSQL فعلياً ولم يتم تشغيل Worker على Cloudflare؛ لذلك لا تزال النسخة غير معتمدة للنشر.
