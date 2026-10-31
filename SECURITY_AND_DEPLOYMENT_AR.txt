@@ -13,3 +13,13 @@ SQL المرفق:
 راجع أسماء الأعمدة وأنواعها في مشروعك قبل تشغيلها، وخذ نسخة احتياطية أولاً.
 
 الاختبارات الآلية التي أُجريت: فحص صياغة JavaScript فقط. لم يُجر اختبار متصفح أو اتصال حي بقاعدة بيانات Supabase، لذلك لا تعتبر هذه الحزمة اعتماداً أمنياً أو ضماناً أن كل السياسات/الميزات تعمل على قاعدة بياناتك.
+
+
+ملاحظات مراجعة V2 (لم يتم النشر):
+- ملف Worker الجديد هو thier-decor-api.js، وعنوانه المتوقع بعد إنشائه باسم thier-decor-api هو https://thier-decor-api.amindrody.workers.dev/ .
+- واجهة الموقع في فرع worker-v2-review موجهة إلى Worker V2؛ لا تغيّر أو تنشر Worker القديم thier-decor-admin-api.
+- يجب ضبط متغيرات Worker V2: SUPABASE_URL وSUPABASE_SERVICE_ROLE_KEY (Secret) وFIREBASE_API_KEY وADMIN_UID وCUSTOMER_SESSION_SECRET (Secret).
+- إنشاء الطلبية أصبح يمر عبر رمز جلسة الزبون الموقّع؛ Worker يتحقق من أن customerId يطابق صاحب الجلسة، ثم يستدعي td_create_order بمفتاح service_role من الخادم.
+- ملف THIER_DECOR_LOYALTY_REDEMPTION_ATOMIC_REVIEW.sql يضيف سجل استبدال النقاط ويجعل خصم 200 نقطة والتوصيل المجاني واستهلاك الكوبون وخصم المخزون ضمن معاملة واحدة. كما يقصر EXECUTE لدالة td_create_order على service_role.
+- ملف THIER_DECOR_CUSTOMER_POINTS_ADDRESS_MIGRATION_REVIEW.sql يمنح 40 نقطة مرة واحدة عند تسليم طلبية total > 10000، ويمنع إعادة فتح الطلبية الملغاة أو تغيير حالة الطلبية المسلّمة.
+- لا تشغّل أي ملف SQL ولا تنشر Worker قبل مراجعة مخطط قاعدة البيانات الفعلي وتشغيل قائمة الاختبار على مشروع تجريبي. لم يتم إجراء اتصال حي بقاعدة Supabase أو اختبار عمليات فعلية.
