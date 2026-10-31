@@ -417,6 +417,21 @@ begin
 end;
 $$;
 
+-- 6) Authentication throttling stores only keyed hashes, never raw phone numbers or IP addresses.
+create table if not exists public.td_customer_auth_attempts (
+  id bigint generated always as identity primary key,
+  phone_hash text not null,
+  ip_hash text not null,
+  action text not null check(action in ('login','register','reset')),
+  attempted_at timestamptz not null default now()
+);
+create index if not exists td_customer_auth_phone_time_idx
+  on public.td_customer_auth_attempts(phone_hash,action,attempted_at);
+create index if not exists td_customer_auth_ip_time_idx
+  on public.td_customer_auth_attempts(ip_hash,attempted_at);
+alter table public.td_customer_auth_attempts enable row level security;
+revoke all on public.td_customer_auth_attempts from public,anon,authenticated;
+
 -- 6) Visitor deduplication + daily IP-hash rate limit. Raw IP addresses are never stored.
 create table if not exists public.td_visit_sessions (
   session_hash text primary key,
