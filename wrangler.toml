@@ -1,0 +1,14 @@
+name = "thier-decor-api-v2"
+main = "thier-decor-api.js"
+compatibility_date = "2026-10-31"
+workers_dev = true
+
+[vars]
+SUPABASE_URL = "https://xdsbnmtthvqgdlytwpes.supabase.co"
+
+# Configure these as Cloudflare Worker secrets/vars in the new Worker:
+# Secrets: SUPABASE_SERVICE_ROLE_KEY, FIREBASE_API_KEY,
+#          CUSTOMER_SESSION_SECRET, AUTH_RATE_SECRET, VISIT_RATE_SECRET
+# Variable: ADMIN_UID
+#
+# This file intentionally contains no credentials and does not deploy anything.
