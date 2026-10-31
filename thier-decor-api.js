@@ -791,6 +791,21 @@ async function deleteRow(env, table, id) {
   if (!Array.isArray(rows) || !rows.length) throw new Error("لم يؤكد الخادم حذف السجل.");
   return rows[0];
 }
+async function productHasOrderHistory(env, productId) {
+  const orders = await dbRequestPaged(env, "orders?select=id,items&order=id.desc");
+  return (orders || []).some(order => Array.isArray(order.items) && order.items.some(item =>
+    Number(item?.id) === Number(productId) ||
+    (Array.isArray(item?.packItems) && item.packItems.some(component => Number(component?.id) === Number(productId)))
+  ));
+}
+
+function canonicalPackDefinition(value) {
+  const items = Array.isArray(value) ? value.map(item => ({
+    id: Number(item?.id), qty: Number(item?.qty)
+  })).sort((a, b) => a.id - b.id) : [];
+  return JSON.stringify(items);
+}
+
 async function adminMutation(action, body, env) {
   switch (action) {
     case "adminUpsertProduct": {
@@ -820,6 +835,14 @@ async function adminMutation(action, body, env) {
         if (!Array.isArray(existingComponents) || existingComponents.length !== componentIds.length) return fail("بعض مكونات الباقة غير موجودة.");
       }
       if (product.promoPrice != null && (!(Number(product.promoPrice) > 0) || Number(product.promoPrice) >= product.price)) return fail("سعر العرض غير صالح.");
+      const existingRows = body.id == null ? [] : await dbRequest(env, "products?select=id,isPack,packItems&id=eq." + id + "&limit=1");
+      const existingProduct = existingRows?.[0];
+      if (existingProduct && (
+        Boolean(existingProduct.isPack) !== Boolean(product.isPack) ||
+        canonicalPackDefinition(existingProduct.packItems) !== canonicalPackDefinition(product.packItems)
+      ) && await productHasOrderHistory(env, id)) {
+        return fail("لا يمكن تغيير مكونات باقة استُخدمت في طلبيات سابقة حفاظاً على سجل المخزون. أنشئ منتجاً/باقة جديدة بدلاً منها.", 409);
+      }
       product.id = id;
       if (body.id == null) product.createdAt = new Date().toISOString();
       const rows = await dbRequest(env, "products?on_conflict=id&select=id", {
@@ -835,6 +858,7 @@ async function adminMutation(action, body, env) {
       const packs = await dbRequest(env, "products?select=id,name,packItems&isPack=eq.true");
       const dependentPack = (packs || []).find(pack => Number(pack.id) !== id && Array.isArray(pack.packItems) && pack.packItems.some(item => Number(item.id) === id));
       if (dependentPack) return fail("لا يمكن حذف هذا المنتج لأنه مكوّن داخل باقة: " + cleanText(dependentPack.name, 120, "اسم الباقة"), 409);
+      if (await productHasOrderHistory(env, id)) return fail("لا يمكن حذف منتج مرتبط بطلبات سابقة حفاظاً على سجل الطلبات والمخزون. عطّله أو أخفه بدلاً من حذفه.", 409);
       await deleteRow(env, "products", id);
       return json({ success: true });
     }
