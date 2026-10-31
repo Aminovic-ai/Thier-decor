@@ -107,3 +107,11 @@ SQL المرفق:
 - endpoint في app.js لا يزال يشير إلى Worker الحالي؛ لا تغيّره قبل اختبار V2.
 - أضيف منع حذف أي منتج له تاريخ في الطلبات، ومنع تغيير مكونات Pack بعد استعمالها في طلبات سابقة، لحماية snapshots والمخزون التاريخي.
 - لا تزال هناك حاجة إلى اختبار runtime على Worker/قاعدة staging، خصوصاً معاملات المخزون والكوبونات والنقاط وتوافق الأعمدة والـ RLS.
+
+
+تجهيز النشر اليدوي (لم يتم تشغيله):
+- أضيف .github/workflows/deploy-v2.yml ويعمل فقط عند اختيار Run workflow يدوياً؛ لا يوجد نشر تلقائي مع كل commit.
+- قبل تشغيله يجب إضافة GitHub secret باسم CLOUDFLARE_API_TOKEN وGitHub variable باسم CLOUDFLARE_ACCOUNT_ID، مع صلاحية Workers Scripts:Edit.
+- بعد إنشاء Worker V2 يجب ضبط Worker secrets: SUPABASE_SERVICE_ROLE_KEY وFIREBASE_API_KEY وCUSTOMER_SESSION_SECRET وAUTH_RATE_SECRET وVISIT_RATE_SECRET، وضبط ADMIN_UID كـ variable.
+- يجب اختبار / health أو مسار فحص مخصص، تسجيل الدخول، إنشاء طلب تجريبي، تعديل حالة، الكوبونات والزيارات قبل تغيير endpoint في app.js.
+- لا تضغط Run workflow ولا تغيّر endpoint قبل موافقة المستخدم الصريحة في مرحلة النشر.
