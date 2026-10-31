@@ -1,0 +1,32 @@
+name: Validate Thier Decor V2
+
+on:
+  push:
+    branches:
+      - worker-v2-review
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  javascript-syntax:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Check browser JavaScript
+        run: |
+          node --check app.js
+          node --check analytics-notifications.js
+          node --check sw.js
+          node --check firebase-config.js
+          node --check supabase-config.js
+      - name: Check Worker module syntax
+        run: node --input-type=module --check < thier-decor-api.js
