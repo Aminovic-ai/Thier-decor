@@ -170,7 +170,7 @@ begin
 exception when others then
   return false;
 end;
-$;
+$$;
 
 create or replace function public.td_consume_promo(p_code text,p_phone text,p_order_id text)
 returns jsonb
@@ -210,7 +210,7 @@ begin
     values(code_norm,phone_norm,p_order_id);
   return jsonb_build_object('ok',true);
 end;
-$;
+$$;
 
 -- 2) Replace checkout RPC: trusted customer identity + canonical item snapshot + one transaction.
 create or replace function public.td_create_order(p_order jsonb)
