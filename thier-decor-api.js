@@ -759,7 +759,8 @@ async function customerConfirmReceipt(request, body, env) {
   const rows = await dbRequest(env, "orders?select=id,customerId,status&id=eq." + encodeURIComponent(id) + "&limit=1");
   const order = rows?.[0];
   if (!order || String(order.customerId) !== String(session.sub)) return fail("الطلبية غير موجودة في حسابك.", 404);
-  if (!["confirmed","on_the_way","out_for_delivery"].includes(order.status)) return fail("لا يمكن تأكيد استلام هذه الطلبية في حالتها الحالية.", 409);
+  // A customer may confirm receipt only after the order has actually left for delivery.
+  if (!["on_the_way","out_for_delivery"].includes(order.status)) return fail("لا يمكن تأكيد استلام هذه الطلبية قبل خروجها للتوصيل.", 409);
   return await updateOrderStatus({ id, status: "delivered" }, env);
 }
 
