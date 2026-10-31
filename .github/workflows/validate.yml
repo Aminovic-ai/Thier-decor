@@ -1,4 +1,4 @@
-name: Validate Thier Decor V2
+name: Validate Thier Decor V2 # syntax and SQL parser checks
 
 on:
   push:
