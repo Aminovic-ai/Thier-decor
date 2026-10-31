@@ -22,6 +22,10 @@ begin
  select * into o from public.orders where id=p_order_id for update;
  if not found then raise exception 'Order not found'; end if;
  if o.status=p_status then return jsonb_build_object('ok',true,'order_id',o.id,'status',o.status,'points_awarded',0); end if;
+ -- A cancelled order cannot be reopened without a dedicated stock re-reservation flow.
+ if o.status='cancelled' then raise exception 'Cancelled orders cannot be reopened'; end if;
+ -- A delivered order is final; changing it could leave awarded points inconsistent.
+ if o.status='delivered' then raise exception 'Delivered orders cannot change status'; end if;
  if p_status='cancelled' and o.status<>'cancelled' then
   for it in select value from jsonb_array_elements(coalesce(o.items,'[]'::jsonb)) loop
    pid:=(it->>'id')::bigint; q:=(it->>'qty')::integer;
