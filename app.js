@@ -2021,6 +2021,16 @@ async function customerConfirmReceipt(orderId) {
         const index = state.orders.findIndex(x => String(x.id) === String(orderId));
         if (index >= 0) state.orders[index] = order;
         save(K.orders, state.orders);
+        try {
+            const refreshed = await fetchCustomerDataViaWorker(state.session.customerToken);
+            if (refreshed.customer) {
+                const customerIndex = state.customers.findIndex(c => String(c.id) === String(refreshed.customer.id));
+                if (customerIndex >= 0) state.customers[customerIndex] = { ...state.customers[customerIndex], ...refreshed.customer };
+                else state.customers.push(refreshed.customer);
+                save(K.customers, state.customers);
+            }
+            if (Array.isArray(refreshed.orders)) { state.orders = refreshed.orders; save(K.orders, state.orders); }
+        } catch (_) {}
         toast(i18n[state.currentLang].receipt_confirmed); renderMyOrders();
     } catch (error) { toast(error.message || i18n[state.currentLang].save_failed, 'error'); }
 }
@@ -2928,8 +2938,7 @@ async function saveCouponsToSettings() {
         return { error: null };
     } catch (error) { return { error }; }
 }
-async function addCoupon()
- {
+async function addCoupon() {
     const code = document.getElementById('new-coupon-code').value.trim().toUpperCase();
     const phone = document.getElementById('new-coupon-phone').value.trim();
     const disc = Number(document.getElementById('new-coupon-discount').value);
