@@ -1774,8 +1774,8 @@ async function confirmShopOrder() {
         } catch (error) { console.error(error); return toast(i18n[state.currentLang].order_failed, 'error'); }
     } else { return toast('يلزم الاتصال بقاعدة البيانات لإتمام الطلبية', 'error'); }
 
-    const pointsEarned = Math.floor(total / 100); c.points = (c.points || 0) + pointsEarned;
-    if (window.supabaseClient) window.supabaseClient.from('customers').update({ points: c.points }).eq('id', c.id).then();
+    // Loyalty points are awarded only by the trusted backend after delivery confirmation.
+    // Never grant points in the browser at checkout.
 
     state.orders.unshift(order); save(K.orders, state.orders); save(K.products, state.products); save(K.customers, state.customers);
     state.cart = []; save(K.cart, state.cart); updateCartBadge(); closeModal('m-checkout'); toast('✅ ' + i18n[state.currentLang].saved); shopGo('orders'); renderShop();
@@ -1841,23 +1841,20 @@ async function confirmCustomerAuth() {
         }
         // 2. إنشاء حساب جديد: لا نقرأ جدول customers من المتصفح؛ يعتمد منع التكرار على قيد UNIQUE في قاعدة البيانات.
         else {
-            const hashedPass = CryptoJS.SHA256(pass).toString();
-            if (!name) throw new Error('أدخل الاسم'); 
+            if (!name) throw new Error('أدخل الاسم');
             if (!recoveryPin) throw new Error('أدخل الرقم السري');
-            
-            const newCustomer = { id: Date.now(), name, phone, password: hashedPass, isVip: false, isTop: false, isBlocked: false, points: 0, recoveryPin: recoveryPin, wishlist: [] };
-            
-            if (window.supabaseClient) { 
-                const { error } = await window.supabaseClient.from('customers').insert([newCustomer]); 
-                if (error) {
-                    if (error.code === '23505' || error.message.includes('duplicate key')) {
-                        throw new Error('❌ رقم الهاتف مسجل مسبقاً! يرجى تسجيل الدخول بدلاً من إنشاء حساب جديد.');
-                    }
-                    throw new Error(error.message); 
-                } 
+            const response = await fetch(TD_ADMIN_API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'customerRegister', name, phone, password: pass, recoveryPin }),
+                cache: 'no-store'
+            });
+            const registerResult = await response.json().catch(() => null);
+            if (!response.ok || registerResult?.success !== true || !registerResult.customer || !registerResult.token) {
+                throw new Error(registerResult?.error || 'تعذر إنشاء الحساب. حاول مجدداً.');
             }
-            state.customers.push(newCustomer); 
-            c = newCustomer;
+            c = registerResult.customer;
+            var customerSessionToken = registerResult.token;
             toast(`✅ ${i18n[state.currentLang].welcome_new}`);
         }
         
@@ -1892,18 +1889,25 @@ async function confirmCustomerAuth() {
 window.confirmCustomerAuth = confirmCustomerAuth;
 
 async function customerForgotPassword() {
-    const phone = prompt("أدخل رقم الهاتف الذي سجلت به:"); if (!phone) return;
-    let c = null;
-    if (window.supabaseClient) { const { data, error } = await window.supabaseClient.from('customers').select('*').eq('phone', phone.trim()).limit(1).maybeSingle(); if (error) throw new Error(error.message); if (data) c = data; }
-    if (!c) return toast("❌ هذا الرقم غير مسجل لدينا!", "error");
-    const pin = prompt("أدخل الرقم السري للاسترجاع (Recovery PIN):"); if (pin !== c.recoveryPin) return toast("❌ الرقم السري غير صحيح!", "error");
-    const newPass = prompt("✅ تم التحقق بنجاح!\nأدخل كلمة المرور الجديدة:");
-    if (newPass && newPass.trim().length >= 4) {
-        const hashedPass = CryptoJS.SHA256(newPass.trim()).toString(); c.password = hashedPass; save(K.customers, state.customers);
-        if (window.supabaseClient) await window.supabaseClient.from('customers').update({ password: hashedPass }).eq('id', c.id);
+    const phone = prompt("أدخل رقم الهاتف الذي سجلت به:");
+    if (!phone) return;
+    const pin = prompt("أدخل رمز الاسترجاع الذي اخترته عند التسجيل:");
+    if (!pin) return;
+    const newPass = prompt("أدخل كلمة المرور الجديدة (4 أحرف على الأقل):");
+    if (!newPass || newPass.trim().length < 4) return toast("❌ كلمة المرور قصيرة جداً", "error");
+    try {
+        const response = await fetch(TD_ADMIN_API_URL, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'customerResetPassword', phone: phone.trim(), recoveryPin: pin.trim(), password: newPass.trim() }),
+            cache: 'no-store'
+        });
+        const result = await response.json().catch(() => null);
+        if (!response.ok || result?.success !== true) throw new Error(result?.error || 'تعذر تغيير كلمة المرور.');
         toast("✅ تم تغيير كلمة المرور بنجاح!");
-        document.getElementById('auth-phone').value = c.phone; document.getElementById('auth-pass').value = ''; document.getElementById('auth-pass').focus();
-    } else if (newPass) { toast("❌ كلمة المرور قصيرة جداً", "error"); }
+        document.getElementById('auth-phone').value = phone.trim();
+        document.getElementById('auth-pass').value = '';
+        document.getElementById('auth-pass').focus();
+    } catch (error) { toast(error.message || 'تعذر تغيير كلمة المرور.', 'error'); }
 }
 window.customerForgotPassword = customerForgotPassword;
 
