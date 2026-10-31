@@ -1919,41 +1919,27 @@ function renderProfile() {
 window.renderProfile = renderProfile;
 
 async function updateCustomerProfile() {
-    if (!state.session) return;
+    if (!state.session || !state.session.customerToken) return toast(i18n[state.currentLang].login_first, 'error');
     const c = state.customers.find(x => String(x.id) === String(state.session.id));
     if (!c) return toast(i18n[state.currentLang].error_fetch, 'error');
     const payload = { name: document.getElementById('p-name').value.trim(), phone: document.getElementById('p-phone').value.trim(), address: document.getElementById('p-address').value.trim() };
-    if (!window.supabaseClient) return toast(i18n[state.currentLang].error_connection, 'error');
     if (!payload.name || !payload.phone) return toast(state.currentLang === 'fr' ? 'Le nom et le téléphone sont obligatoires.' : 'الاسم ورقم الهاتف إجباريان.', 'error');
-    if (payload.phone !== String(c.phone || '')) {
-        const { data: existing, error: duplicateError } = await window.supabaseClient.from('customers').select('id').eq('phone', payload.phone).neq('id', c.id).limit(1);
-        if (duplicateError) return toast(state.currentLang === 'fr' ? 'Impossible de vérifier ce numéro. Réessayez.' : 'تعذر التحقق من رقم الهاتف. حاول مجدداً.', 'error');
-        if (existing && existing.length) return toast(state.currentLang === 'fr' ? 'Ce numéro est déjà utilisé par un autre compte.' : 'هذا الهاتف مستعمل من حساب آخر', 'error');
-        const { data: priorOrders, error: ordersCheckError } = await window.supabaseClient.from('orders').select('id').eq('customerPhone', c.phone).limit(1);
-        if (ordersCheckError) return toast(state.currentLang === 'fr' ? 'Impossible de vérifier les anciennes commandes. Le téléphone n’a pas été modifié.' : 'تعذر التحقق من الطلبيات القديمة. لم يتم تغيير الهاتف.', 'error');
-        if (priorOrders && priorOrders.length) return toast(state.currentLang === 'fr' ? 'Le téléphone ne peut pas être modifié après une commande. Contactez le magasin.' : 'لا يمكن تغيير الهاتف بعد وجود طلبيات سابقة. اتصل بالمتجر للمساعدة.', 'error');
+    try {
+      const response = await fetch(TD_ADMIN_API_URL, {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + state.session.customerToken, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'updateCustomerProfile', ...payload }),
+        cache: 'no-store'
+      });
+      const result = await response.json().catch(() => null);
+      if (!response.ok || result?.success !== true || !result.customer) throw new Error(result?.error || 'تعذر حفظ بيانات الحساب.');
+      Object.assign(c, result.customer);
+      save(K.customers, state.customers);
+      toast('✅ ' + i18n[state.currentLang].saved);
+      setTimeout(() => shopGo('shop'), 1000);
+    } catch (error) {
+      toast(error.message || i18n[state.currentLang].save_failed, 'error');
     }
-    const { data: updatedCustomer, error } = await window.supabaseClient
-        .from('customers')
-        .update(payload)
-        .eq('id', c.id)
-        .select('id, name, phone, address')
-        .maybeSingle();
-    if (error) {
-        console.error('Customer profile update failed:', error);
-        return toast(state.currentLang === 'fr'
-            ? 'Enregistrement impossible. Vérifiez les autorisations du serveur.'
-            : 'تعذر حفظ البيانات. تحقق من صلاحيات الخادم ثم أعد المحاولة.', 'error');
-    }
-    // PostgREST may return no error but update zero rows when RLS blocks the write.
-    // Never report success or update the local profile unless the server confirms a row.
-    if (!updatedCustomer) {
-        return toast(state.currentLang === 'fr'
-            ? 'Aucune modification confirmée par le serveur. Réessayez ou contactez le magasin.'
-            : 'لم يؤكد الخادم حفظ أي تغيير. أعد المحاولة أو تواصل مع المتجر.', 'error');
-    }
-    Object.assign(c, payload); save(K.customers, state.customers);
-    toast('✅ ' + i18n[state.currentLang].saved); setTimeout(() => { shopGo('shop'); }, 1000);
 }
 window.updateCustomerProfile = updateCustomerProfile;
 
