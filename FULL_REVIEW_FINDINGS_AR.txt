@@ -83,3 +83,14 @@ G) Apply reviewed Supabase migrations in documented order only after backup/stag
 H) Run browser smoke tests for Arabic/French, customer lifecycle, admin CRUD, checkout, packs, stock concurrency, coupons, points, order cancellation, reports, notifications and mobile/PWA cache.
 
 No production changes were made during this review.
+
+
+حالة التنفيذ بعد بدء معالجة جميع النقاط (2026-10-31):
+- أُضيفت مسارات Worker محمية بـ Firebase Admin لعمليات CRUD الإدارية المذكورة، وتحوّلت app.js لاستخدامها. بقيت قراءات المنتجات/الإعدادات العامة وRPC التحقق العام من الكوبون فقط عبر anon client؛ لا توجد عمليات كتابة Supabase مباشرة متبقية في app.js بحسب فحص الاستدعاءات النصي الأخير.
+- أُضيفت مسارات جلسة الزبون الموقعة للمفضلة والتقييم والرسائل والطلبات الخاصة وتأكيد الاستلام، وأزيلت قراءة طلبات الزبون المباشرة حسب الهاتف.
+- أُضيفت مسارات Worker للعمليات الذرية لتعديل/حذف الطلبات، وأُنشئ ملف SQL نهائي يعرّف الدوال اللازمة، لكن لم يتم تطبيقه أو التحقق منه على PostgreSQL.
+- أُضيف PBKDF2 وترقية تدريجية للبيانات القديمة، وحدود محاولات عبر جدول يحتاج migration.
+- نُقلت إحصائيات الكوبونات والزيارات إلى Worker، وأضيفت حماية deduplication/حدود زيارة تعتمد على سر Worker.
+- أُضيفت pagination لقراءات Worker وجرى تحديث cache PWA.
+- هذه إنجازات على مستوى الكود والملفات فقط، وليست دليلاً على اختبار حي. تبقى بوابات الإصدار: مراجعة SQL syntax/schema، اختبارات staging، إكمال deployment config، إنشاء Worker مستقل V2 واختباره، ثم فقط التفكير في تطبيق migrations بعد موافقة المستخدم.
+- لا تغيّر endpoint الحالي، ولا تنشر، ولا تشغّل SQL خلال مرحلة المراجعة.
