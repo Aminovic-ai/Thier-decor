@@ -509,49 +509,18 @@ async function listAdminData(env) {
   });
 }
 /* ---------------- UPDATE ORDER STATUS ---------------- */
-
 async function updateOrderStatus(body, env) {
-  const id = body.id;
+  const id = Number(body.id);
   const status = String(body.status || "");
-
-  const allowedStatuses = [
-    "new",
-    "confirmed",
-    "on_the_way",
-    "out_for_delivery",
-    "delivered",
-    "cancelled"
-  ];
-
-  if (id === undefined || !allowedStatuses.includes(status)) {
-    return fail("بيانات تحديث الطلبية غير صحيحة.");
-  }
-
-  const query = new URLSearchParams({
-    id: "eq." + String(id),
-    select: "*"
+  if (!Number.isSafeInteger(id) || id <= 0) return fail("رقم الطلبية غير صحيح.");
+  const result = await dbRequest(env, "rpc/td_admin_update_order_status", {
+    method: "POST",
+    body: JSON.stringify({ p_order_id: id, p_status: status })
   });
-
-  const updated = await dbRequest(
-    env,
-    "orders?" + query.toString(),
-    {
-      method: "PATCH",
-      headers: {
-        "Prefer": "return=representation"
-      },
-      body: JSON.stringify({ status })
-    }
-  );
-
-  if (!Array.isArray(updated) || !updated.length) {
-    return fail("لم يتم العثور على الطلبية.", 404);
-  }
-
-  return json({
-    success: true,
-    order: updated[0]
-  });
+  if (!result?.ok) return fail("لم يتم تأكيد تحديث الطلبية.", 409);
+  const rows = await dbRequest(env, "orders?select=*&id=eq." + encodeURIComponent(id) + "&limit=1");
+  if (!rows?.length) return fail("تعذر قراءة الطلبية بعد التحديث.", 404);
+  return json({ success: true, order: rows[0], pointsAwarded: Number(result.points_awarded || 0) });
 }
 
 /* ---------------- MAIN ROUTER ---------------- */
