@@ -2,11 +2,12 @@ const K = { products: 'td_prod', orders: 'td_ord', expenses: 'td_exp', settings:
 
 // Admin-only orders are fetched through the authenticated Cloudflare Worker.
 const TD_ADMIN_API_URL = 'https://thier-decor-admin-api.amindrody.workers.dev/';
+const TD_CUSTOMER_API_URL = 'https://thier-decor-api.amindrody.workers.dev/';
 const TD_ADMIN_UID = 'DNlHoogN8vMCsZN0hyIC6yPS64J2';
 
 // Customer login is verified server-side so the public browser does not need SELECT access to customers.
 async function callCustomerLoginWorker(phone, password) {
-    const response = await fetch(TD_ADMIN_API_URL, {
+    const response = await fetch(TD_CUSTOMER_API_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'customerLogin', phone: String(phone || '').trim(), password: String(password || '') }),
@@ -24,7 +25,7 @@ async function callCustomerLoginWorker(phone, password) {
 
 async function fetchCustomerDataViaWorker(token) {
     if (!token) throw new Error(state.currentLang === 'fr' ? 'Session client expirée. Reconnectez-vous.' : 'انتهت جلسة الزبون، يرجى تسجيل الدخول مجدداً.');
-    const response = await fetch(TD_ADMIN_API_URL, {
+    const response = await fetch(TD_CUSTOMER_API_URL, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'customerData' }),
@@ -77,7 +78,7 @@ async function fetchAdminDataViaWorker() {
 let state = { products: [], orders: [], expenses: [], customers: [], messages: [], requests: [], session: null, cart: [], wishlist: [], currentLang: 'ar', settings: { shopName: 'Thier Décor', shopPhone: '', promoText: '', promoActive: false, customPrices: {}, manualSalesAdjustment: 0, adActive: false, adImages: [], adText: '', adEndTime: '', coupons: [] } };
 window.state = state;
 let currentCategory = 'all'; let currentOrderFilter = 'all'; let tempUploadedImages = []; let currentAuthMode = 'login'; let pendingCheckout = false;
-let tempAdImages = []; let adSliderInterval = null; let currentAdIndex = 0; let appliedCoupon = null; let lastKnownOrderId = null; let lastKnownMessageId = null;
+let tempAdImages = []; let adSliderInterval = null; let currentAdIndex = 0; let appliedCoupon = null; let lastKnownOrderId = null; let lastKnownMessageId = null; let orderSubmitting = false;
 // Stock changes made while editing an order are drafts until Save is pressed.
 window.pendingStockDelta = new Map();
 let editingOrderOriginal = null;
@@ -1717,6 +1718,7 @@ window.updateDeliveryPrice = updateDeliveryPrice;
 
 async function confirmShopOrder() {
     if (!state.session || state.session.role !== 'customer') return toast(i18n[state.currentLang].login_first, 'error');
+    if (orderSubmitting) return;
     const c = state.customers.find(x => String(x.id) === String(state.session.id)); if (!c) return toast('حساب الزبون غير موجود، يرجى تحديث الصفحة', 'error');
     const wilayaCode = parseInt(document.getElementById('chk-wilaya').value); const type = document.getElementById('chk-type').value; const courier = document.getElementById('chk-courier').value;
     const commune = document.getElementById('chk-commune').value.trim(); const address = document.getElementById('chk-address').value.trim();
@@ -1777,7 +1779,7 @@ async function confirmShopOrder() {
         } catch (error) { return toast(i18n[state.currentLang].error_connection, 'error'); }
     }
 
-    const order = { id: Date.now(), customerId: state.session.id, customerName: c.name, customerPhone: c.phone, items: orderItems, itemsTotal: itemsTotal + discountAmount, discount: discountAmount, couponCode: appliedCoupon ? appliedCoupon.code : null, promoCode: appliedCoupon ? appliedCoupon.code : null, promoDiscountPercent: appliedCoupon ? appliedCoupon.discount : 0, promoDiscountAmount: discountAmount, deliveryPrice: delPrice, total: total, courier, deliveryType: type, wilaya: wData.name, commune: finalCommune, address: finalAddress, stationCode: stationCode || null, stationName: stationName || null, stationAddress: stationAddress || null, status: 'new', createdAt: new Date().toISOString(), useLoyaltyPoints };
+    const order = { id: (lastKnownOrderId || (lastKnownOrderId = Date.now())), customerId: state.session.id, customerName: c.name, customerPhone: c.phone, items: orderItems, itemsTotal: itemsTotal + discountAmount, discount: discountAmount, couponCode: appliedCoupon ? appliedCoupon.code : null, promoCode: appliedCoupon ? appliedCoupon.code : null, promoDiscountPercent: appliedCoupon ? appliedCoupon.discount : 0, promoDiscountAmount: discountAmount, deliveryPrice: delPrice, total: total, courier, deliveryType: type, wilaya: wData.name, commune: finalCommune, address: finalAddress, stationCode: stationCode || null, stationName: stationName || null, stationAddress: stationAddress || null, status: 'new', createdAt: new Date().toISOString(), useLoyaltyPoints };
 
     if (appliedCoupon && window.supabaseClient) {
         // Recheck at submission time; the database atomically records each order ID only once.
@@ -1788,9 +1790,10 @@ async function confirmShopOrder() {
     }
 
     if (state.session.customerToken) {
+        orderSubmitting = true;
         try {
             // The Worker verifies the signed customer session before invoking the service-role RPC.
-            const response = await fetch(TD_ADMIN_API_URL, {
+            const response = await fetch(TD_CUSTOMER_API_URL, {
                 method: 'POST',
                 headers: { 'Authorization': 'Bearer ' + state.session.customerToken, 'Content-Type': 'application/json' },
                 body: JSON.stringify({ action: 'createOrder', order }),
@@ -1799,13 +1802,15 @@ async function confirmShopOrder() {
             const result = await response.json().catch(() => null);
             if (!response.ok || result?.success !== true || !result.order) throw new Error(result?.error || 'Order creation was not confirmed by the server.');
             Object.assign(order, result.order);
+            orderSubmitting = false;
+            lastKnownOrderId = null;
             if (result.customer) { Object.assign(c, result.customer); save(K.customers, state.customers); }
             const stockDeltas = getOrderStockDeltas(orderItems);
             for (const [productId, quantity] of stockDeltas) {
                 const prod = state.products.find(p => String(p.id) === String(productId));
                 if (prod) prod.qty = Math.max(0, Number(prod.qty) - Number(quantity));
             }
-        } catch (error) { console.error(error); return toast((error.message || i18n[state.currentLang].order_failed), 'error'); }
+        } catch (error) { orderSubmitting = false; console.error(error); return toast((error.message || i18n[state.currentLang].order_failed), 'error'); }
     } else { return toast('انتهت جلسة الزبون، سجّل الدخول مجدداً لإتمام الطلبية', 'error'); }
 
     // Loyalty points are awarded only by the trusted backend after delivery confirmation.
@@ -1879,7 +1884,7 @@ async function confirmCustomerAuth() {
         else {
             if (!name) throw new Error('أدخل الاسم');
             if (!recoveryPin) throw new Error('أدخل الرقم السري');
-            const response = await fetch(TD_ADMIN_API_URL, {
+            const response = await fetch(TD_CUSTOMER_API_URL, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ action: 'customerRegister', name, phone, password: pass, recoveryPin }),
@@ -1932,7 +1937,7 @@ async function customerForgotPassword() {
     const newPass = prompt("أدخل كلمة المرور الجديدة (4 أحرف على الأقل):");
     if (!newPass || newPass.trim().length < 4) return toast("❌ كلمة المرور قصيرة جداً", "error");
     try {
-        const response = await fetch(TD_ADMIN_API_URL, {
+        const response = await fetch(TD_CUSTOMER_API_URL, {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ action: 'customerResetPassword', phone: phone.trim(), recoveryPin: pin.trim(), password: newPass.trim() }),
             cache: 'no-store'
@@ -1961,7 +1966,7 @@ async function updateCustomerProfile() {
     const payload = { name: document.getElementById('p-name').value.trim(), phone: document.getElementById('p-phone').value.trim(), address: document.getElementById('p-address').value.trim() };
     if (!payload.name || !payload.phone) return toast(state.currentLang === 'fr' ? 'Le nom et le téléphone sont obligatoires.' : 'الاسم ورقم الهاتف إجباريان.', 'error');
     try {
-      const response = await fetch(TD_ADMIN_API_URL, {
+      const response = await fetch(TD_CUSTOMER_API_URL, {
         method: 'POST',
         headers: { 'Authorization': 'Bearer ' + state.session.customerToken, 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'updateCustomerProfile', ...payload }),
