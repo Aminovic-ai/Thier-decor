@@ -379,6 +379,48 @@ async function customerRegister(body, env) {
   });
 }
 
+
+/* ---------------- CUSTOMER PASSWORD RECOVERY ---------------- */
+async function customerResetPassword(body, env) {
+  const phone = String(body.phone || "").trim();
+  const recoveryPin = String(body.recoveryPin || "").trim();
+  const password = String(body.password || "");
+  if (!phone || !recoveryPin || password.length < 4) return fail("تحقق من رقم الهاتف ورمز الاسترجاع وكلمة المرور (4 أحرف على الأقل).");
+  const customer = await findCustomerByPhone(phone, env);
+  if (!customer || !customer.recoveryPin || String(customer.recoveryPin) !== recoveryPin) return fail("رقم الهاتف أو رمز الاسترجاع غير صحيح.", 401);
+  if (customer.isBlocked === true) return fail("هذا الحساب محظور.", 403);
+  await dbRequest(env, "customers?id=eq." + encodeURIComponent(customer.id), {
+    method: "PATCH", headers: { "Prefer": "return=minimal" },
+    body: JSON.stringify({ password: await sha256(password) })
+  });
+  return json({ success: true });
+}
+
+/* ---------------- CUSTOMER PROFILE ---------------- */
+async function updateCustomerProfile(request, body, env) {
+  const session = await requireCustomer(request, env);
+  if (!session) return fail("انتهت جلسة الزبون. سجّل الدخول مجدداً.", 401);
+  const name = String(body.name || "").trim();
+  const phone = String(body.phone || "").trim();
+  const address = String(body.address || "").trim();
+  if (!name || !phone) return fail("الاسم ورقم الهاتف إجباريان.");
+  const rows = await dbRequest(env, "customers?select=id,phone&id=eq." + encodeURIComponent(session.sub) + "&limit=1");
+  const current = rows?.[0];
+  if (!current) return fail("الحساب غير موجود.", 404);
+  if (normalizePhone(current.phone) !== normalizePhone(phone)) {
+    const duplicate = await findCustomerByPhone(phone, env);
+    if (duplicate && String(duplicate.id) !== String(session.sub)) return fail("رقم الهاتف مستعمل من حساب آخر.", 409);
+    const orders = await dbRequest(env, "orders?select=id&customerPhone=eq." + encodeURIComponent(current.phone) + "&limit=1");
+    if (orders?.length) return fail("لا يمكن تغيير رقم الهاتف بعد وجود طلبيات سابقة. اتصل بالمتجر.", 409);
+  }
+  const updated = await dbRequest(env, "customers?id=eq." + encodeURIComponent(session.sub) + "&select=id,name,phone,address,points,wishlist,isVip,isTop,isBlocked", {
+    method: "PATCH", headers: { "Prefer": "return=representation" },
+    body: JSON.stringify({ name, phone, address })
+  });
+  if (!Array.isArray(updated) || !updated.length) return fail("لم يؤكد الخادم حفظ التعديلات.", 409);
+  return json({ success: true, customer: safeCustomer(updated[0]) });
+}
+
 /* ---------------- CUSTOMER DATA ---------------- */
 
 async function customerData(request, env) {
@@ -547,6 +589,12 @@ export default {
 
         case "customerData":
           return await customerData(request, env);
+
+        case "customerResetPassword":
+          return await customerResetPassword(body, env);
+
+        case "updateCustomerProfile":
+          return await updateCustomerProfile(request, body, env);
 
         case "listOrders":
         case "listAdminData":
