@@ -339,10 +339,29 @@ async function createCustomerOrder(request, body, env) {
     customerPhone: customer.phone
   };
 
-  const created = await dbRequest(env, "rpc/td_create_order", {
-    method: "POST",
-    body: JSON.stringify({ p_order: trustedOrder })
-  });
+  let created;
+  try {
+    created = await dbRequest(env, "rpc/td_create_order", {
+      method: "POST",
+      body: JSON.stringify({ p_order: trustedOrder })
+    });
+  } catch (error) {
+    const reason = String(error?.message || "");
+    if (reason.includes("Insufficient stock")) {
+      return fail("بعض المنتجات لم تعد متوفرة بالكمية المطلوبة. حدّث السلة وحاول مجدداً.", 409);
+    }
+    if (reason.includes("At least 200 loyalty points")) {
+      return fail("رصيد نقاطك غير كافٍ. ألغِ خيار التوصيل المجاني أو اجمع نقاطاً إضافية.", 409);
+    }
+    if (reason.includes("Coupon could not be consumed")) {
+      return fail("الكوبون منتهي أو غير صالح أو استُنفدت استعمالاته.", 409);
+    }
+    if (reason.includes("Order ID already belongs")) {
+      return fail("تعذر التحقق من الطلبية. حدّث الصفحة قبل إعادة المحاولة.", 409);
+    }
+    console.error("Customer order RPC failed:", error);
+    return fail("تعذر إتمام الطلبية. تحقق من الاتصال وحاول مجدداً.", 409);
+  }
   if (!created?.ok || !created.order_id) {
     return fail("لم يتم تأكيد إنشاء الطلبية.", 409);
   }
