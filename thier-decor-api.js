@@ -614,9 +614,9 @@ async function customerData(request, env) {
   }
 
   const [orders, messages, requests] = await Promise.all([
-    dbRequestPaged(env, "orders?select=*&customerId=eq." + id + "&order=createdAt.desc"),
-    dbRequestPaged(env, "messages?select=*&customerId=eq." + id + "&order=date.desc"),
-    dbRequestPaged(env, "requests?select=*&customerId=eq." + id + "&order=date.desc")
+    dbRequestPaged(env, "orders?select=*&customerId=eq." + id + "&order=createdAt.desc,id.desc"),
+    dbRequestPaged(env, "messages?select=*&customerId=eq." + id + "&order=date.desc,id.desc"),
+    dbRequestPaged(env, "requests?select=*&customerId=eq." + id + "&order=date.desc,id.desc")
   ]);
 
   return json({
@@ -631,7 +631,7 @@ async function customerData(request, env) {
 /* ---------------- ADMIN ORDERS ---------------- */
 
 async function listOrders(env) {
-  const orders = await dbRequestPaged(env, "orders?select=*&order=createdAt.desc");
+  const orders = await dbRequestPaged(env, "orders?select=*&order=createdAt.desc,id.desc");
 
   return json({
     success: true,
@@ -650,11 +650,11 @@ async function listAdminData(env) {
     expenses,
     settings
   ] = await Promise.all([
-    dbRequestPaged(env, "products?select=*&order=createdAt.desc"),
-    dbRequestPaged(env, "customers?select=*&order=createdAt.desc"),
-    dbRequestPaged(env, "messages?select=*&order=date.desc"),
-    dbRequestPaged(env, "requests?select=*&order=date.desc"),
-    dbRequestPaged(env, "expenses?select=*&order=date.desc"),
+    dbRequestPaged(env, "products?select=*&order=createdAt.desc,id.desc"),
+    dbRequestPaged(env, "customers?select=*&order=createdAt.desc,id.desc"),
+    dbRequestPaged(env, "messages?select=*&order=date.desc,id.desc"),
+    dbRequestPaged(env, "requests?select=*&order=date.desc,id.desc"),
+    dbRequestPaged(env, "expenses?select=*&order=date.desc,id.desc"),
     dbRequest(env, "settings?select=*&limit=1")
   ]);
 
