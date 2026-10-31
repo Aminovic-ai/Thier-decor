@@ -841,6 +841,55 @@ async function adminMutation(action, body, env) {
   }
 }
 
+
+async function adminNotifyCustomerProductAvailable(body, env) {
+  const requestId = positiveId(body.requestId, "معرّف الطلب الخاص");
+  const rows = await dbRequest(env, "requests?select=id,customerId,customerName,customerPhone,productName,status&id=eq." + encodeURIComponent(requestId) + "&limit=1");
+  const request = rows?.[0];
+  if (!request) return fail("الطلب الخاص غير موجود.", 404);
+  if (request.status !== "fulfilled") return fail("يجب تلبية الطلب قبل إرسال الإشعار.", 409);
+  const message = {
+    id: Date.now(), customerId: request.customerId || null, name: request.customerName || "زبون",
+    phone: request.customerPhone || "", text: "🎉 " + cleanText(request.productName, 180, "اسم المنتج"),
+    date: new Date().toISOString(), reply: null
+  };
+  const inserted = await dbRequest(env, "messages?select=id", {
+    method: "POST", headers: { "Prefer": "return=representation" }, body: JSON.stringify(message)
+  });
+  if (!Array.isArray(inserted) || !inserted.length) return fail("لم يؤكد الخادم إرسال الإشعار.", 409);
+  return json({ success: true, message });
+}
+async function adminDeleteOrder(body, env) {
+  const id = positiveId(body.id, "معرّف الطلبية");
+  const result = await dbRequest(env, "rpc/td_admin_delete_order", { method: "POST", body: JSON.stringify({ p_order_id: id }) });
+  if (!result?.ok) return fail("تعذر حذف الطلبية أو استعادة المخزون بأمان.", 409);
+  return json({ success: true, orderId: id });
+}
+async function adminEditOrder(body, env) {
+  const id = positiveId(body.id, "معرّف الطلبية");
+  if (!Array.isArray(body.items) || body.items.length < 1 || body.items.length > 100) return fail("قائمة منتجات الطلبية غير صالحة.");
+  const result = await dbRequest(env, "rpc/td_admin_edit_order", {
+    method: "POST", body: JSON.stringify({ p_order_id: id, p_items: body.items })
+  });
+  if (!result?.ok) return fail("تعذر تعديل الطلبية والمخزون ضمن معاملة واحدة.", 409);
+  const rows = await dbRequest(env, "orders?select=*&id=eq." + encodeURIComponent(id) + "&limit=1");
+  if (!rows?.length) return fail("تعذر قراءة الطلبية بعد التعديل.", 404);
+  return json({ success: true, order: rows[0] });
+}
+async function adminVisitStats(env) {
+  const stats = await dbRequest(env, "rpc/td_get_visit_stats", { method: "POST", body: "{}" });
+  return json({ success: true, visits: stats || {} });
+}
+async function recordVisit(body, env) {
+  const path = cleanText(body.path || "/", 240, "مسار الصفحة").replace(/[^a-zA-Z0-9/_?=&.-]/g, "").slice(0, 240) || "/";
+  const sessionKey = cleanText(body.sessionKey, 80, "معرّف الجلسة");
+  if (!/^[a-f0-9-]{24,80}$/i.test(sessionKey)) return fail("معرّف جلسة الزيارة غير صالح.");
+  const result = await dbRequest(env, "rpc/td_record_visit_safe", {
+    method: "POST", body: JSON.stringify({ p_path: path, p_session_key: sessionKey })
+  });
+  return json({ success: true, recorded: result?.recorded === true });
+}
+
 /* ---------------- MAIN ROUTER ---------------- */
 
 export default {
@@ -901,6 +950,9 @@ export default {
         case "customerConfirmReceipt":
           return await customerConfirmReceipt(request, body, env);
 
+        case "recordVisit":
+          return await recordVisit(body, env);
+
         case "listOrders":
         case "listAdminData":
         case "updateOrderStatus":
@@ -918,12 +970,20 @@ export default {
         case "adminSetOrderFreeDelivery":
         case "adminSetRequestStatus":
         case "adminDeleteRequest":
-        case "adminCouponUsage": {
+        case "adminCouponUsage":
+        case "adminNotifyCustomerProductAvailable":
+        case "adminDeleteOrder":
+        case "adminEditOrder":
+        case "adminVisitStats": {
           const isAdmin = await verifyFirebaseAdmin(request, env);
           if (!isAdmin) return fail("غير مصرح لك بتنفيذ هذا الإجراء.", 401);
           if (action === "listOrders") return await listOrders(env);
           if (action === "listAdminData") return await listAdminData(env);
           if (action === "updateOrderStatus") return await updateOrderStatus(body, env);
+          if (action === "adminNotifyCustomerProductAvailable") return await adminNotifyCustomerProductAvailable(body, env);
+          if (action === "adminDeleteOrder") return await adminDeleteOrder(body, env);
+          if (action === "adminEditOrder") return await adminEditOrder(body, env);
+          if (action === "adminVisitStats") return await adminVisitStats(env);
           return await adminMutation(action, body, env);
         }
 
