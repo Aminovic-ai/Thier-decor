@@ -1245,8 +1245,10 @@ async function loadOrdersListener(options = {}) {
                     state.wishlist = Array.isArray(customerData.customer.wishlist) ? customerData.customer.wishlist : [];
                     save(K.wishlist, state.wishlist);
                     updateWishlistBadge();
-                    const profileName = document.getElementById('p-name');
-                    if (profileName && document.getElementById('m-profile')?.classList.contains('active')) renderProfile();
+                    // The customer profile is a page (s-profile), not a modal.
+                    // Refresh visible fields after the server's canonical profile arrives.
+                    const profilePage = document.getElementById('s-profile');
+                    if (profilePage?.classList.contains('active')) renderProfile();
                 }
                 if (Array.isArray(customerData.orders)) { state.orders = customerData.orders; save(K.orders, customerData.orders); }
                 if (Array.isArray(customerData.messages)) { state.messages = customerData.messages; save(K.messages, customerData.messages); }
@@ -1628,6 +1630,9 @@ function openShopCheckout() {
     document.getElementById('chk-coupon').value = ''; appliedCoupon = null;
     const pointsToggle = document.getElementById('chk-use-points');
     const customer = state.customers.find(x => String(x.id) === String(state.session.id));
+    // Reuse the address saved in the customer's profile instead of asking for it again.
+    const savedAddressInput = document.getElementById('chk-address');
+    if (savedAddressInput) savedAddressInput.value = customer?.address || '';
     if (pointsToggle) { pointsToggle.checked = false; pointsToggle.disabled = Number(customer?.points || 0) < 200; }
     const pointsBalance = document.getElementById('chk-points-balance');
     if (pointsBalance) pointsBalance.textContent = i18n[state.currentLang].points_balance + ': ' + Number(customer?.points || 0);
@@ -1930,7 +1935,14 @@ window.customerForgotPassword = customerForgotPassword;
 function renderProfile() {
     const n = document.getElementById('p-name'), p = document.getElementById('p-phone'), a = document.getElementById('p-address'); if (!n) return;
     if (!state.session) { n.value = ''; p.value = ''; a.value = ''; return; }
-    const c = state.customers.find(x => x.id === state.session.id); if (c) { n.value = c.name || ''; p.value = c.phone || ''; a.value = c.address || ''; document.getElementById('p-points').textContent = `${c.points || 0}`; }
+    const c = state.customers.find(x => String(x.id) === String(state.session.id));
+    if (c) {
+        n.value = c.name || '';
+        p.value = c.phone || '';
+        a.value = c.address || '';
+        const pointsEl = document.getElementById('p-points');
+        if (pointsEl) pointsEl.textContent = String(c.points || 0);
+    }
 }
 window.renderProfile = renderProfile;
 
