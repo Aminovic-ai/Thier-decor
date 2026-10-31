@@ -791,8 +791,8 @@ async function deleteRow(env, table, id) {
 async function adminMutation(action, body, env) {
   switch (action) {
     case "adminUpsertProduct": {
-      const id = body.id == null ? Date.now() : positiveId(body.id, "معرّف المنتج");
       const source = body.product;
+      const id = body.id == null ? positiveId(source?.id || Date.now(), "معرّف المنتج") : positiveId(body.id, "معرّف المنتج");
       if (!source || typeof source !== "object" || Array.isArray(source)) return fail("بيانات المنتج غير صالحة.");
       const allowed = ["name","price","cost","qty","category","desc","images","isPack","packItems","isSpecial","promoPrice","promoStart","promoEnd","reviews","createdAt"];
       const product = {};
