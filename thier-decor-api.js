@@ -97,9 +97,9 @@ async function recordAuthAttempt(action, phone, request, env) {
   const phoneKey = await hmacSha256Hex(env.AUTH_RATE_SECRET, "phone:" + normalizePhone(phone));
   const ip = request.headers.get("CF-Connecting-IP") || "unknown";
   const ipKey = await hmacSha256Hex(env.AUTH_RATE_SECRET, "ip:" + ip);
-  const windowMinutes = action === "register" ? 60 : 15;
-  const phoneLimit = action === "reset" ? 5 : (action === "register" ? 5 : 8);
-  const ipLimit = action === "register" ? 20 : 30;
+  const windowMinutes = (action === "register" || action === "request") ? 60 : 15;
+  const phoneLimit = action === "reset" ? 5 : (action === "register" ? 5 : (action === "message" ? 8 : (action === "request" ? 10 : 8)));
+  const ipLimit = action === "register" ? 20 : (action === "message" ? 10 : (action === "request" ? 20 : 30));
   const since = encodeURIComponent(new Date(Date.now() - windowMinutes * 60 * 1000).toISOString());
   const [phoneAttempts, ipAttempts] = await Promise.all([
     dbRequest(env, "td_customer_auth_attempts?select=id&phone_hash=eq." + phoneKey + "&action=eq." + action + "&attempted_at=gte." + since + "&limit=" + (phoneLimit + 1)),
@@ -727,6 +727,7 @@ async function customerCreateRequest(request, body, env) {
   const rows = await dbRequest(env, "customers?select=id,name,phone,isTop,isBlocked&id=eq." + encodeURIComponent(session.sub) + "&limit=1");
   const customer = rows?.[0];
   if (!customer || customer.isBlocked) return fail("الحساب غير متاح.", 403);
+  if (!(await recordAuthAttempt("request", customer.phone, request, env))) return fail("أرسلت طلبات كثيرة خلال وقت قصير. حاول لاحقاً.", 429);
   const record = { id: Date.now(), customerId: customer.id, customerName: customer.name, customerPhone: customer.phone, productName, qty, details, date: new Date().toISOString(), status: "pending", isTopCustomer: customer.isTop === true };
   const inserted = await dbRequest(env, "requests?select=id", { method: "POST", headers: { "Prefer": "return=representation" }, body: JSON.stringify(record) });
   if (!Array.isArray(inserted) || !inserted.length) return fail("لم يؤكد الخادم إرسال الطلب.", 409);
@@ -744,6 +745,8 @@ async function customerSendMessage(request, body, env) {
     if (!customer || customer.isBlocked) return fail("الحساب غير متاح.", 403);
     customerId = customer.id; name = customer.name; phone = customer.phone;
   }
+  const rateKey = session ? phone : String(body.sessionKey || "guest");
+  if (!(await recordAuthAttempt("message", rateKey, request, env))) return fail("أرسلت رسائل كثيرة خلال وقت قصير. حاول لاحقاً.", 429);
   const record = { id: Date.now(), customerId, name, phone, text: messageText, date: new Date().toISOString(), reply: null };
   const inserted = await dbRequest(env, "messages?select=id", { method: "POST", headers: { "Prefer": "return=representation" }, body: JSON.stringify(record) });
   if (!Array.isArray(inserted) || !inserted.length) return fail("لم يؤكد الخادم إرسال الرسالة.", 409);
