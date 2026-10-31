@@ -77,6 +77,8 @@ async function callAdminWorker(action, payload = {}) {
     return result;
 }
 
+window.callAdminWorker = callAdminWorker;
+
 async function fetchAdminOrdersViaWorker() {
     const result = await callAdminWorker('listOrders');
     if (!Array.isArray(result.orders)) throw new Error(state.currentLang === 'fr' ? 'Réponse des commandes invalide.' : 'بيانات الطلبيات المستلمة غير صالحة.');
@@ -1242,7 +1244,6 @@ async function loadOrdersListener(options = {}) {
             if (!settingsError && settings) { state.settings = settings; save(K.settings, settings); lastSettingsFetchAt = now; } else if (settingsError) console.error('Supabase settings read failed:', settingsError.message);
         }
         
-        let query = window.supabaseClient.from('orders').select('*').order('id', { ascending: false });
         const currentFirebaseUser = Boolean(window.firebaseReady && typeof firebase !== 'undefined' && firebase.auth && firebase.auth().currentUser);
         const isFirebaseAdmin = currentFirebaseUser && firebase.auth().currentUser.uid === 'DNlHoogN8vMCsZN0hyIC6yPS64J2';
         if (state.session && state.session.role === 'customer' && !isFirebaseAdmin) {
@@ -1265,18 +1266,12 @@ async function loadOrdersListener(options = {}) {
                 }
                 if (Array.isArray(customerData.orders)) { state.orders = customerData.orders; save(K.orders, customerData.orders); }
                 if (Array.isArray(customerData.messages)) { state.messages = customerData.messages; save(K.messages, customerData.messages); }
+                if (Array.isArray(customerData.requests)) { state.requests = customerData.requests; save(K.requests, customerData.requests); }
             } catch (customerDataError) {
                 console.error('Customer Worker data read failed:', customerDataError.message || customerDataError);
                 // Do not query private Supabase tables directly from the customer browser.
                 state.orders = [];
                 state.messages = [];
-            }
-            const cust = state.customers.find(x => String(x.id) === String(state.session.id));
-            if (cust && cust.phone) {
-                // Requests remain separate from the private orders/messages Worker endpoint.
-                const { data: ownRequests, error: requestsError } = await window.supabaseClient.from('requests').select('*').eq('customerPhone', cust.phone).order('id', { ascending: false });
-                if (!requestsError && ownRequests) { state.requests = ownRequests; save(K.requests, ownRequests); }
-                else if (requestsError) console.warn('Customer requests are unavailable under current database policies:', requestsError.message);
             }
         } else if (isFirebaseAdmin) {
             // Private admin order reads go through Cloudflare; never query the private table from the browser.
