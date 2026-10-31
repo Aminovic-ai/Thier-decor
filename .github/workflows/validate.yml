@@ -30,3 +30,19 @@ jobs:
           node --check supabase-config.js
       - name: Check Worker module syntax
         run: node --input-type=module --check < thier-decor-api.js
+      - name: Validate SQL statement syntax
+        run: |
+          python -m pip install --disable-pip-version-check pglast
+          python - <<'PY'
+          from pathlib import Path
+          from pglast import parse_sql
+          files = [
+              Path("THIER_DECOR_FINAL_SECURITY_AND_ORDER_MUTATIONS_REVIEW.sql"),
+              Path("THIER_DECOR_ORDER_SECURITY_REVIEW.sql"),
+              Path("THIER_DECOR_CUSTOMER_POINTS_ADDRESS_MIGRATION_REVIEW.sql"),
+              Path("THIER_DECOR_LOYALTY_REDEMPTION_ATOMIC_REVIEW.sql"),
+          ]
+          for path in files:
+              parse_sql(path.read_text(encoding="utf-8"))
+              print(f"SQL statements parsed: {path}")
+          PY
