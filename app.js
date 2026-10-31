@@ -1,8 +1,9 @@
 const K = { products: 'td_prod', orders: 'td_ord', expenses: 'td_exp', settings: 'td_set', customers: 'td_cust', session: 'td_sess', cart: 'td_cart', lang: 'td_lang', messages: 'td_msg', requests: 'td_req', wishlist: 'td_wish' };
 
 // Admin-only orders are fetched through the authenticated Cloudflare Worker.
-const TD_ADMIN_API_URL = 'https://thier-decor-admin-api.amindrody.workers.dev/';
-const TD_CUSTOMER_API_URL = 'https://thier-decor-api.amindrody.workers.dev/';
+// New unified API Worker. The legacy thier-decor-admin-api Worker remains untouched.
+const TD_ADMIN_API_URL = 'https://thier-decor-api.amindrody.workers.dev/';
+const TD_CUSTOMER_API_URL = TD_ADMIN_API_URL;
 const TD_ADMIN_UID = 'DNlHoogN8vMCsZN0hyIC6yPS64J2';
 
 // Customer login is verified server-side so the public browser does not need SELECT access to customers.
