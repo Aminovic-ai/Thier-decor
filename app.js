@@ -2064,7 +2064,13 @@ async function submitCustomerMessage() {
     const text = document.getElementById('msg-text').value.trim();
     if (!text) return toast(i18n[state.currentLang].write_message_first, 'error');
     try {
-        const result = await callCustomerWorker('customerSendMessage', { text });
+        let visitSessionKey = sessionStorage.getItem('td_visit_session_key_v1');
+        if (!visitSessionKey) {
+            visitSessionKey = (window.crypto?.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(16).slice(2));
+            sessionStorage.setItem('td_visit_session_key_v1', visitSessionKey.replace(/[^a-f0-9-]/gi, '').slice(0, 80));
+            visitSessionKey = sessionStorage.getItem('td_visit_session_key_v1');
+        }
+        const result = await callCustomerWorker('customerSendMessage', { text, sessionKey: visitSessionKey });
         if (result.message) { state.messages.unshift(result.message); save(K.messages, state.messages); }
         closeModal('m-customer-message'); toast('✅ ' + i18n[state.currentLang].msg_sent_success);
     } catch (error) {
