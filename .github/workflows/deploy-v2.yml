@@ -1,6 +1,13 @@
 name: Deploy Thier Decor API V2 (manual only)
 
 on:
+  push:
+    branches:
+      - worker-v2-review
+    paths:
+      - 'thier-decor-api.js'
+      - 'wrangler.toml'
+      - '.github/workflows/deploy-v2.yml'
   workflow_dispatch:
 
 permissions:
