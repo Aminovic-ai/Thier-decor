@@ -29,6 +29,7 @@ end;
 $$;
 
 revoke all on function public.td_customer_phone_key(text) from public;
+grant execute on function public.td_customer_phone_key(text) to service_role;
 
 -- Stop before creating the unique index if legacy accounts already share a
 -- canonical phone number. No customer data is changed by this check.
