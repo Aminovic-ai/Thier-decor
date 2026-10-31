@@ -2099,8 +2099,19 @@ function renderAdminHome() {
 }
 window.renderAdminHome = renderAdminHome;
 
-async function adjustSales() { const val = prompt("", state.settings.manualSalesAdjustment || 0); if (val === null) return; const num = Number(val); if (isNaN(num)) return toast(i18n[state.currentLang].save_failed, 'error'); state.settings.manualSalesAdjustment = num; save(K.settings, state.settings); if (window.supabaseClient) await window.supabaseClient.from('settings').update({ manualSalesAdjustment: num }).eq('id', 1); renderAdminHome(); toast('✅ ' + i18n[state.currentLang].saved); }
+async function adjustSales() {
+    const val = prompt("", state.settings.manualSalesAdjustment || 0);
+    if (val === null) return;
+    const num = Number(val);
+    if (!Number.isFinite(num)) return toast(i18n[state.currentLang].save_failed, 'error');
+    try {
+        await callAdminWorker('adminUpdateSettings', { settings: { manualSalesAdjustment: num } });
+        state.settings.manualSalesAdjustment = num; save(K.settings, state.settings);
+        renderAdminHome(); toast('✅ ' + i18n[state.currentLang].saved);
+    } catch (error) { toast(error.message || i18n[state.currentLang].save_failed, 'error'); }
+}
 window.adjustSales = adjustSales;
+
 
 function normalizeOrderStatus(status) {
     const value = String(status || 'new').trim().toLowerCase().replace(/[ -]+/g, '_');
@@ -2139,8 +2150,18 @@ function renderAdminOrdersList() {
 window.renderAdminOrdersList = renderAdminOrdersList;
 
 
-async function saveTrackingCode(orderId) { const input = document.getElementById('track-input-' + orderId); if (!input) return; const code = input.value.trim(); const order = state.orders.find(o => o.id === orderId); if (order) { order.trackingNumber = code; save(K.orders, state.orders); if (window.supabaseClient) await window.supabaseClient.from('orders').update({ trackingNumber: code }).eq('id', orderId); toast('✅ ' + i18n[state.currentLang].saved); } }
+async function saveTrackingCode(orderId) {
+    const input = document.getElementById('track-input-' + orderId); if (!input) return;
+    const trackingNumber = input.value.trim();
+    const order = state.orders.find(o => String(o.id) === String(orderId)); if (!order) return;
+    try {
+        await callAdminWorker('adminUpdateOrderTracking', { id: orderId, trackingNumber });
+        order.trackingNumber = trackingNumber; save(K.orders, state.orders);
+        toast('✅ ' + i18n[state.currentLang].tracking_saved_success);
+    } catch (error) { toast(error.message || i18n[state.currentLang].save_failed, 'error'); }
+}
 window.saveTrackingCode = saveTrackingCode;
+
 
 function getOrderStockDeltas(items) {
     const deltas = new Map();
@@ -2212,30 +2233,25 @@ async function updateOrderStatus(id, status) {
 window.updateOrderStatus = updateOrderStatus;
 
 async function deleteOrder(id) {
-    if(!confirm(i18n[state.currentLang].delete_order_confirm))return;
-    if(!window.supabaseClient)return toast(i18n[state.currentLang].error_connection,'error');
-    const order=state.orders.find(o=>String(o.id)===String(id)); if(!order)return;
-    if (normalizeOrderStatus(order.status) === 'delivered') {
-        return toast(state.currentLang === 'fr'
-            ? 'Une commande livrée ne peut pas être supprimée afin de préserver le stock et l’historique.'
-            : 'لا يمكن حذف طلبية تم تسليمها حفاظاً على المخزون وسجل النقاط.', 'error');
-    }
-    const restored=[];
+    if (!confirm(i18n[state.currentLang].delete_order_confirm)) return;
+    const order = state.orders.find(o => String(o.id) === String(id)); if (!order) return;
+    if (normalizeOrderStatus(order.status) === 'delivered') return toast(state.currentLang === 'fr'
+        ? 'Une commande livrée ne peut pas être supprimée afin de préserver le stock et l’historique.'
+        : 'لا يمكن حذف طلبية تم تسليمها حفاظاً على المخزون وسجل النقاط.', 'error');
     try {
-        if(normalizeOrderStatus(order.status)!=='cancelled') for(const [productId, qtyBack] of getOrderStockDeltas(order.items)) {
-            const prod=state.products.find(p=>String(p.id)===productId); if(!prod) throw new Error('Product missing while restoring stock: '+productId);
-            const oldQty=Number(prod.qty||0), nextQty=oldQty+qtyBack;
-            const {error}=await window.supabaseClient.from('products').update({qty:nextQty}).eq('id',prod.id); if(error)throw error;
-            restored.push({prod,oldQty,nextQty});
-        }
-        const {error}=await window.supabaseClient.from('orders').delete().eq('id',id); if(error)throw error;
-        restored.forEach(x=>x.prod.qty=x.nextQty); state.orders=state.orders.filter(o=>String(o.id)!==String(id)); save(K.orders,state.orders);save(K.products,state.products);renderAdminOrdersList();renderAdminHome();renderShop();toast('✅ '+i18n[state.currentLang].deleted);
-    } catch(error) {
-        for(const x of restored.reverse()){try{await window.supabaseClient.from('products').update({qty:x.oldQty}).eq('id',x.prod.id);}catch(_){}}
-        console.error('Delete order failed:',error);toast((state.currentLang==='ar'?'تعذر حذف الطلبية: ':'Échec de suppression : ')+(error.message||''),'error');
+        await callAdminWorker('adminDeleteOrder', { id });
+        state.orders = state.orders.filter(o => String(o.id) !== String(id));
+        save(K.orders, state.orders);
+        await loadOrdersListener({ forceProducts: true, forceWait: true });
+        renderAdminOrdersList(); renderAdminHome(); renderShop();
+        toast('✅ ' + i18n[state.currentLang].deleted);
+    } catch (error) {
+        console.error('Delete order failed:', error);
+        toast((state.currentLang === 'ar' ? 'تعذر حذف الطلبية: ' : 'Échec de suppression : ') + (error.message || ''), 'error');
     }
 }
 window.deleteOrder = deleteOrder;
+
 
 function viewOrderDetails(orderId) {
     const order = state.orders.find(o => o.id === orderId); if (!order) return; const customer = state.customers.find(c => c.phone === order.customerPhone); const isVip = customer && customer.isVip;
@@ -2262,14 +2278,34 @@ function viewOrderDetails(orderId) {
                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     }
 window.viewOrderDetails = viewOrderDetails;
 
-async function makeDeliveryFree(orderId) { const o = state.orders.find(x => x.id === orderId); if (!o) return; o.deliveryPrice = 0; o.total = Math.max(0, (Number(o.itemsTotal) || 0) - (Number(o.discount) || 0)); save(K.orders, state.orders); if (window.supabaseClient) await window.supabaseClient.from('orders').update({ deliveryPrice: 0, total: Math.max(0, (Number(o.itemsTotal) || 0) - (Number(o.discount) || 0)) }).eq('id', orderId); toast('✅ ' + i18n[state.currentLang].saved); viewOrderDetails(orderId); renderAdminOrdersList(); }
+async function makeDeliveryFree(orderId) {
+    const order = state.orders.find(x => String(x.id) === String(orderId)); if (!order) return;
+    try {
+        await callAdminWorker('adminSetOrderFreeDelivery', { id: orderId });
+        order.deliveryPrice = 0;
+        order.total = Math.max(0, Number(order.itemsTotal || 0) - Number(order.discount || 0));
+        save(K.orders, state.orders); toast('✅ ' + i18n[state.currentLang].saved);
+        viewOrderDetails(orderId); renderAdminOrdersList();
+    } catch (error) { toast(error.message || i18n[state.currentLang].save_failed, 'error'); }
+}
 window.makeDeliveryFree = makeDeliveryFree;
+
 
 function calcDebt(orderId, totalAmount) { const paid = Number(document.getElementById(`paid-amount-${orderId}`).value) || 0; const debt = totalAmount - paid; document.getElementById(`debt-display-${orderId}`).textContent = fmtMoney(debt > 0 ? debt : 0); }
 window.calcDebt = calcDebt;
 
-async function saveOrderDebt(orderId) { const o = state.orders.find(x => x.id === orderId); if (!o) return; const paid = Number(document.getElementById(`paid-amount-${orderId}`).value) || 0; o.paidAmount = paid; save(K.orders, state.orders); if (window.supabaseClient) await window.supabaseClient.from('orders').update({ paidAmount: paid }).eq('id', orderId); toast('✅ ' + i18n[state.currentLang].saved); closeModal('m-order-details'); renderAdminOrdersList(); }
+async function saveOrderDebt(orderId) {
+    const order = state.orders.find(x => String(x.id) === String(orderId)); if (!order) return;
+    const paidAmount = Number(document.getElementById('paid-amount-' + orderId)?.value);
+    if (!Number.isFinite(paidAmount) || paidAmount < 0 || paidAmount > Number(order.total)) return toast(i18n[state.currentLang].save_failed, 'error');
+    try {
+        await callAdminWorker('adminSetOrderPaid', { id: orderId, paidAmount });
+        order.paidAmount = paidAmount; save(K.orders, state.orders);
+        toast('✅ ' + i18n[state.currentLang].saved); closeModal('m-order-details'); renderAdminOrdersList();
+    } catch (error) { toast(error.message || i18n[state.currentLang].save_failed, 'error'); }
+}
 window.saveOrderDebt = saveOrderDebt;
+
 
 function openEditOrder(orderId) {
     const o = state.orders.find(x => String(x.id) === String(orderId)); if (!o) return;
@@ -2319,35 +2355,33 @@ function recalcEditedOrder(o) {
     o.total = Math.max(0, o.itemsTotal - discount + Math.max(0,Number(o.deliveryPrice)||0));
 }
 async function saveChangesOrder() {
-    const o = state.orders.find(x => String(x.id) === String(window.editingOrderId)); if (!o || !window.supabaseClient) return toast(i18n[state.currentLang].error_connection,'error');
-    recalcEditedOrder(o);
-    const changedProducts=[];
+    const order = state.orders.find(x => String(x.id) === String(window.editingOrderId));
+    if (!order) return toast(i18n[state.currentLang].error_connection, 'error');
+    recalcEditedOrder(order);
     try {
-        // Apply the drafted stock deltas only when the order is explicitly saved.
-        for (const [id, delta] of window.pendingStockDelta.entries()) {
-            if (!delta) continue;
-            const prod=state.products.find(p=>String(p.id)===String(id)); if(!prod) throw new Error('Product missing: '+id);
-            const nextQty=Number(prod.qty||0)+Number(delta); if(nextQty<0) throw new Error('Insufficient stock for '+prod.name);
-            const {error}=await window.supabaseClient.from('products').update({qty:nextQty}).eq('id',prod.id);
-            if(error) throw error;
-            changedProducts.push({prod,oldQty:Number(prod.qty||0),nextQty});
+        const result = await callAdminWorker('adminEditOrder', { id: order.id, items: order.items });
+        if (result.order) {
+            const index = state.orders.findIndex(x => String(x.id) === String(order.id));
+            if (index >= 0) state.orders[index] = result.order;
         }
-        const {error:orderError}=await window.supabaseClient.from('orders').update({items:o.items,itemsTotal:o.itemsTotal,discount:Number(o.discount)||0,total:o.total}).eq('id',o.id);
-        if(orderError) throw orderError;
-        changedProducts.forEach(x=>x.prod.qty=x.nextQty);
-        save(K.orders,state.orders); save(K.products,state.products);
-        window.pendingStockDelta.clear(); editingOrderOriginal=null;
-        closeModal('m-edit-order'); toast('✅ '+i18n[state.currentLang].saved); renderAdminOrdersList(); renderAdminHome(); renderShop();
-        await loadOrdersListener({forceProducts:true,forceWait:true});
-    } catch(error) {
-        console.error('Order edit failed:',error);
-        for (const x of changedProducts.reverse()) { try { await window.supabaseClient.from('products').update({qty:x.oldQty}).eq('id',x.prod.id); } catch(_){} }
-        if (editingOrderOriginal) { const idx=state.orders.findIndex(x=>String(x.id)===String(window.editingOrderId)); if(idx>=0) state.orders[idx]=editingOrderOriginal; }
-        window.pendingStockDelta.clear(); save(K.orders,state.orders); save(K.products,state.products);
-        toast((state.currentLang==='ar'?'تعذر حفظ التعديلات: ':'Échec de sauvegarde : ')+(error.message||''),'error'); renderAdminOrdersList(); renderShop();
+        window.pendingStockDelta.clear(); editingOrderOriginal = null;
+        save(K.orders, state.orders);
+        closeModal('m-edit-order'); toast('✅ ' + i18n[state.currentLang].saved);
+        renderAdminOrdersList(); renderAdminHome(); renderShop();
+        await loadOrdersListener({ forceProducts: true, forceWait: true });
+    } catch (error) {
+        console.error('Order edit failed:', error);
+        if (editingOrderOriginal) {
+            const index = state.orders.findIndex(x => String(x.id) === String(window.editingOrderId));
+            if (index >= 0) state.orders[index] = editingOrderOriginal;
+        }
+        window.pendingStockDelta.clear(); save(K.orders, state.orders);
+        toast((state.currentLang === 'ar' ? 'تعذر حفظ التعديلات: ' : 'Échec de sauvegarde : ') + (error.message || ''), 'error');
+        renderAdminOrdersList(); renderShop();
     }
 }
 window.saveChangesOrder = saveChangesOrder;
+
 
 function printLabels() {
     const newOrders = state.orders.filter(o => o.status === 'new'); if (newOrders.length === 0) return toast(i18n[state.currentLang].no_orders, 'error');
@@ -2969,18 +3003,37 @@ window.convertRequestToProduct = function(reqId) {
     window.pendingRequestId = reqId; document.getElementById('pf-title').textContent = i18n[state.currentLang].add_product; document.getElementById('pf-id').value = ''; document.getElementById('pf-name').value = req.productName; document.getElementById('pf-desc').value = req.details || ''; document.getElementById('pf-qty').value = req.qty || 1; document.getElementById('pf-price').value = ''; document.getElementById('pf-cost').value = ''; document.getElementById('pf-category').value = ''; tempUploadedImages = []; renderImagePreviews(); openModal('m-product-form');
 };
 
-async function rejectRequest(reqId) { if (!confirm(i18n[state.currentLang].reject_request_confirm)) return; const req = state.requests.find(r => r.id === reqId); if (!req) return; req.status = 'rejected'; save(K.requests, state.requests); if (window.supabaseClient) await window.supabaseClient.from('requests').update({ status: 'rejected' }).eq('id', reqId); renderAdminRequests(); toast('✓'); }
+async function rejectRequest(reqId) {
+    if (!confirm(i18n[state.currentLang].reject_request_confirm)) return;
+    const request = state.requests.find(r => String(r.id) === String(reqId)); if (!request) return;
+    try {
+        await callAdminWorker('adminSetRequestStatus', { id: reqId, status: 'rejected' });
+        request.status = 'rejected'; save(K.requests, state.requests); renderAdminRequests(); toast('✓');
+    } catch (error) { toast(error.message || i18n[state.currentLang].save_failed, 'error'); }
+}
 window.rejectRequest = rejectRequest;
 
-async function deleteRequest(reqId) { if (!confirm(i18n[state.currentLang].delete_request_confirm)) return; state.requests = state.requests.filter(r => r.id !== reqId); save(K.requests, state.requests); if (window.supabaseClient) await window.supabaseClient.from('requests').delete().eq('id', reqId); renderAdminRequests(); toast('✓'); }
+
+async function deleteRequest(reqId) {
+    if (!confirm(i18n[state.currentLang].delete_request_confirm)) return;
+    try {
+        await callAdminWorker('adminDeleteRequest', { id: reqId });
+        state.requests = state.requests.filter(r => String(r.id) !== String(reqId));
+        save(K.requests, state.requests); renderAdminRequests(); toast('✓');
+    } catch (error) { toast(error.message || i18n[state.currentLang].save_failed, 'error'); }
+}
 window.deleteRequest = deleteRequest;
 
+
 async function notifyCustomerProductAvailable(req) {
-    const msg = { id: Date.now(), customerId: null, name: req.customerName, phone: req.customerPhone, text: `🎉 ${req.productName}`, date: new Date().toISOString(), reply: null };
-    const cust = state.customers.find(c => c.phone === req.customerPhone); if (cust) msg.customerId = cust.id;
-    state.messages.unshift(msg); save(K.messages, state.messages); if (window.supabaseClient) await window.supabaseClient.from('messages').insert([msg]);
+    if (!req) return;
+    try {
+        const result = await callAdminWorker('adminNotifyCustomerProductAvailable', { requestId: req.id });
+        if (result.message) { state.messages.unshift(result.message); save(K.messages, state.messages); }
+    } catch (error) { console.error('Customer availability notification failed:', error); toast(error.message || i18n[state.currentLang].save_failed, 'error'); }
 }
 window.notifyCustomerProductAvailable = notifyCustomerProductAvailable;
+
 
 // Missing HTML handlers restored for product requests and exports.
 function openProductRequestModal() {
