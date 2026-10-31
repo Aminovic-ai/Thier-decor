@@ -598,6 +598,7 @@ grant execute on function public.td_consume_promo(text,text,text) to service_rol
 grant execute on function public.td_promo_usage_stats() to service_role;
 grant execute on function public.td_get_visit_stats() to service_role;
 grant execute on function public.td_record_visit_safe(text,text,text) to service_role;
+revoke all on function public.td_check_promo(text,text) from public,anon,authenticated;
 grant execute on function public.td_check_promo(text,text) to anon,authenticated,service_role;
 
 do $$
@@ -609,15 +610,28 @@ begin
     raise exception 'V2 security verification failed: required functions are missing';
   end if;
   if has_function_privilege('anon','public.td_create_order(jsonb)','EXECUTE')
+     or has_function_privilege('authenticated','public.td_consume_promo(text,text,text)','EXECUTE')
+     or has_function_privilege('anon','public.td_admin_update_order_status(bigint,text)','EXECUTE')
+     or has_function_privilege('authenticated','public.td_admin_edit_order(bigint,jsonb)','EXECUTE')
      or has_function_privilege('authenticated','public.td_admin_delete_order(bigint)','EXECUTE')
      or has_function_privilege('anon','public.td_promo_usage_stats()','EXECUTE')
-     or has_function_privilege('anon','public.td_get_visit_stats()','EXECUTE') then
+     or has_function_privilege('anon','public.td_get_visit_stats()','EXECUTE')
+     or has_function_privilege('anon','public.td_record_visit_safe(text,text,text)','EXECUTE')
+     or has_function_privilege('anon','public.td_record_visit(text)','EXECUTE') then
     raise exception 'V2 security verification failed: public execution remains on a privileged function';
   end if;
   if not has_function_privilege('service_role','public.td_create_order(jsonb)','EXECUTE')
+     or not has_function_privilege('service_role','public.td_consume_promo(text,text,text)','EXECUTE')
+     or not has_function_privilege('service_role','public.td_admin_update_order_status(bigint,text)','EXECUTE')
      or not has_function_privilege('service_role','public.td_admin_edit_order(bigint,jsonb)','EXECUTE')
-     or not has_function_privilege('service_role','public.td_admin_delete_order(bigint)','EXECUTE') then
+     or not has_function_privilege('service_role','public.td_admin_delete_order(bigint)','EXECUTE')
+     or not has_function_privilege('service_role','public.td_promo_usage_stats()','EXECUTE')
+     or not has_function_privilege('service_role','public.td_get_visit_stats()','EXECUTE')
+     or not has_function_privilege('service_role','public.td_record_visit_safe(text,text,text)','EXECUTE') then
     raise exception 'V2 security verification failed: service_role is missing required privileges';
+  end if;
+  if not has_function_privilege('anon','public.td_check_promo(text,text)','EXECUTE') then
+    raise exception 'V2 security verification failed: storefront coupon validation is unavailable';
   end if;
 end;
 $$;
