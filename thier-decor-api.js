@@ -706,7 +706,7 @@ async function customerAddReview(request, body, env) {
   const customers = await dbRequest(env, "customers?select=id,name,isBlocked&id=eq." + encodeURIComponent(session.sub) + "&limit=1");
   const customer = customers?.[0];
   if (!customer || customer.isBlocked) return fail("الحساب غير متاح.", 403);
-  const orders = await dbRequest(env, "orders?select=id,items,status&customerId=eq." + encodeURIComponent(session.sub) + "&status=eq.delivered&limit=100");
+  const orders = await dbRequestPaged(env, "orders?select=id,items,status&customerId=eq." + encodeURIComponent(session.sub) + "&status=eq.delivered&order=createdAt.desc,id.desc");
   const hasPurchased = (orders || []).some(o => Array.isArray(o.items) && o.items.some(i => Number(i.id) === productId || (Array.isArray(i.packItems) && i.packItems.some(p => Number(p.id) === productId))));
   if (!hasPurchased) return fail("يمكنك تقييم المنتجات بعد استلام طلبية تحتوي عليها.", 403);
   const products = await dbRequest(env, "products?select=id,reviews&id=eq." + encodeURIComponent(productId) + "&limit=1");
