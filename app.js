@@ -150,7 +150,7 @@ const i18n = {
         no_requests: "لا توجد طلبات حالياً", request_sent_success: "تم إرسال طلبك للمسؤول بنجاح", request_details: "تفاصيل المنتج المطلوب",
         cart_empty: "السلة فارغة", login_first: "يرجى تسجيل الدخول أولاً", complete_address: "أكمل معلومات العنوان", updated: "تم التحديث",
         deleted: "تم الحذف", max_stock: "الكمية القصوى", wrong_pass: "كلمة السر خاطئة", saved: "تم الحفظ", save_failed: "حدث خطأ",
-        top_only_feature: "👑 هذه الخدمة متاحة لأصحاب التاج فقط", admin_debts: "الديون", wishlist_title: "مفضلتي", points_title: "نقاط الولاء", 
+        top_only_feature: "👑 هذه الخدمة متاحة لأصحاب التاج فقط", admin_debts: "الديون", wishlist_title: "مفضلتي", points_title: "نقاط الولاء", use_points_delivery: "استبدال 200 نقطة بتوصيل مجاني", points_balance: "رصيدك", points_not_enough: "تحتاج إلى 200 نقطة على الأقل", points_redeemed: "تم استعمال 200 نقطة للحصول على توصيل مجاني", 
         coupons_tab: "كوبونات الخصم", image_ads_title: "إشهار الصور", activate_ad: "تفعيل إشهار الصور", ad_text: "نص الإشهار", ad_endtime: "وقت الانتهاء", 
         ad_images: "الصور", print_labels: "طباعة بوالص الشحن", export_orders: "تصدير الطلبات", export_customers: "تصدير الزبائن", 
         sort_default: "الترتيب الافتراضي", sort_price_asc: "السعر: من الأقل للأعلى", sort_price_desc: "السعر: من الأعلى للأقل", sort_newest: "الأحدث أولاً", 
@@ -207,7 +207,7 @@ const i18n = {
         no_requests: "Aucune demande", request_sent_success: "Demande envoyée", request_details: "Détails", cart_empty: "Panier vide", 
         login_first: "Connectez-vous", complete_address: "Complétez", updated: "Mis à jour", deleted: "Supprimé", max_stock: "Stock max", 
         wrong_pass: "Mot de passe incorrect", saved: "Sauvegardé", save_failed: "Erreur", top_only_feature: "👑 Réservé VIP", admin_debts: "Dettes", 
-        wishlist_title: "Ma Liste", points_title: "Points", coupons_tab: "Coupons", image_ads_title: "Publicité", activate_ad: "Activer", 
+        wishlist_title: "Ma Liste", points_title: "Points", use_points_delivery: "Échanger 200 points contre la livraison gratuite", points_balance: "Votre solde", points_not_enough: "Il faut au moins 200 points", points_redeemed: "200 points utilisés pour la livraison gratuite", coupons_tab: "Coupons", image_ads_title: "Publicité", activate_ad: "Activer", 
         ad_text: "Texte", ad_endtime: "Date fin", ad_images: "Images", print_labels: "Imprimer Bons", export_orders: "Exporter Commandes", 
         export_customers: "Exporter Clients", sort_default: "Défaut", sort_price_asc: "Prix +", sort_price_desc: "Prix -", sort_newest: "Nouveaux", 
         calc_delivery: "Livraison:", reviews_title: "Avis ⭐", review_placeholder: "Votre avis...", coupon_placeholder: "Code promo...", 
@@ -1624,6 +1624,11 @@ function openShopCheckout() {
     if (state.cart.length === 0) return toast(i18n[state.currentLang].cart_empty, 'error');
     if (!state.session || state.session.role !== 'customer') { pendingCheckout = true; toast(i18n[state.currentLang].login_first, 'error'); openCustomerAuthModal(); return; }
     document.getElementById('chk-coupon').value = ''; appliedCoupon = null;
+    const pointsToggle = document.getElementById('chk-use-points');
+    const customer = state.customers.find(x => String(x.id) === String(state.session.id));
+    if (pointsToggle) { pointsToggle.checked = false; pointsToggle.disabled = Number(customer?.points || 0) < 200; }
+    const pointsBalance = document.getElementById('chk-points-balance');
+    if (pointsBalance) pointsBalance.textContent = i18n[state.currentLang].points_balance + ': ' + Number(customer?.points || 0);
     populateWilayas();
     document.getElementById('chk-courier').value = 'noest';
     document.getElementById('chk-type').value = 'home';
@@ -1695,7 +1700,14 @@ function updateDeliveryPrice() {
     if (w) { delPrice = comp === 'yalidine' ? (type === 'home' ? w.yalidineHome : w.yalidineDesk) : (type === 'home' ? w.noestHome : w.noestDesk); if (state.settings.customPrices?.[wId]?.[comp]?.[type === 'home' ? 'home' : 'desk']) delPrice = state.settings.customPrices[wId][comp][type === 'home' ? 'home' : 'desk']; }
     let itemsTotal = state.cart.reduce((s, i) => s + i.price * i.qty, 0); let discountAmount = 0;
     if (appliedCoupon) { discountAmount = itemsTotal * (appliedCoupon.discount / 100); itemsTotal -= discountAmount; }
+    const customer = state.session && state.session.role === 'customer' ? state.customers.find(x => String(x.id) === String(state.session.id)) : null;
+    const usePoints = !!document.getElementById('chk-use-points')?.checked && Number(customer?.points || 0) >= 200;
+    if (usePoints) delPrice = 0;
     const total = itemsTotal + delPrice;
+    const deliveryLabel = document.getElementById('chk-delivery-label');
+    if (deliveryLabel) deliveryLabel.textContent = usePoints ? (state.currentLang === 'fr' ? 'Livraison (200 points)' : 'التوصيل (200 نقطة)') : i18n[state.currentLang].delivery_cost;
+    const pointsNote = document.getElementById('chk-points-note');
+    if (pointsNote) pointsNote.textContent = usePoints ? i18n[state.currentLang].points_redeemed : '';
     document.getElementById('chk-discount').textContent = fmtMoney(discountAmount);
     document.getElementById('chk-del-price').textContent = fmtMoney(delPrice); 
     document.getElementById('chk-items-total').textContent = fmtMoney(itemsTotal + discountAmount); 
@@ -1740,6 +1752,9 @@ async function confirmShopOrder() {
     }
     let itemsTotal = orderItems.reduce((s, i) => s + (Number(i.price) || 0) * (Number(i.qty) || 0), 0); let discountAmount = 0;
     if (appliedCoupon) { discountAmount = itemsTotal * (appliedCoupon.discount / 100); itemsTotal -= discountAmount; }
+    const useLoyaltyPoints = !!document.getElementById('chk-use-points')?.checked;
+    if (useLoyaltyPoints && Number(c.points || 0) < 200) return toast(i18n[state.currentLang].points_not_enough, 'error');
+    if (useLoyaltyPoints) delPrice = 0;
     const total = itemsTotal + delPrice;
 
     if (window.supabaseClient) {
@@ -1762,7 +1777,7 @@ async function confirmShopOrder() {
         } catch (error) { return toast(i18n[state.currentLang].error_connection, 'error'); }
     }
 
-    const order = { id: Date.now(), customerId: state.session.id, customerName: c.name, customerPhone: c.phone, items: orderItems, itemsTotal: itemsTotal + discountAmount, discount: discountAmount, couponCode: appliedCoupon ? appliedCoupon.code : null, promoCode: appliedCoupon ? appliedCoupon.code : null, promoDiscountPercent: appliedCoupon ? appliedCoupon.discount : 0, promoDiscountAmount: discountAmount, deliveryPrice: delPrice, total: total, courier, deliveryType: type, wilaya: wData.name, commune: finalCommune, address: finalAddress, stationCode: stationCode || null, stationName: stationName || null, stationAddress: stationAddress || null, status: 'new', createdAt: new Date().toISOString() };
+    const order = { id: Date.now(), customerId: state.session.id, customerName: c.name, customerPhone: c.phone, items: orderItems, itemsTotal: itemsTotal + discountAmount, discount: discountAmount, couponCode: appliedCoupon ? appliedCoupon.code : null, promoCode: appliedCoupon ? appliedCoupon.code : null, promoDiscountPercent: appliedCoupon ? appliedCoupon.discount : 0, promoDiscountAmount: discountAmount, deliveryPrice: delPrice, total: total, courier, deliveryType: type, wilaya: wData.name, commune: finalCommune, address: finalAddress, stationCode: stationCode || null, stationName: stationName || null, stationAddress: stationAddress || null, status: 'new', createdAt: new Date().toISOString(), useLoyaltyPoints };
 
     if (appliedCoupon && window.supabaseClient) {
         // Recheck at submission time; the database atomically records each order ID only once.
@@ -1772,25 +1787,34 @@ async function confirmShopOrder() {
         if (freshDiscount !== Number(order.promoDiscountPercent)) return toast('تغيرت نسبة التخفيض. أعد تطبيق الكود من جديد.', 'error');
     }
 
-    if (window.supabaseClient) {
+    if (state.session.customerToken) {
         try {
-            // The database RPC locks all stock rows and inserts the order + stock deductions atomically.
-            const { data: created, error } = await window.supabaseClient.rpc('td_create_order', { p_order: order });
-            if (error) throw error;
-            if (!created || created.ok !== true) throw new Error('Order creation was not confirmed by the database.');
+            // The Worker verifies the signed customer session before invoking the service-role RPC.
+            const response = await fetch(TD_ADMIN_API_URL, {
+                method: 'POST',
+                headers: { 'Authorization': 'Bearer ' + state.session.customerToken, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'createOrder', order }),
+                cache: 'no-store'
+            });
+            const result = await response.json().catch(() => null);
+            if (!response.ok || result?.success !== true || !result.order) throw new Error(result?.error || 'Order creation was not confirmed by the server.');
+            Object.assign(order, result.order);
+            if (result.customer) { Object.assign(c, result.customer); save(K.customers, state.customers); }
             const stockDeltas = getOrderStockDeltas(orderItems);
             for (const [productId, quantity] of stockDeltas) {
                 const prod = state.products.find(p => String(p.id) === String(productId));
                 if (prod) prod.qty = Math.max(0, Number(prod.qty) - Number(quantity));
             }
-        } catch (error) { console.error(error); return toast(i18n[state.currentLang].order_failed, 'error'); }
-    } else { return toast('يلزم الاتصال بقاعدة البيانات لإتمام الطلبية', 'error'); }
+        } catch (error) { console.error(error); return toast((error.message || i18n[state.currentLang].order_failed), 'error'); }
+    } else { return toast('انتهت جلسة الزبون، سجّل الدخول مجدداً لإتمام الطلبية', 'error'); }
 
     // Loyalty points are awarded only by the trusted backend after delivery confirmation.
     // Never grant points in the browser at checkout.
 
     state.orders.unshift(order); save(K.orders, state.orders); save(K.products, state.products); save(K.customers, state.customers);
-    state.cart = []; save(K.cart, state.cart); updateCartBadge(); closeModal('m-checkout'); toast('✅ ' + i18n[state.currentLang].saved); shopGo('orders'); renderShop();
+    state.cart = []; save(K.cart, state.cart); updateCartBadge();
+    const pointsToggle = document.getElementById('chk-use-points'); if (pointsToggle) pointsToggle.checked = false;
+    closeModal('m-checkout'); toast('✅ ' + i18n[state.currentLang].saved); shopGo('orders'); renderShop();
 }
 window.confirmShopOrder = confirmShopOrder;
 function callStore() { const phone = state.settings.shopPhone ? state.settings.shopPhone.replace(/[^0-9+]/g, '') : ''; if (!phone) return toast(i18n[state.currentLang].save_failed, 'error'); window.location.href = `tel:${phone}`; }
