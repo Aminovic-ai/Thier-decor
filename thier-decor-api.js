@@ -458,7 +458,7 @@ async function listAdminData(env) {
     success: true,
     data: {
       products: products || [],
-      customers: customers || [],
+      customers: (customers || []).map(safeCustomer),
       messages: messages || [],
       requests: requests || [],
       expenses: expenses || [],
@@ -466,7 +466,6 @@ async function listAdminData(env) {
     }
   });
 }
-
 /* ---------------- UPDATE ORDER STATUS ---------------- */
 
 async function updateOrderStatus(body, env) {
