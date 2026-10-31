@@ -514,7 +514,7 @@ create table if not exists public.td_customer_auth_attempts (
   id bigint generated always as identity primary key,
   phone_hash text not null,
   ip_hash text not null,
-  action text not null check(action in ('login','register','reset')),
+  action text not null check(action in ('login','register','reset','message','request')),
   attempted_at timestamptz not null default now()
 );
 create index if not exists td_customer_auth_phone_time_idx
