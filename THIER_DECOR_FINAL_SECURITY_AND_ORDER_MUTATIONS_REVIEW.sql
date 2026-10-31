@@ -193,10 +193,10 @@ begin
   ) values (
     (p_order->>'id')::bigint,customer_row.id,customer_row.name,customer_row.phone,canonical_items,0,0,
     nullif(p_order->>'couponCode',''),nullif(p_order->>'promoCode',''),0,0,
-    0,0,clean_null(p_order->>'courier'),clean_null(p_order->>'deliveryType'),
-    clean_null(p_order->>'wilaya'),clean_null(p_order->>'commune'),clean_null(p_order->>'address'),
-    clean_null(p_order->>'stationCode'),clean_null(p_order->>'stationName'),clean_null(p_order->>'stationAddress'),
-    'new',now(),0,null,clean_null(p_order->>'weight'),clean_null(p_order->>'phone2')
+    0,0,nullif(trim(coalesce(p_order->>'courier','')),''),nullif(trim(coalesce(p_order->>'deliveryType','')),''),
+    nullif(trim(coalesce(p_order->>'wilaya','')),''),nullif(trim(coalesce(p_order->>'commune','')),''),nullif(trim(coalesce(p_order->>'address','')),''),
+    nullif(trim(coalesce(p_order->>'stationCode','')),''),nullif(trim(coalesce(p_order->>'stationName','')),''),nullif(trim(coalesce(p_order->>'stationAddress','')),''),
+    'new',now(),0,null,nullif(trim(coalesce(p_order->>'weight','')),''),nullif(trim(coalesce(p_order->>'phone2','')),'')
   ) returning id into inserted_id;
 
   promo_code := upper(trim(coalesce(nullif(p_order->>'promoCode',''),p_order->>'couponCode','')));
@@ -227,11 +227,6 @@ begin
     'delivery_price',final_delivery,'total',final_total);
 end;
 $$;
-
--- Helper for nullable text fields used above.
-create or replace function public.clean_null(p_value text)
-returns text language sql immutable set search_path=public,pg_temp
-as $$ select nullif(trim(coalesce(p_value,'')),'') $$;
 
 -- 3) Atomic edit and delete; use only the canonical snapshot saved on the order.
 create or replace function public.td_admin_edit_order(p_order_id bigint,p_items jsonb)
