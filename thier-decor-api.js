@@ -308,6 +308,61 @@ async function customerLogin(body, env) {
   });
 }
 
+/* ---------------- CUSTOMER ORDER CREATION ---------------- */
+async function createCustomerOrder(request, body, env) {
+  const session = await requireCustomer(request, env);
+  if (!session) return fail("انتهت جلسة الزبون. سجّل الدخول مجدداً.", 401);
+
+  const order = body.order;
+  if (!order || typeof order !== "object" || Array.isArray(order)) {
+    return fail("بيانات الطلبية غير صالحة.", 400);
+  }
+  if (String(order.customerId || "") !== String(session.sub)) {
+    return fail("لا يمكنك إنشاء طلبية لحساب زبون آخر.", 403);
+  }
+
+  const customerRows = await dbRequest(
+    env,
+    "customers?select=id,name,phone,points,isBlocked&id=eq." +
+      encodeURIComponent(session.sub) + "&limit=1"
+  );
+  const customer = customerRows?.[0];
+  if (!customer || customer.isBlocked === true) {
+    return fail("الحساب غير متاح.", 403);
+  }
+
+  // Ignore client-supplied identity fields; use the official account data.
+  const trustedOrder = {
+    ...order,
+    customerId: customer.id,
+    customerName: customer.name,
+    customerPhone: customer.phone
+  };
+
+  const created = await dbRequest(env, "rpc/td_create_order", {
+    method: "POST",
+    body: JSON.stringify({ p_order: trustedOrder })
+  });
+  if (!created?.ok || !created.order_id) {
+    return fail("لم يتم تأكيد إنشاء الطلبية.", 409);
+  }
+
+  const [orders, refreshedCustomers] = await Promise.all([
+    dbRequest(env, "orders?select=*&id=eq." + encodeURIComponent(created.order_id) + "&limit=1"),
+    dbRequest(env, "customers?select=id,name,phone,points,isVip,isTop,isBlocked,wishlist,address&id=eq." + encodeURIComponent(session.sub) + "&limit=1")
+  ]);
+  if (!orders?.length || !refreshedCustomers?.length) {
+    return fail("تعذر تأكيد بيانات الطلبية بعد الحفظ. حدّث صفحة طلباتك قبل إعادة المحاولة.", 202);
+  }
+
+  return json({
+    success: true,
+    order: orders[0],
+    customer: safeCustomer(refreshedCustomers[0]),
+    pointsRedeemed: Number(created.points_redeemed || 0)
+  });
+}
+
 /* ---------------- CUSTOMER REGISTER ---------------- */
 
 async function customerRegister(body, env) {
@@ -558,6 +613,9 @@ export default {
 
         case "customerData":
           return await customerData(request, env);
+
+        case "createOrder":
+          return await createCustomerOrder(request, body, env);
 
         case "customerResetPassword":
           return await customerResetPassword(body, env);
