@@ -257,6 +257,26 @@ async function dbRequest(env, path, options = {}) {
   return data;
 }
 
+
+async function dbRequestPaged(env, path, pageSize = 1000, maxRows = 50000) {
+  const all = [];
+  for (let offset = 0; offset < maxRows; offset += pageSize) {
+    const rows = await dbRequest(env, path, {
+      method: "GET",
+      headers: { "Range-Unit": "items", "Range": offset + "-" + (offset + pageSize - 1) }
+    });
+    const page = Array.isArray(rows) ? rows : [];
+    all.push(...page);
+    if (page.length < pageSize) return all;
+  }
+  const extra = await dbRequest(env, path, {
+    method: "GET",
+    headers: { "Range-Unit": "items", "Range": maxRows + "-" + (maxRows + pageSize - 1) }
+  });
+  if (Array.isArray(extra) && extra.length) throw new Error("Dataset exceeds the safe pagination limit; use cursor-based admin search.");
+  return all;
+}
+
 async function findCustomerByPhone(phone, env) {
   const rows = await dbRequest(env, "rpc/td_find_customer_by_phone", {
     method: "POST",
@@ -622,10 +642,7 @@ async function customerData(request, env) {
 /* ---------------- ADMIN ORDERS ---------------- */
 
 async function listOrders(env) {
-  const orders = await dbRequest(
-    env,
-    "orders?select=*&order=createdAt.desc&limit=1000"
-  );
+  const orders = await dbRequestPaged(env, "orders?select=*&order=createdAt.desc");
 
   return json({
     success: true,
@@ -644,11 +661,11 @@ async function listAdminData(env) {
     expenses,
     settings
   ] = await Promise.all([
-    dbRequest(env, "products?select=*&order=createdAt.desc&limit=2000"),
-    dbRequest(env, "customers?select=*&order=createdAt.desc&limit=2000"),
-    dbRequest(env, "messages?select=*&order=date.desc&limit=2000"),
-    dbRequest(env, "requests?select=*&order=date.desc&limit=2000"),
-    dbRequest(env, "expenses?select=*&order=date.desc&limit=2000"),
+    dbRequestPaged(env, "products?select=*&order=createdAt.desc"),
+    dbRequestPaged(env, "customers?select=*&order=createdAt.desc"),
+    dbRequestPaged(env, "messages?select=*&order=date.desc"),
+    dbRequestPaged(env, "requests?select=*&order=date.desc"),
+    dbRequestPaged(env, "expenses?select=*&order=date.desc"),
     dbRequest(env, "settings?select=*&limit=1")
   ]);
 
