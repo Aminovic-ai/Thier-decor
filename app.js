@@ -1234,6 +1234,18 @@ async function loadOrdersListener(options = {}) {
             // Customer-private orders/messages are fetched only through the signed-session Worker.
             try {
                 const customerData = await fetchCustomerDataViaWorker(state.session.customerToken);
+                // Refresh the signed-in customer's canonical profile from the server on every private-data refresh.
+                if (customerData.customer && String(customerData.customer.id) === String(state.session.id)) {
+                    const profileIndex = state.customers.findIndex(x => String(x.id) === String(state.session.id));
+                    if (profileIndex >= 0) state.customers[profileIndex] = { ...state.customers[profileIndex], ...customerData.customer };
+                    else state.customers.push(customerData.customer);
+                    save(K.customers, state.customers);
+                    state.wishlist = Array.isArray(customerData.customer.wishlist) ? customerData.customer.wishlist : [];
+                    save(K.wishlist, state.wishlist);
+                    updateWishlistBadge();
+                    const profileName = document.getElementById('p-name');
+                    if (profileName && document.getElementById('m-profile')?.classList.contains('active')) renderProfile();
+                }
                 if (Array.isArray(customerData.orders)) { state.orders = customerData.orders; save(K.orders, customerData.orders); }
                 if (Array.isArray(customerData.messages)) { state.messages = customerData.messages; save(K.messages, customerData.messages); }
             } catch (customerDataError) {
