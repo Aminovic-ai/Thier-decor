@@ -1,3 +1,6 @@
+import { pbkdf2 as nodePbkdf2 } from "node:crypto";
+import { Buffer } from "node:buffer";
+
 /**
  * Thier Décor API Worker
  * Cloudflare Worker
@@ -72,8 +75,21 @@ function constantTimeEqual(a, b) {
 }
 async function pbkdf2Hash(value, saltBytes = null, iterations = 310000) {
   const salt = saltBytes || crypto.getRandomValues(new Uint8Array(16));
-  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(String(value)), "PBKDF2", false, ["deriveBits"]);
-  const bits = await crypto.subtle.deriveBits({ name: "PBKDF2", salt, iterations, hash: "SHA-256" }, key, 256);
+  // Use Node's native PBKDF2: Workers WebCrypto rejects the existing 310,000 cost.
+  // Parameters and serialized format stay identical to existing customer hashes.
+  const bits = await new Promise((resolve, reject) => {
+    nodePbkdf2(
+      String(value),
+      Buffer.from(salt),
+      iterations,
+      32,
+      "sha256",
+      (error, derivedKey) => {
+        if (error) reject(error);
+        else resolve(derivedKey);
+      }
+    );
+  });
   return "pbkdf2$" + iterations + "$" + bytesToHex(salt) + "$" + bytesToHex(bits);
 }
 async function verifyStoredSecret(stored, supplied) {
