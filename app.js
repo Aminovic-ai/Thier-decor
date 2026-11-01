@@ -1712,10 +1712,10 @@ async function applyCoupon() {
     const customer = state.session && state.session.role === 'customer' ? state.customers.find(x => x.id === state.session.id) : null;
     if (!customer || !customer.phone) return toast('سجّل الدخول برقم هاتفك أولًا / Connectez-vous avec votre téléphone', 'error');
     if (!code) return toast('أدخل كود البرومو / Saisissez le code promo', 'error');
-    if (!window.supabaseClient) return toast('يلزم الاتصال بقاعدة البيانات للتحقق من البرومو', 'error');
+    if (!state.session?.customerToken) return toast(state.currentLang === 'fr' ? 'Veuillez vous reconnecter.' : 'يرجى تسجيل الدخول مجدداً.', 'error');
     try {
-        const { data, error } = await window.supabaseClient.rpc('td_check_promo', { p_code: code, p_phone: customer.phone });
-        if (error) throw error;
+        const result = await callCustomerWorker('customerCheckPromo', { code });
+        const data = result.promo;
         if (!data || data.valid !== true) {
             const messages = { phone_mismatch: 'هذا الكود غير مرتبط برقم هاتفك', limit_reached: 'انتهى عدد استعمالات هذا الكود', expired: 'انتهت صلاحية الكود', inactive: 'هذا الكود متوقف', not_found: 'كود غير صحيح' };
             appliedCoupon = null; updateDeliveryPrice(); return toast(messages[data?.reason] || 'كود غير صالح', 'error');
