@@ -628,6 +628,25 @@ async function customerData(request, env) {
   });
 }
 
+/* ---------------- CUSTOMER PROMO VALIDATION ---------------- */
+async function customerCheckPromo(request, body, env) {
+  const session = await requireCustomer(request, env);
+  if (!session) return fail("انتهت جلسة الزبون. يرجى تسجيل الدخول مجدداً.", 401);
+  const code = String(body.code || "").trim().toUpperCase();
+  if (!code || code.length > 80) return fail("كود الخصم غير صالح.", 400);
+  const customers = await dbRequest(
+    env,
+    "customers?select=id,phone,isBlocked&id=eq." + encodeURIComponent(session.sub) + "&limit=1"
+  );
+  const customer = customers?.[0];
+  if (!customer || customer.isBlocked === true || !customer.phone) return fail("الحساب غير متاح.", 403);
+  const promo = await dbRequest(env, "rpc/td_check_promo", {
+    method: "POST",
+    body: JSON.stringify({ p_code: code, p_phone: customer.phone })
+  });
+  return json({ success: true, promo: promo || { valid: false, reason: "not_found" } });
+}
+
 /* ---------------- ADMIN ORDERS ---------------- */
 
 async function listOrders(env) {
@@ -1081,6 +1100,9 @@ export default {
 
         case "customerData":
           return await customerData(request, env);
+
+        case "customerCheckPromo":
+          return await customerCheckPromo(request, body, env);
 
         case "createOrder":
           return await createCustomerOrder(request, body, env);
