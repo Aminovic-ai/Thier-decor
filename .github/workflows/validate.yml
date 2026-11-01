@@ -30,6 +30,8 @@ jobs:
           node --check supabase-config.js
       - name: Check Thier Decor API Worker module syntax
         run: node --input-type=module --check < thier-decor-api.js
+      - name: Test PBKDF2 compatibility at the existing customer hash cost
+        run: node --test tests/pbkdf2-worker-compat.test.mjs
       - name: Validate SQL statement syntax
         run: |
           python -m pip install --disable-pip-version-check pglast
