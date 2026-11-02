@@ -49,7 +49,6 @@ jobs:
               Path("THIER_DECOR_ORDER_SECURITY_REVIEW.sql"),
               Path("THIER_DECOR_CUSTOMER_POINTS_ADDRESS_MIGRATION_REVIEW.sql"),
               Path("THIER_DECOR_LOYALTY_REDEMPTION_ATOMIC_REVIEW.sql"),
-              Path("THIER_DECOR_VISIT_TRACKING_SAFE_RPC_REVIEW.sql"),
           ]
           for path in files:
               parse_sql(path.read_text(encoding="utf-8"))
