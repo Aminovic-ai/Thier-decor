@@ -578,7 +578,7 @@ $$;
 
 -- 7) Lock down every exposed table. The browser may read only the public product catalog.
 -- All customer/admin records and settings (including phone-bound coupons) are served by the Worker.
-DO $
+DO $rls$
 DECLARE t text;
 BEGIN
   FOREACH t IN ARRAY ARRAY[
@@ -591,7 +591,7 @@ BEGIN
     EXECUTE format('REVOKE ALL ON TABLE public.%I FROM PUBLIC, anon, authenticated', t);
   END LOOP;
 END;
-$;
+$rls$;
 
 ALTER TABLE public.products ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON TABLE public.products FROM PUBLIC, anon, authenticated;
