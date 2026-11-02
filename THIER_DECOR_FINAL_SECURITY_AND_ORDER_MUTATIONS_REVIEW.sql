@@ -70,8 +70,10 @@ begin
            or component_qty<>trunc(component_qty) or component_qty>1000 then
           raise exception 'Invalid component quantity in pack %',product_id;
         end if;
+        if component_id=product_id then raise exception 'A pack cannot contain itself'; end if;
         select * into component_row from public.products where id=component_id for share;
         if not found then raise exception 'Pack component % no longer exists',component_id; end if;
+        if coalesce(component_row."isPack",false) then raise exception 'Nested packs are not supported'; end if;
         canonical_components := canonical_components || jsonb_build_array(
           jsonb_build_object('id',component_row.id,'name',component_row.name,'qty',component_qty)
         );
