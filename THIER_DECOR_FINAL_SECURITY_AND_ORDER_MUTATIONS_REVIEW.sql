@@ -633,6 +633,34 @@ begin
      or to_regprocedure('public.td_record_visit_safe(text,text,text)') is null then
     raise exception 'V2 security verification failed: required functions are missing';
   end if;
+  if exists (
+    select 1 from (values
+      ('customers'),('orders'),('settings'),('messages'),('requests'),('expenses'),
+      ('td_promo_uses'),('td_visit_events'),('td_delivery_defaults'),
+      ('td_loyalty_awards'),('td_loyalty_redemptions'),
+      ('td_customer_auth_attempts'),('td_visit_sessions')
+    ) as required(table_name)
+    left join pg_class c on c.oid=to_regclass('public.'||required.table_name)
+    where c.oid is null or not c.relrowsecurity
+  ) then
+    raise exception 'V2 security verification failed: a private table is missing or RLS is disabled';
+  end if;
+  if has_table_privilege('anon','public.customers','SELECT')
+     or has_table_privilege('authenticated','public.customers','SELECT')
+     or has_table_privilege('anon','public.orders','SELECT')
+     or has_table_privilege('authenticated','public.orders','SELECT')
+     or has_table_privilege('anon','public.settings','SELECT')
+     or has_table_privilege('authenticated','public.settings','SELECT')
+     or has_table_privilege('anon','public.messages','SELECT')
+     or has_table_privilege('authenticated','public.messages','SELECT')
+     or has_table_privilege('anon','public.requests','SELECT')
+     or has_table_privilege('authenticated','public.requests','SELECT') then
+    raise exception 'V2 security verification failed: anonymous/private table SELECT is still granted';
+  end if;
+  if not has_table_privilege('anon','public.products','SELECT')
+     or not exists(select 1 from pg_policies where schemaname='public' and tablename='products' and policyname='td_public_products_read') then
+    raise exception 'V2 security verification failed: public product catalog read is unavailable';
+  end if;
   if has_function_privilege('anon','public.td_create_order(jsonb)','EXECUTE')
      or has_function_privilege('authenticated','public.td_consume_promo(text,text,text)','EXECUTE')
      or has_function_privilege('anon','public.td_admin_update_order_status(bigint,text)','EXECUTE')
