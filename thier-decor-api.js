@@ -6,14 +6,13 @@
  * Required bindings:
  * SUPABASE_URL             Variable
  * SUPABASE_SERVICE_ROLE_KEY Secret
- * FIREBASE_API_KEY         Secret or Variable
+ * FIREBASE_API_KEY         Variable (public Firebase project API key)
  * ADMIN_UID                Variable
  * CUSTOMER_SESSION_SECRET  Secret
  * CUSTOMER_PASSWORD_SERVICE_SECRET Secret
- * AUTH_RATE_SECRET          Secret
- * VISIT_RATE_SECRET         Secret
- * ADMIN_UID                 Variable
- * ALLOWED_ORIGINS           Variable (comma-separated exact origins)
+ * AUTH_RATE_SECRET         Secret
+ * VISIT_RATE_SECRET        Secret
+ * ALLOWED_ORIGINS          Variable (comma-separated exact origins)
  */
 
 const CORS_HEADERS = {
