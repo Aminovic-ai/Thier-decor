@@ -576,7 +576,31 @@ as $$
   ) from public.td_visit_sessions;
 $$;
 
--- 7) Function execution is restricted to the server Worker, except minimal coupon validation.
+-- 7) Lock down every exposed table. The browser may read only the public product catalog.
+-- All customer/admin records and settings (including phone-bound coupons) are served by the Worker.
+DO $
+DECLARE t text;
+BEGIN
+  FOREACH t IN ARRAY ARRAY[
+    'customers','orders','settings','messages','requests','expenses',
+    'td_promo_uses','td_visit_events','td_delivery_defaults',
+    'td_loyalty_awards','td_loyalty_redemptions',
+    'td_customer_auth_attempts','td_visit_sessions'
+  ] LOOP
+    EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY', t);
+    EXECUTE format('REVOKE ALL ON TABLE public.%I FROM PUBLIC, anon, authenticated', t);
+  END LOOP;
+END;
+$;
+
+ALTER TABLE public.products ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON TABLE public.products FROM PUBLIC, anon, authenticated;
+GRANT SELECT ON TABLE public.products TO anon, authenticated;
+DROP POLICY IF EXISTS td_public_products_read ON public.products;
+CREATE POLICY td_public_products_read ON public.products
+  FOR SELECT TO anon, authenticated USING (true);
+
+-- 8) Function execution is restricted to the server Worker.
 revoke all on function public.td_build_order_items(jsonb) from public,anon,authenticated;
 revoke all on function public.td_order_stock_requirements(jsonb) from public,anon,authenticated;
 revoke all on function public.td_order_snapshot_safe(jsonb) from public,anon,authenticated;
