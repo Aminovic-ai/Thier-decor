@@ -88,7 +88,9 @@
         sessionKey=Array.from(bytes,b=>b.toString(16).padStart(2,'0')).join('');
         sessionStorage.setItem(sessionKeyName,sessionKey);
       }
-      fetch(window.TD_API_URL || 'https://thier-decor-api.amindrody.workers.dev/',{
+      const apiUrl = window.TD_API_URL || window.TD_CONFIG?.apiUrl;
+      if (!apiUrl) { console.warn('Visit tracking skipped: API URL is not configured.'); return; }
+      fetch(apiUrl,{
         method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({action:'recordVisit',path:location.pathname,sessionKey}),
         cache:'no-store'
