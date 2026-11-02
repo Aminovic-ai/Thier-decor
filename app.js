@@ -2,10 +2,12 @@ const K = { products: 'td_prod', orders: 'td_ord', expenses: 'td_exp', settings:
 
 // Admin-only orders are fetched through the authenticated Cloudflare Worker.
 // New unified API Worker. The legacy thier-decor-admin-api Worker remains untouched.
-const TD_ADMIN_API_URL = 'https://thier-decor-api.amindrody.workers.dev/';
+// Public service endpoints and identifiers are centralized in td-config.js.
+const TD_RUNTIME_CONFIG = window.TD_CONFIG || {};
+const TD_ADMIN_API_URL = String(TD_RUNTIME_CONFIG.apiUrl || '').trim();
 const TD_CUSTOMER_API_URL = TD_ADMIN_API_URL;
 window.TD_API_URL = TD_ADMIN_API_URL;
-const TD_ADMIN_UID = 'DNlHoogN8vMCsZN0hyIC6yPS64J2';
+const TD_ADMIN_UID = String(TD_RUNTIME_CONFIG.adminUid || '');
 
 // Customer login is verified server-side so the public browser does not need SELECT access to customers.
 async function callCustomerLoginWorker(phone, password) {
