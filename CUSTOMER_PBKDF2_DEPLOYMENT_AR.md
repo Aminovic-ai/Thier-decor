@@ -6,7 +6,7 @@ This change keeps the existing `pbkdf2$iterations$salt$hash` database format and
 
 - The Cloudflare API Worker delegates PBKDF2 hash and verify operations to the private Supabase Edge Function `customer-password`.
 - The Edge Function uses WebCrypto PBKDF2-SHA-256, matching the previous Node PBKDF2 output format.
-- The function requires a gateway-validated JWT and additionally checks the `service_role` claim. Do not remove either check.
+- The function uses the Supabase `sb_secret_` key only in the `apikey` header. Because this key is not a JWT, `verify_jwt` is disabled for this function and a separate high-entropy `CUSTOMER_PASSWORD_SERVICE_SECRET` is checked inside the function. Both checks are required.
 - Legacy plaintext/SHA-256 verification remains in the Worker and is upgraded to the existing PBKDF2 format after a successful login/reset.
 
 ## Required deployment order
@@ -15,11 +15,13 @@ This change keeps the existing `pbkdf2$iterations$salt$hash` database format and
 
 1. Deploy `supabase/functions/customer-password/index.ts` to project `xdsbnmtthvqgdlytwpes` with the included `supabase/config.toml` setting:
    ```sh
+   supabase secrets set CUSTOMER_PASSWORD_SERVICE_SECRET='<locally-generated-secret>' --project-ref xdsbnmtthvqgdlytwpes
    supabase functions deploy customer-password --project-ref xdsbnmtthvqgdlytwpes
    ```
-2. Confirm the function is deployed with JWT verification enabled. The Cloudflare Worker already has the server-side `SUPABASE_SERVICE_ROLE_KEY`; no new browser key or client-side secret is required.
-3. Test the function through a server-side request using the existing service-role key. A hash request must return a `pbkdf2$310000$...` string; verifying it with the same password must return `valid: true`; a wrong password must return `valid: false`. Never paste the service-role key into chat or the browser.
-4. Only after step 3 succeeds, merge this branch so the Cloudflare Worker update can deploy. Keep the function deployed before the Worker rollout.
+2. Generate a new random secret of at least 32 bytes locally. Set the exact same value as the Supabase Edge Function secret `CUSTOMER_PASSWORD_SERVICE_SECRET` and as a Cloudflare Worker secret with the same name. Never paste it into chat, source control, or browser code. Keep the existing `SUPABASE_SERVICE_ROLE_KEY` secret; it must contain the Supabase `sb_secret_` key.
+3. Confirm the function has `verify_jwt = false`. The function still rejects requests without the separate internal secret. The Worker sends the Supabase secret key in `apikey` and the shared secret in `x-td-internal-key` (not as a Bearer JWT).
+4. Test the deployed function server-side: hash must return `pbkdf2$310000$...`; same-password verify must return `valid: true`; wrong-password verify must return `valid: false`. Never paste either secret into chat or the browser.
+5. Only after all hosted tests succeed, merge this branch so the Cloudflare Worker update can deploy. Keep the function deployed before the Worker rollout.
 
 ## Compatibility test
 
