@@ -2682,7 +2682,7 @@ async function handleImageUpload(event) {
 }
 window.handleImageUpload = handleImageUpload;
 
-function renderImagePreviews() { const grid = document.getElementById('pf-preview'); grid.innerHTML = tempUploadedImages.map((img, index) => `<div style="position:relative;"><img src="${img}" style="width:100%; height:80px; object-fit:cover; border-radius:8px;"><button onclick="removeUploadedImage(${index})" style="position:absolute; top:-5px; right:-5px; background:var(--danger); color:#fff; border:none; border-radius:50%; width:20px; height:20px; cursor:pointer;">✕</button></div>`).join(''); }
+function renderImagePreviews() { const grid = document.getElementById('pf-preview'); grid.innerHTML = tempUploadedImages.map((img, index) => `<div style="position:relative;"><img src="${img}" style="width:100%; height:100px; object-fit:contain; background:#e5e7eb; padding:6px; border-radius:8px; border:1px solid #d1d5db;"><button onclick="removeUploadedImage(${index})" style="position:absolute; top:-5px; right:-5px; background:var(--danger); color:#fff; border:none; border-radius:50%; width:20px; height:20px; cursor:pointer;">✕</button></div>`).join(''); }
 function removeUploadedImage(index) { tempUploadedImages.splice(index, 1); renderImagePreviews(); }
 window.removeUploadedImage = removeUploadedImage;
 
