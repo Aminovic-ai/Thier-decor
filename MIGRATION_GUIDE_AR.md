@@ -35,6 +35,7 @@
 كما يلزم ضبط `FIREBASE_API_KEY` و`ADMIN_UID` كمتغيرات وفق إعدادات Worker.
 
 ## ترتيب الانتقال
+راجع `SUPABASE_MIGRATION_ORDER_AR.md` لترتيب ملفات SQL الصحيح؛ لا تشغّل ملفات المراجعة الأخرى عشوائياً.
 1. إنشاء Supabase جديد، ثم مقارنة المخطط وتطبيق migrations على بيئة اختبار فقط.
 2. نشر Edge Function `customer-password` واختبار hash/verify على الخدمة المستضافة.
 3. إنشاء Worker V2 وضبط المتغيرات والأسرار.
