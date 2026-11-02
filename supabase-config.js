@@ -1,11 +1,14 @@
-const supabaseUrl = 'https://xdsbnmtthvqgdlytwpes.supabase.co';
-const supabaseKey = 'sb_publishable_7F6Bg9zRlX61rdZo60A4iQ_ZYBvqt1b';
+const supabaseConfig = window.TD_CONFIG?.supabase || {};
+const supabaseUrl = String(supabaseConfig.url || '').trim();
+const supabaseKey = String(supabaseConfig.publishableKey || '').trim();
 
-if (typeof supabase === 'undefined') {
+if (!supabaseUrl || !supabaseKey) {
+    console.error('❌ إعدادات Supabase العامة غير مكتملة. راجع td-config.js.');
+} else if (typeof supabase === 'undefined') {
     console.error('❌ مكتبة Supabase غير محملة.');
 } else {
     window.supabaseClient = supabase.createClient(supabaseUrl, supabaseKey);
-    // Compatibility alias for any older code paths; app.js should prefer supabaseClient.
+    // Compatibility alias for older read-only code paths.
     window.supabase = window.supabaseClient;
-    console.log('✅ Supabase connecté avec succès!');
+    console.log('✅ Supabase client initialized.');
 }
