@@ -22,7 +22,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Check browser JavaScript
+      - name: Check browser JavaScript and validation scripts
         run: |
           node --check td-config.js
           node --check app.js
@@ -30,13 +30,25 @@ jobs:
           node --check sw.js
           node --check firebase-config.js
           node --check supabase-config.js
+          node --check scripts/build.mjs
+          node --check scripts/check-api-contract.mjs
       - name: Check Cloudflare Worker module syntax
         run: node --input-type=module --check < thier-decor-api.js
+      - name: Verify browser-to-Worker action contract
+        run: node scripts/check-api-contract.mjs
+      - name: Build allow-listed static website
+        run: |
+          npm run build
+          test -s dist/index.html
+          test -s dist/app.js
+          test -s dist/td-config.js
+          test ! -e dist/thier-decor-api.js
+          test ! -e dist/supabase
       - name: Test PBKDF2 compatibility
         run: |
           node --test tests/pbkdf2-compat.test.mjs
           node --test tests/pbkdf2-worker-compat.test.mjs
-      - name: Validate SQL statement syntax
+      - name: Validate authoritative SQL files
         run: |
           python -m pip install --disable-pip-version-check pglast
           python - <<'PY'
@@ -44,11 +56,11 @@ jobs:
           from pglast import parse_sql
           files = [
               Path("THIER_DECOR_SUPABASE_SCHEMA_FIXED_V2.sql"),
-              Path("THIER_DECOR_FINAL_SECURITY_AND_ORDER_MUTATIONS_REVIEW.sql"),
-              Path("THIER_DECOR_CUSTOMER_PHONE_UNIQUE_REVIEW.sql"),
-              Path("THIER_DECOR_ORDER_SECURITY_REVIEW.sql"),
               Path("THIER_DECOR_CUSTOMER_POINTS_ADDRESS_MIGRATION_REVIEW.sql"),
               Path("THIER_DECOR_LOYALTY_REDEMPTION_ATOMIC_REVIEW.sql"),
+              Path("THIER_DECOR_CUSTOMER_PHONE_UNIQUE_REVIEW.sql"),
+              Path("THIER_DECOR_FINAL_SECURITY_AND_ORDER_MUTATIONS_REVIEW.sql"),
+              Path("SCHEMA_AUDIT_READONLY.sql"),
           ]
           for path in files:
               parse_sql(path.read_text(encoding="utf-8"))
