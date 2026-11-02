@@ -599,7 +599,7 @@ grant execute on function public.td_promo_usage_stats() to service_role;
 grant execute on function public.td_get_visit_stats() to service_role;
 grant execute on function public.td_record_visit_safe(text,text,text) to service_role;
 revoke all on function public.td_check_promo(text,text) from public,anon,authenticated;
-grant execute on function public.td_check_promo(text,text) to anon,authenticated,service_role;
+grant execute on function public.td_check_promo(text,text) to service_role;
 
 do $$
 begin
@@ -630,8 +630,12 @@ begin
      or not has_function_privilege('service_role','public.td_record_visit_safe(text,text,text)','EXECUTE') then
     raise exception 'V2 security verification failed: service_role is missing required privileges';
   end if;
-  if not has_function_privilege('anon','public.td_check_promo(text,text)','EXECUTE') then
-    raise exception 'V2 security verification failed: storefront coupon validation is unavailable';
+  if has_function_privilege('anon','public.td_check_promo(text,text)','EXECUTE')
+     or has_function_privilege('authenticated','public.td_check_promo(text,text)','EXECUTE') then
+    raise exception 'V2 security verification failed: private coupon validation is publicly executable';
+  end if;
+  if not has_function_privilege('service_role','public.td_check_promo(text,text)','EXECUTE') then
+    raise exception 'V2 security verification failed: Worker coupon validation is unavailable';
   end if;
 end;
 $$;
