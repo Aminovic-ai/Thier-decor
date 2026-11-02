@@ -1,9 +1,10 @@
-name: Validate Thier Decor API
+name: Validate Thier Decor
 
 on:
   push:
     branches:
       - main
+      - migration-prep
   pull_request:
     branches:
       - main
@@ -12,7 +13,7 @@ permissions:
   contents: read
 
 jobs:
-  javascript-syntax:
+  javascript-and-worker:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -23,15 +24,18 @@ jobs:
           node-version: 22
       - name: Check browser JavaScript
         run: |
+          node --check td-config.js
           node --check app.js
           node --check analytics-notifications.js
           node --check sw.js
           node --check firebase-config.js
           node --check supabase-config.js
-      - name: Check Thier Decor API Worker module syntax
+      - name: Check Cloudflare Worker module syntax
         run: node --input-type=module --check < thier-decor-api.js
-      - name: Test PBKDF2 compatibility at the existing customer hash cost
-        run: node --test tests/pbkdf2-worker-compat.test.mjs
+      - name: Test PBKDF2 compatibility
+        run: |
+          node --test tests/pbkdf2-compat.test.mjs
+          node --test tests/pbkdf2-worker-compat.test.mjs
       - name: Validate SQL statement syntax
         run: |
           python -m pip install --disable-pip-version-check pglast
@@ -45,6 +49,7 @@ jobs:
               Path("THIER_DECOR_ORDER_SECURITY_REVIEW.sql"),
               Path("THIER_DECOR_CUSTOMER_POINTS_ADDRESS_MIGRATION_REVIEW.sql"),
               Path("THIER_DECOR_LOYALTY_REDEMPTION_ATOMIC_REVIEW.sql"),
+              Path("THIER_DECOR_VISIT_TRACKING_SAFE_RPC_REVIEW.sql"),
           ]
           for path in files:
               parse_sql(path.read_text(encoding="utf-8"))
