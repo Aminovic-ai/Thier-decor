@@ -1,3 +1,9 @@
+/* ARCHIVE ONLY — LEGACY FIRESTORE CLIENT CODE.
+   This file is not loaded by index.html and must not be used for the new architecture.
+   The active Firebase Auth setup is firebase-config.js + td-config.js.
+   Do not enable broad client-side Firestore reads/writes from this legacy file.
+*/
+
 /* ============================================================
    🔥 Firebase Configuration
    ============================================================ */
