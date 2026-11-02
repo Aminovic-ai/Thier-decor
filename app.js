@@ -9,8 +9,16 @@ const TD_CUSTOMER_API_URL = TD_ADMIN_API_URL;
 window.TD_API_URL = TD_ADMIN_API_URL;
 const TD_ADMIN_UID = String(TD_RUNTIME_CONFIG.adminUid || '');
 
+function ensureApiConfigured() {
+    if (TD_ADMIN_API_URL) return;
+    throw new Error(state?.currentLang === 'fr'
+        ? 'Les services du magasin ne sont pas encore configurés.'
+        : 'لم يتم ربط خدمات المتجر الجديدة بعد.');
+}
+
 // Customer login is verified server-side so the public browser does not need SELECT access to customers.
 async function callCustomerLoginWorker(phone, password) {
+    ensureApiConfigured();
     const response = await fetch(TD_CUSTOMER_API_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -28,6 +36,7 @@ async function callCustomerLoginWorker(phone, password) {
 }
 
 async function fetchCustomerDataViaWorker(token) {
+    ensureApiConfigured();
     if (!token) throw new Error(state.currentLang === 'fr' ? 'Session client expirée. Reconnectez-vous.' : 'انتهت جلسة الزبون، يرجى تسجيل الدخول مجدداً.');
     const response = await fetch(TD_CUSTOMER_API_URL, {
         method: 'POST',
@@ -44,6 +53,7 @@ async function fetchCustomerDataViaWorker(token) {
 
 
 async function callCustomerWorker(action, payload = {}) {
+    ensureApiConfigured();
     const token = state.session?.role === 'customer' ? state.session.customerToken : null;
     if (state.session?.role === 'customer' && !token) throw new Error(state.currentLang === 'fr' ? 'Session client expirée.' : 'انتهت جلسة الزبون، يرجى تسجيل الدخول مجدداً.');
     const headers = { 'Content-Type': 'application/json' };
@@ -56,6 +66,7 @@ async function callCustomerWorker(action, payload = {}) {
 }
 
 async function callAdminWorker(action, payload = {}) {
+    ensureApiConfigured();
     if (!window.firebaseReady || typeof firebase === 'undefined' || !firebase.auth) {
         throw new Error(state.currentLang === 'fr' ? 'La session Firebase administrateur est indisponible.' : 'جلسة Firebase الخاصة بالمسؤول غير متاحة.');
     }
