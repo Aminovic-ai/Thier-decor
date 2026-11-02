@@ -901,8 +901,9 @@ async function adminMutation(action, body, env) {
           componentIds.push(componentId);
         }
         if (new Set(componentIds).size !== componentIds.length) return fail("لا تكرر المنتج نفسه داخل مكونات الباقة.");
-        const existingComponents = await dbRequest(env, "products?select=id&id=in.(" + componentIds.join(",") + ")");
+        const existingComponents = await dbRequest(env, "products?select=id,isPack&id=in.(" + componentIds.join(",") + ")");
         if (!Array.isArray(existingComponents) || existingComponents.length !== componentIds.length) return fail("بعض مكونات الباقة غير موجودة.");
+        if (existingComponents.some(component => component.isPack === true)) return fail("لا يمكن وضع باقة داخل باقة؛ اختر منتجات عادية كمكونات.");
       }
       if (product.promoPrice != null && (!(Number(product.promoPrice) > 0) || Number(product.promoPrice) >= product.price)) return fail("سعر العرض غير صالح.");
       const existingRows = body.id == null ? [] : await dbRequest(env, "products?select=id,isPack,packItems&id=eq." + id + "&limit=1");
@@ -949,6 +950,10 @@ async function adminMutation(action, body, env) {
     }
     case "adminDeleteCustomer": {
       const id = positiveId(body.id, "معرّف الزبون");
+      const linkedOrders = await dbRequest(env, "orders?select=id&customerId=eq." + encodeURIComponent(id) + "&limit=1");
+      if (Array.isArray(linkedOrders) && linkedOrders.length) {
+        return fail("لا يمكن حذف حساب زبون لديه طلبيات سابقة؛ احظر الحساب بدلاً من حذف سجلّه حفاظاً على تاريخ الطلبات.", 409);
+      }
       await deleteRow(env, "customers", id);
       return json({ success: true });
     }
