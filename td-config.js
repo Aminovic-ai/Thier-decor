@@ -2,11 +2,11 @@
 // SAFE FOR THE BROWSER: only public identifiers and publishable keys belong here.
 // NEVER add Supabase service-role/secret keys, Cloudflare secrets, or shared passwords.
 window.TD_CONFIG = Object.freeze({
-  apiUrl: "https://thier-decor-api.amindrody.workers.dev/",
+  apiUrl: "", // Fill after the new Cloudflare Worker is created.
   adminUid: "DNlHoogN8vMCsZN0hyIC6yPS64J2",
   supabase: {
-    url: "https://xdsbnmtthvqgdlytwpes.supabase.co",
-    publishableKey: "sb_publishable_7F6Bg9zRlX61rdZo60A4iQ_ZYBvqt1b"
+    url: "", // Fill after the new Supabase project is created.
+    publishableKey: "" // Fill with the new project publishable key.
   },
   // Firebase remains the current administrator sign-in project for now.
   firebase: {
