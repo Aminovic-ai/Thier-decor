@@ -3,6 +3,21 @@
 // The Cloudflare API Worker calls this endpoint with its server-side service-role key.
 const encoder = new TextEncoder();
 
+function hasServiceRoleClaim(request: Request): boolean {
+  const authorization = request.headers.get("Authorization") || "";
+  const token = authorization.startsWith("Bearer ") ? authorization.slice(7) : "";
+  const parts = token.split(".");
+  if (parts.length !== 3) return false;
+  try {
+    const payloadPart = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    const padded = payloadPart + "=".repeat((4 - payloadPart.length % 4) % 4);
+    const claims = JSON.parse(atob(padded));
+    return claims?.role === "service_role";
+  } catch {
+    return false;
+  }
+}
+
 function json(data: Record<string, unknown>, status = 200): Response {
   return new Response(JSON.stringify(data), {
     status,
@@ -46,6 +61,8 @@ async function derive(value: string, salt: Uint8Array, iterations: number): Prom
 
 Deno.serve(async (request: Request) => {
   if (request.method !== "POST") return json({ success: false, error: "Method not allowed" }, 405);
+  // The gateway validates the JWT signature; this additional claim check blocks anon/authenticated callers.
+  if (!hasServiceRoleClaim(request)) return json({ success: false, error: "Forbidden" }, 403);
 
   try {
     const body = await request.json();
