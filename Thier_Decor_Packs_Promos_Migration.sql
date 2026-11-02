@@ -1,3 +1,7 @@
+-- LEGACY INCREMENTAL MIGRATION: the current base schema already includes these columns.
+-- Do not run for a fresh V2 setup unless schema audit confirms they are missing.
+-- See SUPABASE_MIGRATION_ORDER_AR.md.
+
 -- Thier Décor Store: database migration for Packs and product promotions
 -- Run this once in Supabase Dashboard > SQL Editor > New query.
 -- Existing products and orders are not deleted or rewritten.
