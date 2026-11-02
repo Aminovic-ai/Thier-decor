@@ -1,3 +1,7 @@
+-- LEGACY INCREMENTAL MIGRATION: the current base schema already creates products.createdAt.
+-- Do not run for a fresh V2 setup unless the read-only schema audit confirms the column is missing.
+-- See SUPABASE_MIGRATION_ORDER_AR.md.
+
 -- Thier Décor: ajoute la date de création utilisée par la section « Produits récents ».
 -- À exécuter dans Supabase SQL Editor après une sauvegarde.
 ALTER TABLE public.products
