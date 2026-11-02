@@ -1,3 +1,6 @@
+-- SUPERSEDED: the final security grants/revokes are included in THIER_DECOR_FINAL_SECURITY_AND_ORDER_MUTATIONS_REVIEW.sql.
+-- Do not run this older subset in the new setup; see SUPABASE_MIGRATION_ORDER_AR.md.
+
 -- Thier Décor: lock down privileged order and coupon RPCs
 -- REVIEW ONLY: do not execute on production. Apply only after the base schema
 -- and the V2 loyalty/order migrations have been reviewed on a staging database.
