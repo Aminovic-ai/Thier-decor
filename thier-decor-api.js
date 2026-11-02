@@ -9,14 +9,36 @@
  * FIREBASE_API_KEY         Secret or Variable
  * ADMIN_UID                Variable
  * CUSTOMER_SESSION_SECRET  Secret
+ * CUSTOMER_PASSWORD_SERVICE_SECRET Secret
+ * AUTH_RATE_SECRET          Secret
+ * VISIT_RATE_SECRET         Secret
+ * ADMIN_UID                 Variable
+ * ALLOWED_ORIGINS           Variable (comma-separated exact origins)
  */
 
 const CORS_HEADERS = {
-  "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
   "Access-Control-Allow-Headers": "Authorization, Content-Type",
   "Cache-Control": "no-store"
 };
+
+function isAllowedOrigin(request, env) {
+  const origin = request.headers.get("Origin");
+  if (!origin) return true;
+  const allowed = String(env.ALLOWED_ORIGINS || "").split(",").map(value => value.trim()).filter(Boolean);
+  return allowed.includes(origin);
+}
+
+function withCors(response, request, env) {
+  const headers = new Headers(response.headers);
+  for (const [key, value] of Object.entries(CORS_HEADERS)) headers.set(key, value);
+  const origin = request.headers.get("Origin");
+  if (origin && isAllowedOrigin(request, env)) {
+    headers.set("Access-Control-Allow-Origin", origin);
+    headers.set("Vary", "Origin");
+  }
+  return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
+}
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -1086,14 +1108,9 @@ async function recordVisit(request, body, env) {
 }
 /* ---------------- MAIN ROUTER ---------------- */
 
-export default {
-  async fetch(request, env) {
-    if (request.method === "OPTIONS") {
-      return new Response(null, {
-        status: 204,
-        headers: CORS_HEADERS
-      });
-    }
+async function handleRequest(request, env) {
+    if (!isAllowedOrigin(request, env)) return fail("Origin not allowed.", 403);
+    if (request.method === "OPTIONS") return new Response(null, { status: 204 });
 
     if (request.method !== "POST") {
       return fail("Method not allowed.", 405);
@@ -1198,5 +1215,11 @@ export default {
         500
       );
     }
+}
+
+export default {
+  async fetch(request, env) {
+    const response = await handleRequest(request, env);
+    return withCors(response, request, env);
   }
 };
