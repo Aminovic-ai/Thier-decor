@@ -73,7 +73,9 @@ function constantTimeEqual(a, b) {
 }
 async function passwordServiceRequest(payload, env) {
   if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) throw new Error("Password service configuration is missing");
-  const endpoint = env.SUPABASE_URL.replace(/\\/+$/, "") + "/functions/v1/customer-password";
+  let base = env.SUPABASE_URL;
+  while (base.endsWith("/")) base = base.slice(0, -1);
+  const endpoint = base + "/functions/v1/customer-password";
   const response = await fetch(endpoint, {
     method: "POST",
     headers: {
