@@ -1,3 +1,5 @@
+ملاحظة: هذا تقرير مراجعة تاريخي للنسخة السابقة بتاريخ 2026-10-31، وليس شهادة أمان أو تعليمات نشر للبيئة الجديدة. راجع MIGRATION_GUIDE_AR.md وسجل الاختبارات الحالي قبل أي نشر.
+
 THIER DECOR — FULL REVIEW REPORT (worker-v2-review)
 Date: 2026-10-31
 Scope: static review of current branch files through GitHub connector.
