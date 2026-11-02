@@ -1367,9 +1367,9 @@ function setupRealtimeListeners() {
     
     if (!isAdmin) return; 
     
-    realtimeChannel = window.supabaseClient.channel('custom-all-channel')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => { loadOrdersListener(); })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, () => { loadOrdersListener(); }) // تمت إضافة الاستماع للرسائل
+    // Only the public product catalog is subscribed to from the browser.
+    // Private orders/messages are refreshed through the Firebase-verified Worker poll below.
+    realtimeChannel = window.supabaseClient.channel('public-products-channel')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, () => { lastProductsFetchAt = 0; loadOrdersListener({ forceProducts: true }); })
       .subscribe();
 }
@@ -1411,11 +1411,18 @@ window.adminRefreshAll = adminRefreshAll;
 // Fallback catalog refresh if Realtime is disconnected. Only run while this page is visible;
 // Realtime remains the preferred instant update path.
 let catalogFallbackTimer = null;
+let lastAdminPollAt = 0;
 function startCatalogFallbackRefresh() {
     if (catalogFallbackTimer) clearInterval(catalogFallbackTimer);
     catalogFallbackTimer = setInterval(async () => {
         if (document.hidden || !window.supabaseClient || loadRefreshInProgress) return;
         const now = Date.now();
+        const firebaseAdmin = Boolean(window.firebaseReady && typeof firebase !== 'undefined' && firebase.auth && firebase.auth().currentUser && firebase.auth().currentUser.uid === TD_ADMIN_UID);
+        const adminSession = firebaseAdmin || (state.session && state.session.role === 'admin');
+        if (adminSession && now - lastAdminPollAt >= 60 * 1000) {
+            lastAdminPollAt = now;
+            loadOrdersListener().catch(error => console.warn('Admin Worker refresh failed:', error.message || error));
+        }
         if (now - lastProductsFetchAt < PRODUCT_CACHE_TTL_MS) return;
         try {
             const { data, error } = await window.supabaseClient.from('products').select('*');
