@@ -1,5 +1,3 @@
-import { pbkdf2 as nodePbkdf2 } from "node:crypto";
-import { Buffer } from "node:buffer";
 
 /**
  * Thier Décor API Worker
@@ -73,38 +71,44 @@ function constantTimeEqual(a, b) {
   for (let i = 0; i < length; i++) diff |= (left.charCodeAt(i) || 0) ^ (right.charCodeAt(i) || 0);
   return diff === 0;
 }
-async function pbkdf2Hash(value, saltBytes = null, iterations = 310000) {
-  const salt = saltBytes || crypto.getRandomValues(new Uint8Array(16));
-  // Use Node's native PBKDF2: Workers WebCrypto rejects the existing 310,000 cost.
-  // Parameters and serialized format stay identical to existing customer hashes.
-  const bits = await new Promise((resolve, reject) => {
-    nodePbkdf2(
-      String(value),
-      Buffer.from(salt),
-      iterations,
-      32,
-      "sha256",
-      (error, derivedKey) => {
-        if (error) reject(error);
-        else resolve(derivedKey);
-      }
-    );
+async function passwordServiceRequest(payload, env) {
+  if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) throw new Error("Password service configuration is missing");
+  const endpoint = env.SUPABASE_URL.replace(/\\/+$/, "") + "/functions/v1/customer-password";
+  const response = await fetch(endpoint, {
+    method: "POST",
+    headers: {
+      "apikey": env.SUPABASE_SERVICE_ROLE_KEY,
+      "Authorization": "Bearer " + env.SUPABASE_SERVICE_ROLE_KEY,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(payload)
   });
-  return "pbkdf2$" + iterations + "$" + bytesToHex(salt) + "$" + bytesToHex(bits);
+  let data = null;
+  try { data = await response.json(); } catch (_) {}
+  if (!response.ok || !data?.success) {
+    console.error("Password service failed:", response.status, data?.error || "No response");
+    throw new Error("Password service unavailable");
+  }
+  return data;
 }
-async function verifyStoredSecret(stored, supplied) {
+async function pbkdf2Hash(value, saltBytes = null, iterations = 310000, env) {
+  const result = await passwordServiceRequest({
+    action: "hash", value: String(value),
+    salt: saltBytes ? bytesToHex(saltBytes) : null, iterations
+  }, env);
+  if (typeof result.hash !== "string" || !result.hash.startsWith("pbkdf2$")) throw new Error("Invalid password hash response");
+  return result.hash;
+}
+async function verifyStoredSecret(stored, supplied, env) {
   const value = String(stored || "");
   if (value.startsWith("pbkdf2$")) {
     const parts = value.split("$");
     if (parts.length !== 4) return { valid: false, needsUpgrade: false };
     const iterations = Number(parts[1]);
     if (!Number.isInteger(iterations) || iterations < 100000 || iterations > 1000000) return { valid: false, needsUpgrade: false };
-    try {
-      const candidate = await pbkdf2Hash(supplied, hexToBytes(parts[2]), iterations);
-      return { valid: constantTimeEqual(candidate, value), needsUpgrade: false };
-    } catch (_) { return { valid: false, needsUpgrade: false }; }
+    const result = await passwordServiceRequest({ action: "verify", stored: value, supplied: String(supplied) }, env);
+    return { valid: result.valid === true, needsUpgrade: false };
   }
-  // Legacy compatibility: successful login/reset upgrades the verifier to salted PBKDF2.
   const legacy = await sha256(supplied);
   return { valid: constantTimeEqual(value, legacy) || constantTimeEqual(value, supplied), needsUpgrade: true };
 }
@@ -364,11 +368,11 @@ async function customerLogin(request, body, env) {
   if (!(await recordAuthAttempt("login", phone, request, env))) return fail("محاولات كثيرة. انتظر قليلاً ثم أعد المحاولة.", 429);
   const customer = await findCustomerByPhone(phone, env);
   if (!customer) return fail("رقم الهاتف غير مسجل.", 401);
-  const verification = await verifyStoredSecret(customer.password, password);
+  const verification = await verifyStoredSecret(customer.password, password, env);
   if (!verification.valid) return fail("كلمة المرور غير صحيحة.", 401);
   if (customer.isBlocked === true) return fail("هذا الحساب محظور.", 403);
   if (verification.needsUpgrade) {
-    customer.password = await pbkdf2Hash(password);
+    customer.password = await pbkdf2Hash(password, null, 310000, env);
     await dbRequest(env, "customers?id=eq." + encodeURIComponent(customer.id), {
       method: "PATCH", headers: { "Prefer": "return=minimal" },
       body: JSON.stringify({ password: customer.password })
@@ -514,12 +518,12 @@ async function customerRegister(request, body, env) {
     id: Date.now(),
     name,
     phone,
-    password: await pbkdf2Hash(password),
+    password: await pbkdf2Hash(password, null, 310000, env),
     isVip: false,
     isTop: false,
     isBlocked: false,
     points: 0,
-    recoveryPin: await pbkdf2Hash(recoveryPin),
+    recoveryPin: await pbkdf2Hash(recoveryPin, null, 310000, env),
     wishlist: []
   };
 
@@ -571,11 +575,11 @@ async function customerResetPassword(request, body, env) {
   if (!(await recordAuthAttempt("reset", phone, request, env))) return fail("محاولات استرجاع كثيرة. حاول لاحقاً.", 429);
   const customer = await findCustomerByPhone(phone, env);
   if (!customer || !customer.recoveryPin) return fail("رقم الهاتف أو رمز الاسترجاع غير صحيح.", 401);
-  const pinVerification = await verifyStoredSecret(customer.recoveryPin, recoveryPin);
+  const pinVerification = await verifyStoredSecret(customer.recoveryPin, recoveryPin, env);
   if (!pinVerification.valid) return fail("رقم الهاتف أو رمز الاسترجاع غير صحيح.", 401);
   if (customer.isBlocked === true) return fail("هذا الحساب محظور.", 403);
-  const patch = { password: await pbkdf2Hash(password) };
-  if (pinVerification.needsUpgrade) patch.recoveryPin = await pbkdf2Hash(recoveryPin);
+  const patch = { password: await pbkdf2Hash(password, null, 310000, env) };
+  if (pinVerification.needsUpgrade) patch.recoveryPin = await pbkdf2Hash(recoveryPin, null, 310000, env);
   await dbRequest(env, "customers?id=eq." + encodeURIComponent(customer.id), {
     method: "PATCH", headers: { "Prefer": "return=minimal" }, body: JSON.stringify(patch)
   });
