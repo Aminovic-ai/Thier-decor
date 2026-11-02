@@ -1,21 +1,22 @@
 // Internal PBKDF2 service for Thier Décor customer credentials.
-// Requests are authenticated by the Supabase Functions gateway (verify_jwt = true).
-// The Cloudflare API Worker calls this endpoint with its server-side service-role key.
+// Requests use the Supabase secret API key at the gateway and a separate shared
+// internal secret between this function and the Cloudflare Worker. The shared
+// secret is never exposed to browsers.
 const encoder = new TextEncoder();
 
-function hasServiceRoleClaim(request: Request): boolean {
-  const authorization = request.headers.get("Authorization") || "";
-  const token = authorization.startsWith("Bearer ") ? authorization.slice(7) : "";
-  const parts = token.split(".");
-  if (parts.length !== 3) return false;
-  try {
-    const payloadPart = parts[1].replace(/-/g, "+").replace(/_/g, "/");
-    const padded = payloadPart + "=".repeat((4 - payloadPart.length % 4) % 4);
-    const claims = JSON.parse(atob(padded));
-    return claims?.role === "service_role";
-  } catch {
-    return false;
+function constantTimeSecretEqual(actual: string, expected: string): boolean {
+  let diff = actual.length ^ expected.length;
+  const n = Math.max(actual.length, expected.length);
+  for (let i = 0; i < n; i++) {
+    diff |= (actual.charCodeAt(i) || 0) ^ (expected.charCodeAt(i) || 0);
   }
+  return diff === 0 && actual.length > 0;
+}
+
+function hasInternalServiceSecret(request: Request): boolean {
+  const expected = Deno.env.get("CUSTOMER_PASSWORD_SERVICE_SECRET") || "";
+  const supplied = request.headers.get("x-td-internal-key") || "";
+  return expected.length >= 32 && constantTimeSecretEqual(supplied, expected);
 }
 
 function json(data: Record<string, unknown>, status = 200): Response {
@@ -61,8 +62,9 @@ async function derive(value: string, salt: Uint8Array, iterations: number): Prom
 
 Deno.serve(async (request: Request) => {
   if (request.method !== "POST") return json({ success: false, error: "Method not allowed" }, 405);
-  // The gateway validates the JWT signature; this additional claim check blocks anon/authenticated callers.
-  if (!hasServiceRoleClaim(request)) return json({ success: false, error: "Forbidden" }, 403);
+  // verify_jwt is disabled because sb_secret_* is not a JWT. Authenticate the
+  // Worker independently with a high-entropy shared secret stored as a function secret.
+  if (!hasInternalServiceSecret(request)) return json({ success: false, error: "Forbidden" }, 403);
 
   try {
     const body = await request.json();
