@@ -690,6 +690,13 @@ async function customerCheckPromo(request, body, env) {
   return json({ success: true, promo: promo || { valid: false, reason: "not_found" } });
 }
 
+/* ---------------- PUBLIC STOREFRONT SETTINGS ---------------- */
+// Never expose the private coupons array or admin-only sales adjustments to anonymous browsers.
+async function publicSettings(env) {
+  const rows = await dbRequest(env, "settings?select=id,shopName,shopPhone,shopAddress,logoUrl,promoText,promoActive,adActive,adImages,adText,adEndTime,customPrices&limit=1");
+  return json({ success: true, settings: rows?.[0] || {} });
+}
+
 /* ---------------- ADMIN ORDERS ---------------- */
 
 async function listOrders(env) {
@@ -1129,6 +1136,9 @@ async function handleRequest(request, env) {
       switch (action) {
         case "health":
           return json({ success: true, service: "thier-decor-api-v2", version: 2 });
+
+        case "publicSettings":
+          return await publicSettings(env);
 
         case "customerLogin":
           return await customerLogin(request, body, env);
