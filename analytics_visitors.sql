@@ -1,3 +1,8 @@
+-- LEGACY REVIEW NOTE: this file defines the older td_visit_events/public RPC approach.
+-- The current V2 Worker uses td_visit_sessions + td_record_visit_safe, defined in
+-- THIER_DECOR_FINAL_SECURITY_AND_ORDER_MUTATIONS_REVIEW.sql. Do not run this file
+-- as a separate migration in the new environment unless the schema plan is revised.
+
 -- Thier Décor: privacy-minimised visit counters.
 -- Run this script in Supabase SQL Editor. It records one visit per browser tab session.
 create table if not exists public.td_visit_events (
