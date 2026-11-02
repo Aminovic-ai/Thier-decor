@@ -13,10 +13,10 @@ This change keeps the existing `pbkdf2$iterations$salt$hash` database format and
 
 **Do not deploy the Worker change before the Edge Function is deployed and tested.** Otherwise registration, login, and password recovery will return a server error while the function endpoint is missing.
 
-1. Deploy `supabase/functions/customer-password/index.ts` to project `xdsbnmtthvqgdlytwpes` with the included `supabase/config.toml` setting:
+1. Deploy `supabase/functions/customer-password/index.ts` to the new Supabase project `YOUR_NEW_PROJECT_REF` with the included `supabase/config.toml` setting:
    ```sh
-   supabase secrets set CUSTOMER_PASSWORD_SERVICE_SECRET='<locally-generated-secret>' --project-ref xdsbnmtthvqgdlytwpes
-   supabase functions deploy customer-password --project-ref xdsbnmtthvqgdlytwpes
+   supabase secrets set CUSTOMER_PASSWORD_SERVICE_SECRET='<locally-generated-secret>' --project-ref YOUR_NEW_PROJECT_REF
+   supabase functions deploy customer-password --project-ref YOUR_NEW_PROJECT_REF
    ```
 2. Generate a new random secret of at least 32 bytes locally. Set the exact same value as the Supabase Edge Function secret `CUSTOMER_PASSWORD_SERVICE_SECRET` and as a Cloudflare Worker secret with the same name. Never paste it into chat, source control, or browser code. Keep the existing `SUPABASE_SERVICE_ROLE_KEY` secret; it must contain the Supabase `sb_secret_` key.
 3. Confirm the function has `verify_jwt = false`. The function still rejects requests without the separate internal secret. The Worker sends the Supabase secret key in `apikey` and the shared secret in `x-td-internal-key` (not as a Bearer JWT).
