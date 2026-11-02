@@ -105,6 +105,23 @@ async function fetchAdminDataViaWorker() {
     return result.data;
 }
 
+async function fetchPublicSettingsViaWorker() {
+    ensureApiConfigured();
+    const response = await fetch(TD_ADMIN_API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'publicSettings' }),
+        cache: 'no-store'
+    });
+    let result;
+    try { result = await response.json(); }
+    catch (_) { throw new Error(state.currentLang === 'fr' ? 'Réponse des paramètres invalide.' : 'ردّ إعدادات المتجر غير صالح.'); }
+    if (!response.ok || result?.success !== true || !result.settings || typeof result.settings !== 'object') {
+        throw new Error(result?.error || (state.currentLang === 'fr' ? 'Impossible de charger les paramètres.' : 'تعذر جلب إعدادات المتجر.'));
+    }
+    return result.settings;
+}
+
 let state = { products: [], orders: [], expenses: [], customers: [], messages: [], requests: [], session: null, cart: [], wishlist: [], currentLang: 'ar', settings: { shopName: 'Thier Décor', shopPhone: '', promoText: '', promoActive: false, customPrices: {}, manualSalesAdjustment: 0, adActive: false, adImages: [], adText: '', adEndTime: '', coupons: [] } };
 window.state = state;
 let currentCategory = 'all'; let currentOrderFilter = 'all'; let tempUploadedImages = []; let currentAuthMode = 'login'; let pendingCheckout = false;
@@ -1254,12 +1271,18 @@ async function loadOrdersListener(options = {}) {
             if (!productsError && products) { state.products = products; save(K.products, products); lastProductsFetchAt = now; } else if (productsError) console.error('Supabase products read failed:', productsError.message);
         }
         if (options.forceSettings || !state.settings || (now - lastSettingsFetchAt) >= SETTINGS_CACHE_TTL_MS) {
-            const { data: settings, error: settingsError } = await window.supabaseClient.from('settings').select('*').eq('id', 1).single();
-            if (!settingsError && settings) { state.settings = settings; save(K.settings, settings); lastSettingsFetchAt = now; } else if (settingsError) console.error('Supabase settings read failed:', settingsError.message);
+            try {
+                const settings = await fetchPublicSettingsViaWorker();
+                state.settings = settings;
+                save(K.settings, settings);
+                lastSettingsFetchAt = now;
+            } catch (settingsError) {
+                console.error('Public settings Worker read failed:', settingsError.message || settingsError);
+            }
         }
         
         const currentFirebaseUser = Boolean(window.firebaseReady && typeof firebase !== 'undefined' && firebase.auth && firebase.auth().currentUser);
-        const isFirebaseAdmin = currentFirebaseUser && firebase.auth().currentUser.uid === 'DNlHoogN8vMCsZN0hyIC6yPS64J2';
+        const isFirebaseAdmin = currentFirebaseUser && firebase.auth().currentUser.uid === TD_ADMIN_UID;
         if (state.session && state.session.role === 'customer' && !isFirebaseAdmin) {
             // Customer-private orders/messages are fetched only through the signed-session Worker.
             try {
@@ -1309,6 +1332,7 @@ async function loadOrdersListener(options = {}) {
             if (shouldRefreshAdminData) {
                 try {
                     const adminData = await fetchAdminDataViaWorker();
+                    if (adminData.settings && typeof adminData.settings === 'object') { state.settings = adminData.settings; save(K.settings, adminData.settings); }
                     if (Array.isArray(adminData.customers)) { state.customers = adminData.customers; save(K.customers, adminData.customers); renderAdminCustomers(document.getElementById('admin-customer-search')?.value || ''); }
                     if (Array.isArray(adminData.messages)) { state.messages = adminData.messages; save(K.messages, adminData.messages); }
                     if (Array.isArray(adminData.requests)) { state.requests = adminData.requests; save(K.requests, adminData.requests); }
@@ -1339,7 +1363,7 @@ function setupRealtimeListeners() {
     
     // هذا السطر هو التعديل: يسمح للمدير بالاتصال حتى لو لم يكن Firebase نشطاً
     const firebaseUser = Boolean(window.firebaseReady && typeof firebase !== 'undefined' && firebase.auth && firebase.auth().currentUser);
-    const isAdmin = (firebaseUser && firebase.auth().currentUser.uid === 'DNlHoogN8vMCsZN0hyIC6yPS64J2') || (state.session && state.session.role === 'admin');
+    const isAdmin = (firebaseUser && firebase.auth().currentUser.uid === TD_ADMIN_UID) || (state.session && state.session.role === 'admin');
     
     if (!isAdmin) return; 
     
