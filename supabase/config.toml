@@ -1,2 +1,2 @@
 [functions.customer-password]
-verify_jwt = true
+verify_jwt = false
