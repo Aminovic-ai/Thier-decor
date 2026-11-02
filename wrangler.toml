@@ -1,13 +1,9 @@
-name = "thier-decor-api"
+name = "thier-decor-api-v2"
 main = "thier-decor-api.js"
-compatibility_date = "2026-10-31"
+compatibility_date = "2026-11-02"
 compatibility_flags = ["nodejs_compat"]
 workers_dev = true
 
-[vars]
-SUPABASE_URL = "https://xdsbnmtthvqgdlytwpes.supabase.co"
-
-# Configure secrets only in Cloudflare Worker settings:
-# SUPABASE_SERVICE_ROLE_KEY, FIREBASE_API_KEY,
-# CUSTOMER_SESSION_SECRET, AUTH_RATE_SECRET, VISIT_RATE_SECRET
-# Variable: ADMIN_UID
+# Project-specific public variables are injected by the deployment workflow.
+# SUPABASE_URL and ALLOWED_ORIGINS must be configured in the GitHub Environment.
+# Never place service keys or shared secrets in this file.
