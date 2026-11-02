@@ -72,7 +72,7 @@ function constantTimeEqual(a, b) {
   return diff === 0;
 }
 async function passwordServiceRequest(payload, env) {
-  if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) throw new Error("Password service configuration is missing");
+  if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY || !env.CUSTOMER_PASSWORD_SERVICE_SECRET) throw new Error("Password service configuration is missing");
   let base = env.SUPABASE_URL;
   while (base.endsWith("/")) base = base.slice(0, -1);
   const endpoint = base + "/functions/v1/customer-password";
@@ -80,7 +80,7 @@ async function passwordServiceRequest(payload, env) {
     method: "POST",
     headers: {
       "apikey": env.SUPABASE_SERVICE_ROLE_KEY,
-      "Authorization": "Bearer " + env.SUPABASE_SERVICE_ROLE_KEY,
+      "x-td-internal-key": env.CUSTOMER_PASSWORD_SERVICE_SECRET || "",
       "Content-Type": "application/json"
     },
     body: JSON.stringify(payload)
