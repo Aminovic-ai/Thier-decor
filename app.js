@@ -1465,83 +1465,102 @@ document.addEventListener('DOMContentLoaded', () => {
     renderCategories(); renderShop(); renderPromoBanner(); updateStoreBranding(); updateUIBasedOnSession(); updateCartBadge(); updateWishlistBadge();
 
     (function initAdminLongPress() {
-        const waitForButtons = setInterval(() => {
-            const langButtons = [
-                document.getElementById('lang-btn'),
-                document.getElementById('mobile-lang-btn')
-            ].filter(Boolean);
-            if (!langButtons.length) return;
-            clearInterval(waitForButtons);
+        // Bind after the DOM is ready and support touch screens reliably.
+        const langButtons = [
+            document.getElementById('lang-btn'),
+            document.getElementById('mobile-lang-btn')
+        ].filter(Boolean);
 
-            langButtons.forEach((langBtn) => {
-                const isMobileLanguageButton = langBtn.id === 'mobile-lang-btn';
-                let pressTimer = null;
-                let progressRAF = null;
-                let startTime = 0;
-                let longPressTriggered = false;
-                let progressEl = null;
+        langButtons.forEach((langBtn) => {
+            if (langBtn.dataset.adminLongPressBound === '1') return;
+            langBtn.dataset.adminLongPressBound = '1';
 
-                const cleanup = () => {
-                    clearTimeout(pressTimer);
-                    cancelAnimationFrame(progressRAF);
-                    if (progressEl && progressEl.parentNode) progressEl.remove();
-                    progressEl = null;
-                };
+            const isMobileLanguageButton = langBtn.id === 'mobile-lang-btn';
+            let pressTimer = null;
+            let progressRAF = null;
+            let startTime = 0;
+            let longPressTriggered = false;
+            let suppressNextClick = false;
+            let progressEl = null;
+            let activePointerId = null;
 
-                const startPress = () => {
-                    cleanup();
-                    longPressTriggered = false;
-                    startTime = Date.now();
-                    progressEl = document.createElement('span');
-                    progressEl.className = 'lang-press-progress';
-                    langBtn.appendChild(progressEl);
+            // Prevent touch scrolling/context-menu cancellation while pressing this control.
+            langBtn.style.touchAction = 'none';
+            langBtn.style.userSelect = 'none';
+            langBtn.style.webkitUserSelect = 'none';
+            langBtn.style.webkitTouchCallout = 'none';
+            langBtn.style.position = langBtn.style.position || 'relative';
+            langBtn.style.overflow = 'hidden';
 
-                    pressTimer = setTimeout(() => {
-                        longPressTriggered = true;
-                        cleanup();
-                        if (navigator.vibrate) navigator.vibrate(100);
-                        goScreen('screen-admin-login');
-                    }, 5000);
+            const cleanup = () => {
+                clearTimeout(pressTimer);
+                if (progressRAF) cancelAnimationFrame(progressRAF);
+                pressTimer = null;
+                progressRAF = null;
+                if (progressEl && progressEl.parentNode) progressEl.remove();
+                progressEl = null;
+            };
 
-                    const tick = () => {
-                        const pct = Math.min((Date.now() - startTime) / 5000, 1);
-                        if (progressEl) progressEl.style.setProperty('--p', pct);
-                        if (pct < 1) progressRAF = requestAnimationFrame(tick);
-                    };
-                    progressRAF = requestAnimationFrame(tick);
-                };
-
-                const endPress = () => {
-                    if (!longPressTriggered) cleanup();
-                };
-
-                langBtn.addEventListener('pointerdown', startPress);
-                langBtn.addEventListener('pointerup', endPress);
-                langBtn.addEventListener('pointerleave', endPress);
-                langBtn.addEventListener('pointercancel', endPress);
-
-                if (isMobileLanguageButton) {
-                    // The mobile button already has an inline short-click language toggle.
-                    // Capture the click only after a completed long press so it cannot toggle language.
-                    langBtn.addEventListener('click', (event) => {
-                        if (!longPressTriggered) return;
-                        event.preventDefault();
-                        event.stopImmediatePropagation();
-                        longPressTriggered = false;
-                    }, true);
-                } else {
-                    langBtn.addEventListener('click', (event) => {
-                        if (longPressTriggered) {
-                            event.preventDefault();
-                            event.stopImmediatePropagation();
-                            longPressTriggered = false;
-                            return;
-                        }
-                        switchLanguage(state.currentLang === 'ar' ? 'fr' : 'ar');
-                    });
+            const startPress = (event) => {
+                if (event && event.pointerType === 'mouse' && event.button !== 0) return;
+                cleanup();
+                longPressTriggered = false;
+                activePointerId = event?.pointerId ?? null;
+                if (activePointerId !== null && langBtn.setPointerCapture) {
+                    try { langBtn.setPointerCapture(activePointerId); } catch (_) {}
                 }
-            });
-        }, 300);
+
+                startTime = Date.now();
+                progressEl = document.createElement('span');
+                progressEl.className = 'lang-press-progress';
+                progressEl.style.cssText = 'position:absolute;inset:0;pointer-events:none;border-radius:inherit;background:rgba(37,99,235,.18);transform:scaleX(0);transform-origin:left;z-index:5;';
+                langBtn.appendChild(progressEl);
+
+                pressTimer = setTimeout(() => {
+                    longPressTriggered = true;
+                    suppressNextClick = true;
+                    cleanup();
+                    if (navigator.vibrate) navigator.vibrate(100);
+                    goScreen('screen-admin-login');
+                }, 5000);
+
+                const tick = () => {
+                    const pct = Math.min((Date.now() - startTime) / 5000, 1);
+                    if (progressEl) progressEl.style.transform = 'scaleX(' + pct + ')';
+                    if (pct < 1) progressRAF = requestAnimationFrame(tick);
+                };
+                progressRAF = requestAnimationFrame(tick);
+            };
+
+            const endPress = () => {
+                cleanup();
+                activePointerId = null;
+            };
+
+            langBtn.addEventListener('pointerdown', startPress);
+            langBtn.addEventListener('pointerup', endPress);
+            langBtn.addEventListener('pointercancel', endPress);
+            // Do not cancel on pointerleave: touch browsers may emit it while the finger
+            // remains pressed. Pointer capture keeps the press attached to this button.
+            langBtn.addEventListener('lostpointercapture', endPress);
+
+            // Capture the generated click before the inline mobile language handler runs.
+            langBtn.addEventListener('click', (event) => {
+                if (suppressNextClick || longPressTriggered) {
+                    event.preventDefault();
+                    event.stopImmediatePropagation();
+                    suppressNextClick = false;
+                    longPressTriggered = false;
+                    return;
+                }
+                if (!isMobileLanguageButton) {
+                    event.preventDefault();
+                    switchLanguage(state.currentLang === 'ar' ? 'fr' : 'ar');
+                }
+            }, true);
+
+            langBtn.addEventListener('contextmenu', (event) => event.preventDefault());
+        });
     })();
 
     if (window.supabaseClient) {
