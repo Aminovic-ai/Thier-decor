@@ -646,3 +646,29 @@ a { text-underline-offset: 3px; }
   }
   #screen-shop .header-actions { display: none !important; }
 }
+
+
+/* Product card refinement: image, icon actions, title, then price. */
+#screen-shop .product-card{display:flex!important;flex-direction:column!important;overflow:hidden;min-width:0;height:100%;border:1px solid #e1ebf2!important;border-radius:16px!important;background:#fff!important;box-shadow:0 5px 18px rgba(28,74,105,.07)!important}
+#screen-shop .product-card .product-img{order:0;flex:0 0 auto;display:flex;align-items:center;justify-content:center;width:100%;background:#f1f5f8!important;border:0!important;border-radius:0!important}
+#screen-shop .product-card .product-img img{display:block;width:100%;height:100%;object-fit:contain!important;object-position:center}
+#screen-shop .product-card>.product-actions-under-image{order:1;display:flex!important;align-items:center;justify-content:center!important;gap:10px!important;width:100%;padding:10px 14px 2px!important;margin:0!important;border:0!important;background:#fff!important}
+#screen-shop .product-card>.product-actions-under-image .product-mini-action{display:inline-flex;flex:1 1 0;align-items:center;justify-content:center;max-width:76px;min-height:40px;border:1px solid #dce8f0;border-radius:11px;background:#f6fbfe;color:#315f7c;cursor:pointer;transition:background .18s ease,transform .18s ease}
+#screen-shop .product-card>.product-actions-under-image .product-mini-action:hover{background:#eaf6fd;transform:translateY(-1px)}
+#screen-shop .product-card>.product-actions-under-image .product-mini-action.is-favorite{color:#e04468;background:#fff1f4;border-color:#ffd2dc}
+#screen-shop .product-card>.product-info{order:2;display:flex!important;flex:1 1 auto;flex-direction:column;gap:7px!important;min-width:0;padding:10px 14px 15px!important;text-align:center}
+#screen-shop .product-card>.product-info h3{min-height:2.8em;margin:0!important;overflow:hidden;color:#233e53;font-size:.96rem;font-weight:800;line-height:1.45;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2}
+#screen-shop .product-card>.product-info .product-price-box{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:center;gap:6px;margin:auto 0 0!important;color:#087f5b;font-size:1.08rem;font-weight:900}
+@media(max-width:680px){#screen-shop .product-card .product-img{height:164px!important;min-height:164px!important;padding:9px!important}#screen-shop .product-card>.product-actions-under-image{gap:8px!important;padding:8px 10px 0!important}#screen-shop .product-card>.product-actions-under-image .product-mini-action{min-height:38px;max-width:none}#screen-shop .product-card>.product-info{padding:8px 10px 12px!important;gap:5px!important}#screen-shop .product-card>.product-info h3{font-size:.88rem;min-height:2.8em}#screen-shop .product-card>.product-info .product-price-box{font-size:.98rem}}
+
+/* Elegant floating mobile navigation with light, refined labels. */
+@media(max-width:680px){
+.mobile-bottom-nav{inset-inline:10px!important;bottom:calc(8px + env(safe-area-inset-bottom))!important;min-height:68px!important;padding:7px 7px calc(7px + env(safe-area-inset-bottom))!important;border:1px solid rgba(213,229,239,.95)!important;border-radius:19px!important;background:rgba(255,255,255,.94)!important;box-shadow:0 8px 30px rgba(32,75,101,.14),0 2px 7px rgba(32,75,101,.06)!important;backdrop-filter:blur(18px) saturate(1.25)!important;-webkit-backdrop-filter:blur(18px) saturate(1.25)!important}
+.mobile-nav-item{gap:4px!important;min-height:52px!important;padding:5px 2px 4px!important;border-radius:13px!important;color:#7890a1!important;font-size:.68rem!important;font-weight:500!important;letter-spacing:.1px;line-height:1.2!important;transition:color .2s ease,background .2s ease,transform .2s ease!important}
+.mobile-nav-item i{font-size:1.12rem!important;line-height:1.15!important;color:#8299a9!important;transition:color .2s ease,transform .2s ease!important}
+.mobile-nav-item.active{color:#167eae!important;background:linear-gradient(180deg,#eef8fd 0%,#f8fcff 100%)!important;font-weight:650!important}
+.mobile-nav-item.active:before{content:"";position:absolute;top:2px;left:50%;width:19px;height:3px;border-radius:4px;background:#2697c8;transform:translateX(-50%)}
+.mobile-nav-item.active i{color:#1688bd!important;transform:translateY(-1px)}
+.mobile-nav-badge{top:0!important;min-width:15px!important;height:15px!important;padding:0 4px!important;border:2px solid #fff;font-size:9px!important;font-weight:700!important;line-height:12px!important}
+#screen-shop{padding-bottom:calc(88px + env(safe-area-inset-bottom))!important}
+}
