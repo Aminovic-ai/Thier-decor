@@ -570,3 +570,65 @@ a { text-underline-offset: 3px; }
   }
   #screen-shop .store-main { padding-bottom:12px; }
 }
+
+
+/* Compact mobile product cards: keep two columns and show more products per screen. */
+@media (max-width: 680px) {
+  #screen-shop #s-products.store-products-grid,
+  #screen-shop .store-products-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    align-items: start !important;
+    column-gap: 10px !important;
+    row-gap: 12px !important;
+    padding: 8px 0 14px !important;
+  }
+  #screen-shop .store-products-grid .product-card {
+    min-height: 0 !important;
+    height: auto !important;
+    border-radius: 13px !important;
+    overflow: hidden;
+  }
+  #screen-shop .store-products-grid .product-card .product-img {
+    height: 194px !important;
+    min-height: 194px !important;
+    max-height: 194px !important;
+    padding: 8px !important;
+    aspect-ratio: auto !important;
+    background: #e5e7eb !important;
+  }
+  #screen-shop .store-products-grid .product-card .product-img img {
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: contain !important;
+    object-position: center !important;
+    transform: none !important;
+  }
+  #screen-shop .store-products-grid .product-info {
+    min-height: 0 !important;
+    gap: 7px !important;
+    padding: 10px 10px 11px !important;
+  }
+  #screen-shop .store-products-grid .product-info h3 {
+    min-height: 2.7em !important;
+    max-height: 2.7em !important;
+    overflow: hidden !important;
+    font-size: .88rem !important;
+    line-height: 1.35 !important;
+    -webkit-line-clamp: 2 !important;
+  }
+  #screen-shop .store-products-grid .product-price-box {
+    margin: 0 !important;
+    font-size: 1rem !important;
+    line-height: 1.3 !important;
+  }
+  #screen-shop .store-products-grid .product-actions-under-image {
+    display: flex !important;
+    gap: 7px !important;
+    margin-top: 2px !important;
+  }
+  #screen-shop .store-products-grid .product-mini-action {
+    height: 38px !important;
+    min-height: 38px !important;
+    border-radius: 9px !important;
+  }
+}
