@@ -3249,6 +3249,17 @@ window.renderAdminRequests = renderAdminRequests;
     document.addEventListener('click', event => {
         if (event.target.closest('.mobile-nav-item')) setTimeout(updateNav, 0);
     });
+    document.addEventListener('click', event => {
+        const categoryButton = event.target.closest('.mobile-nav-item[data-mobile-page="categories"]');
+        if (!categoryButton) return;
+        const shop = document.getElementById('screen-shop');
+        if (!shop) return;
+        shop.classList.toggle('mobile-categories-open');
+        const bar = document.getElementById('mobile-category-bar');
+        if (bar && shop.classList.contains('mobile-categories-open')) {
+            bar.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+    });
     const cartBadge = document.getElementById('cart-badge');
     const wishBadge = document.getElementById('wishlist-badge');
     const syncBadges = () => {
