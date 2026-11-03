@@ -1099,7 +1099,7 @@ a { text-underline-offset: 3px; }
 #screen-admin button:focus-visible,#screen-admin a:focus-visible{
   outline:3px solid rgba(113,143,117,.28);outline-offset:2px
 }
-#screen-admin .admin-section .fa,.#screen-admin .admin-section i{vertical-align:middle}
+#screen-admin .admin-section .fa,#screen-admin .admin-section i{vertical-align:middle}
 @media(max-width:900px){
   #screen-admin .admin-sidebar{width:220px}
 }
