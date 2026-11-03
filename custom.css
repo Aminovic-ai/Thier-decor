@@ -782,3 +782,46 @@ a { text-underline-offset: 3px; }
     z-index: 1 !important;
   }
 }
+
+
+/* Premium customer account area */
+.customer-area-page{max-width:1120px;margin-inline:auto;padding:clamp(14px,2.5vw,28px)!important;color:var(--text-dark,#172033)}
+.customer-page-heading{display:flex;align-items:center;justify-content:space-between;gap:16px;margin:4px 0 20px}
+.customer-page-heading h2{margin:4px 0 5px;font-size:clamp(1.35rem,2.4vw,1.9rem);font-weight:800;letter-spacing:-.035em}
+.customer-page-heading p,.customer-panel-heading p{margin:0;color:var(--text-mid,#718096);font-size:.88rem;line-height:1.7}
+.customer-eyebrow,.customer-panel-kicker{font-size:.66rem;letter-spacing:.16em;font-weight:800;color:#6393b9}
+.customer-heading-icon{width:48px;height:48px;display:grid;place-items:center;border-radius:16px;background:#edf6fc;color:#3d82b5;font-size:1.35rem}
+.customer-welcome-card{position:relative;overflow:hidden;display:flex;align-items:center;justify-content:space-between;gap:20px;min-height:178px;padding:26px 30px;border-radius:24px;background:linear-gradient(115deg,#102d49 0%,#174c70 58%,#2c7899 100%);color:#fff;box-shadow:0 14px 35px rgba(20,62,91,.14)}
+.customer-welcome-copy{position:relative;z-index:1}
+.customer-welcome-kicker{font-size:.66rem;letter-spacing:.2em;font-weight:800;color:#b9d9eb}
+.customer-welcome-copy h3{font-size:clamp(1.35rem,3vw,2rem);margin:8px 0 5px;font-weight:800}
+.customer-welcome-copy p{margin:0;color:#d5e6f1;font-size:.88rem}
+.customer-loyalty-card{position:relative;z-index:1;min-width:155px;padding:15px 18px;border:1px solid rgba(255,255,255,.22);border-radius:17px;background:rgba(255,255,255,.12);backdrop-filter:blur(10px);display:flex;flex-direction:column;gap:5px}
+.customer-loyalty-card>span{font-size:.78rem;color:#e4f1f8}.customer-loyalty-card>span i{color:#f5d58b;margin-inline-end:5px}
+.customer-loyalty-card strong{font-size:2rem;line-height:1.1}.customer-loyalty-card small{font-size:.58rem;letter-spacing:.18em;color:#c3dce9}
+.customer-welcome-decoration{position:absolute;inset-inline-end:34%;top:-48px;font-size:13rem;color:rgba(255,255,255,.045);transform:rotate(-14deg);pointer-events:none}
+.customer-shortcuts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:17px 0 22px}
+.customer-shortcut{min-width:0;display:flex;align-items:center;gap:10px;padding:14px 13px;border:1px solid #e7edf2;border-radius:17px;background:#fff;color:#26384a;text-align:start;font:inherit;font-weight:700;box-shadow:0 5px 16px rgba(25,55,80,.035);transition:transform .2s,border-color .2s,box-shadow .2s;cursor:pointer}
+.customer-shortcut:hover{transform:translateY(-2px);border-color:#b9d6e8;box-shadow:0 9px 22px rgba(25,75,110,.09)}
+.customer-shortcut-icon{flex:0 0 37px;width:37px;height:37px;display:grid;place-items:center;border-radius:12px;background:#edf6fb;color:#347da9;font-size:1rem}
+.customer-shortcut-arrow{margin-inline-start:auto;color:#9aabba;font-size:.72rem}
+.customer-profile-panel{padding:24px 26px;border:1px solid #e8edf2;border-radius:22px;background:#fff;box-shadow:0 8px 26px rgba(25,55,80,.045)}
+.customer-panel-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-bottom:18px;border-bottom:1px solid #edf1f4}
+.customer-panel-heading h3{margin:5px 0;font-size:1.12rem;font-weight:800;color:#20364a}
+.customer-panel-heading h3 i{color:#4789b5;margin-inline-end:5px}
+.customer-secure-mark{width:42px;height:42px;display:grid;place-items:center;border-radius:14px;background:#eff8f4;color:#35936b;font-size:1.15rem}
+.customer-profile-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:15px 18px;padding-top:20px}
+.customer-profile-fields .form-group{margin:0}
+.customer-profile-fields label{display:flex;align-items:center;gap:7px;margin-bottom:8px;font-size:.82rem;font-weight:700;color:#43576a}
+.customer-profile-fields label i{color:#6d9bb9;font-size:.8rem}
+.customer-profile-fields input{width:100%;min-height:47px;padding:11px 13px;border:1px solid #dfe7ed;border-radius:12px;background:#fbfdfe;color:#24384a;font:inherit;transition:border-color .2s,box-shadow .2s}
+.customer-profile-fields input:focus{outline:none;border-color:#78acd0;box-shadow:0 0 0 3px rgba(76,145,190,.12);background:#fff}
+.customer-address-field{grid-column:1/-1}
+.customer-profile-actions{display:flex;align-items:center;gap:14px;margin-top:20px;padding-top:18px;border-top:1px solid #edf1f4}
+.customer-save-profile{width:auto!important;min-width:190px;min-height:45px;padding:10px 20px!important;border-radius:12px!important;font-weight:750!important}
+.customer-logout-link{display:inline-flex;align-items:center;gap:8px;padding:10px 12px;border:0;background:transparent;color:#b45c61;font:inherit;font-size:.84rem;font-weight:700;cursor:pointer}
+.customer-logout-link:hover{color:#923d43}
+.customer-help-note{display:flex;align-items:center;gap:10px;margin-top:16px;padding:13px 16px;border-radius:14px;background:#f1f7fb;color:#5b7182;font-size:.8rem}
+.customer-help-note>i{color:#5792b8}.customer-help-note button{margin-inline-start:auto;border:0;background:transparent;color:#347da9;font:inherit;font-weight:750;white-space:nowrap;cursor:pointer}
+@media(max-width:700px){.customer-area-page{padding:12px!important}.customer-page-heading{margin-bottom:14px}.customer-welcome-card{min-height:155px;padding:19px 17px;border-radius:19px;align-items:flex-start}.customer-welcome-copy p{max-width:205px;font-size:.78rem}.customer-loyalty-card{min-width:104px;padding:11px 12px;border-radius:14px}.customer-loyalty-card>span{font-size:.68rem}.customer-loyalty-card strong{font-size:1.65rem}.customer-welcome-decoration{inset-inline-end:25%;font-size:9rem}.customer-shortcuts{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin:12px 0 16px}.customer-shortcut{padding:11px 10px;gap:8px;border-radius:14px;font-size:.8rem}.customer-shortcut-icon{width:34px;height:34px;flex-basis:34px}.customer-profile-panel{padding:18px 14px;border-radius:18px}.customer-profile-fields{grid-template-columns:1fr;gap:13px;padding-top:16px}.customer-address-field{grid-column:auto}.customer-profile-actions{align-items:stretch;flex-direction:column;gap:6px}.customer-save-profile{width:100%!important}.customer-logout-link{justify-content:center}.customer-help-note{align-items:flex-start;flex-wrap:wrap;line-height:1.6}.customer-help-note button{margin-inline-start:0;margin-inline-end:auto}}
+@media(min-width:701px) and (max-width:950px){.customer-shortcuts{grid-template-columns:repeat(2,minmax(0,1fr))}}

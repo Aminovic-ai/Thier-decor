@@ -91,16 +91,32 @@
             <div class="page" id="s-myrequests"><div class="section-header"><h2 data-i18n="my_requests">📋 طلباتي الخاصة</h2></div><div id="s-myrequests-list"></div></div>
             <div class="page" id="s-messages"><div class="section-header"><h2 data-i18n="my_messages">📩 رسائلي</h2></div><div id="s-customer-messages-list"></div></div>
             <div class="page" id="s-notifications"><div class="section-header"><h2 data-i18n="notifications">الإشعارات</h2><button class="btn-secondary" onclick="markCustomerNotificationsRead()" style="width:auto;"> <span data-i18n="mark_all_read">تحديد الكل كمقروء</span></button></div><div id="s-customer-notifications-list"></div></div>
-            <div class="page" id="s-profile">
-                <div class="section-header"><h2 data-i18n="profile_title">👤 الملف الشخصي</h2></div>
-                <div class="profile-box">
-                    <div style="background:linear-gradient(135deg, #fbbf24, #f59e0b); padding:15px; border-radius:10px; margin-bottom:15px; text-align:center; color:#fff;"><i class="fas fa-gift" style="font-size:2rem;"></i><h3 style="margin:5px 0;" data-i18n="points_title">نقاط الولاء</h3><h2 style="margin:0; font-size:1.5rem;" id="p-points">0</h2></div>
-                    <div class="form-group"><label data-i18n="full_name">الاسم</label><input type="text" id="p-name"></div>
-                    <div class="form-group"><label data-i18n="phone">الهاتف</label><input type="tel" id="p-phone"></div>
-                    <div class="form-group"><label data-i18n="address">العنوان</label><input type="text" id="p-address"></div>
-                    <button class="btn-primary" onclick="updateCustomerProfile()" style="width:100%;" data-i18n="save">حفظ</button>
-                    <button class="btn-danger" onclick="logoutCustomer()" style="margin-top:10px;width:100%;" data-i18n="logout">خروج</button>
+            <div class="page customer-area-page" id="s-profile">
+                <div class="customer-page-heading">
+                    <div><span class="customer-eyebrow" data-i18n="customer_space">THIER DÉCOR · MY SPACE</span><h2 data-i18n="profile_title">الملف الشخصي</h2><p><span data-i18n="customer_intro">مساحتك الخاصة لمتابعة مشترياتك وإدارة حسابك بسهولة.</span></p></div>
+                    <span class="customer-heading-icon"><i class="fas fa-user-circle"></i></span>
                 </div>
+                <section class="customer-welcome-card">
+                    <div class="customer-welcome-copy"><span class="customer-welcome-kicker"><span data-i18n="welcome_back">WELCOME BACK</span></span><h3 id="customer-profile-name">مرحباً بك</h3><p><span data-i18n="customer_welcome_desc">كل ما تحتاجه لتجربة تسوق أسهل، في مكان واحد.</span></p></div>
+                    <div class="customer-loyalty-card"><span><i class="fas fa-crown"></i> <span data-i18n="points_title">نقاط الولاء</span></span><strong id="p-points">0</strong><small data-i18n="rewards_label">THIER REWARDS</small></div>
+                    <div class="customer-welcome-decoration"><i class="fas fa-sparkles"></i></div>
+                </section>
+                <section class="customer-shortcuts" aria-label="روابط حساب الزبون">
+                    <button type="button" class="customer-shortcut" onclick="shopGo('orders')"><span class="customer-shortcut-icon"><i class="fas fa-box-open"></i></span><span data-i18n="orders_title">طلباتي</span><i class="fas fa-arrow-left customer-shortcut-arrow"></i></button>
+                    <button type="button" class="customer-shortcut" onclick="shopGo('messages')"><span class="customer-shortcut-icon"><i class="fas fa-comments"></i></span><span data-i18n="my_messages">رسائلي</span><i class="fas fa-arrow-left customer-shortcut-arrow"></i></button>
+                    <button type="button" class="customer-shortcut" onclick="shopGo('wishlist')"><span class="customer-shortcut-icon"><i class="fas fa-heart"></i></span><span data-i18n="wishlist_title">مفضلتي</span><i class="fas fa-arrow-left customer-shortcut-arrow"></i></button>
+                    <button type="button" class="customer-shortcut" onclick="shopGo('notifications')"><span class="customer-shortcut-icon"><i class="fas fa-bell"></i></span><span data-i18n="notifications">الإشعارات</span><i class="fas fa-arrow-left customer-shortcut-arrow"></i></button>
+                </section>
+                <section class="customer-profile-panel">
+                    <div class="customer-panel-heading"><div><span class="customer-panel-kicker" data-i18n="account_settings">ACCOUNT SETTINGS</span><h3><i class="fas fa-id-card"></i> <span data-i18n="profile_title">بيانات حسابي</span></h3><p><span data-i18n="customer_profile_hint">تأكد من صحة معلوماتك حتى تصلك طلباتك بسهولة.</span></p></div><span class="customer-secure-mark"><i class="fas fa-shield-alt"></i></span></div>
+                    <div class="customer-profile-fields">
+                        <div class="form-group"><label for="p-name"><i class="fas fa-user"></i> <span data-i18n="full_name">الاسم الكامل</span></label><input type="text" id="p-name" autocomplete="name" placeholder="" data-i18n-placeholder="full_name"></div>
+                        <div class="form-group"><label for="p-phone"><i class="fas fa-phone-alt"></i> <span data-i18n="phone">رقم الهاتف</span></label><input type="tel" id="p-phone" autocomplete="tel" inputmode="tel" dir="ltr"></div>
+                        <div class="form-group customer-address-field"><label for="p-address"><i class="fas fa-map-marker-alt"></i> <span data-i18n="address">العنوان</span></label><input type="text" id="p-address" autocomplete="street-address" placeholder="" data-i18n-placeholder="address"></div>
+                    </div>
+                    <div class="customer-profile-actions"><button class="btn-primary customer-save-profile" onclick="updateCustomerProfile()"><i class="fas fa-check-circle"></i> <span data-i18n="save">حفظ التغييرات</span></button><button class="customer-logout-link" onclick="logoutCustomer()"><i class="fas fa-sign-out-alt"></i> <span data-i18n="logout">تسجيل الخروج</span></button></div>
+                </section>
+                <div class="customer-help-note"><i class="fas fa-info-circle"></i><span><span data-i18n="customer_help_text">تحتاج إلى مساعدة؟ يمكنك مراسلة فريق المتجر من قسم «رسائلي».</span></span><button type="button" onclick="shopGo('messages')">رسائلي <i class="fas fa-arrow-left"></i></button></div>
             </div>
         </main>
         <nav class="mobile-bottom-nav" id="mobile-bottom-nav" aria-label="التنقل الرئيسي">
