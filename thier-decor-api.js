@@ -91,7 +91,7 @@ function constantTimeEqual(a, b) {
   for (let i = 0; i < length; i++) diff |= (left.charCodeAt(i) || 0) ^ (right.charCodeAt(i) || 0);
   return diff === 0;
 }
-async function pbkdf2Hash(value, saltBytes = null, iterations = 310000) {
+async function pbkdf2Hash(value, saltBytes = null, iterations = 310000, env = null) {
   if (!Number.isInteger(iterations) || iterations < 100000 || iterations > 1000000) {
     throw new Error("Invalid PBKDF2 work factor");
   }
@@ -115,7 +115,7 @@ async function pbkdf2Hash(value, saltBytes = null, iterations = 310000) {
   return `pbkdf2$${iterations}$${bytesToHex(salt)}$${bytesToHex(new Uint8Array(bits))}`;
 }
 
-async function verifyStoredSecret(stored, supplied) {
+async function verifyStoredSecret(stored, supplied, env = null) {
   const value = String(stored || "");
   if (value.startsWith("pbkdf2$")) {
     const parts = value.split("$");
@@ -398,11 +398,11 @@ async function customerLogin(request, body, env) {
   if (!(await recordAuthAttempt("login", phone, request, env))) return fail("محاولات كثيرة. انتظر قليلاً ثم أعد المحاولة.", 429);
   const customer = await findCustomerByPhone(phone, env);
   if (!customer) return fail("رقم الهاتف غير مسجل.", 401);
-  const verification = await verifyStoredSecret(customer.password, password);
+  const verification = await verifyStoredSecret(customer.password, password, env);
   if (!verification.valid) return fail("كلمة المرور غير صحيحة.", 401);
   if (customer.isBlocked === true) return fail("هذا الحساب محظور.", 403);
   if (verification.needsUpgrade) {
-    customer.password = await pbkdf2Hash(password, null, 310000);
+    customer.password = await pbkdf2Hash(password, null, 310000, env);
     await dbRequest(env, "customers?id=eq." + encodeURIComponent(customer.id), {
       method: "PATCH", headers: { "Prefer": "return=minimal" },
       body: JSON.stringify({ password: customer.password })
@@ -553,7 +553,7 @@ async function customerRegister(request, body, env) {
     isTop: false,
     isBlocked: false,
     points: 0,
-    recoveryPin: await pbkdf2Hash(recoveryPin, null, 310000),
+    recoveryPin: await pbkdf2Hash(recoveryPin, null, 310000, env),
     wishlist: []
   };
 
@@ -605,7 +605,7 @@ async function customerResetPassword(request, body, env) {
   if (!(await recordAuthAttempt("reset", phone, request, env))) return fail("محاولات استرجاع كثيرة. حاول لاحقاً.", 429);
   const customer = await findCustomerByPhone(phone, env);
   if (!customer || !customer.recoveryPin) return fail("رقم الهاتف أو رمز الاسترجاع غير صحيح.", 401);
-  const pinVerification = await verifyStoredSecret(customer.recoveryPin, recoveryPin);
+  const pinVerification = await verifyStoredSecret(customer.recoveryPin, recoveryPin, env);
   if (!pinVerification.valid) return fail("رقم الهاتف أو رمز الاسترجاع غير صحيح.", 401);
   if (customer.isBlocked === true) return fail("هذا الحساب محظور.", 403);
   const patch = { password: await pbkdf2Hash(password, null, 310000, env) };
