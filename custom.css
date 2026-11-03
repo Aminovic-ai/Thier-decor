@@ -632,3 +632,17 @@ a { text-underline-offset: 3px; }
     border-radius: 9px !important;
   }
 }
+
+
+/* Keep a language switch visible on phones while the desktop action row is hidden. */
+.mobile-lang-btn { display: none; }
+@media (max-width: 680px) {
+  #screen-shop .header-search { order: 0; flex: 1 1 0 !important; width: auto !important; min-width: 0; }
+  #screen-shop .mobile-lang-btn {
+    order: 1; display: inline-flex !important; flex: 0 0 auto; align-items: center;
+    justify-content: center; gap: 6px; min-width: 54px; min-height: 44px;
+    padding: 8px 10px; border: 1px solid #d8eaf5; border-radius: 12px;
+    background: #f3faff; color: #245b7b; font-weight: 800;
+  }
+  #screen-shop .header-actions { display: none !important; }
+}
