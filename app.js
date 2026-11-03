@@ -3187,3 +3187,68 @@ window.renderAdminRequests = renderAdminRequests;
    return originalCloseModal.call(this,id,...args);
  };
 })();
+
+
+/* Mobile category strip, compact bottom navigation and scroll-aware header. */
+(function initMobileStoreNavigation() {
+    const setup = () => {
+        const header = document.querySelector('#screen-shop .store-header');
+        const categories = document.getElementById('store-categories');
+        if (!header || !categories) return;
+        let bar = document.getElementById('mobile-category-bar');
+        if (!bar) {
+            bar = document.createElement('div');
+            bar.id = 'mobile-category-bar';
+            bar.setAttribute('aria-label', state.currentLang === 'fr' ? 'Catégories' : 'أصناف المنتجات');
+            header.appendChild(bar);
+        }
+        const aside = categories.closest('.shop-categories');
+        if (window.matchMedia('(max-width: 680px)').matches) {
+            if (categories.parentElement !== bar) bar.appendChild(categories);
+        } else if (aside && categories.parentElement !== aside) {
+            aside.appendChild(categories);
+        }
+    };
+    let lastY = window.scrollY || 0;
+    let ticking = false;
+    const onScroll = () => {
+        if (ticking) return;
+        ticking = true;
+        window.requestAnimationFrame(() => {
+            const header = document.querySelector('#screen-shop .store-header');
+            const y = window.scrollY || 0;
+            if (header && window.matchMedia('(max-width: 680px)').matches) {
+                const delta = y - lastY;
+                if (y < 70 || delta < -7) header.classList.remove('mobile-header-hidden');
+                else if (delta > 5 && y > 110) header.classList.add('mobile-header-hidden');
+            } else if (header) header.classList.remove('mobile-header-hidden');
+            lastY = y;
+            ticking = false;
+        });
+    };
+    const updateNav = () => {
+        const active = document.querySelector('#screen-shop .page.active');
+        const page = active?.id?.replace('s-', '') || 'shop';
+        document.querySelectorAll('.mobile-nav-item').forEach(item => {
+            const key = item.dataset.mobilePage;
+            item.classList.toggle('active', key === page || (key === 'categories' && page === 'shop'));
+        });
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', setup, { passive: true });
+    document.addEventListener('click', event => {
+        if (event.target.closest('.mobile-nav-item')) setTimeout(updateNav, 0);
+    });
+    const cartBadge = document.getElementById('cart-badge');
+    const wishBadge = document.getElementById('wishlist-badge');
+    const syncBadges = () => {
+        const cb = document.getElementById('mobile-cart-badge');
+        const wb = document.getElementById('mobile-wishlist-badge');
+        if (cb && cartBadge) { cb.textContent = cartBadge.textContent; cb.style.display = cartBadge.style.display === 'none' ? 'none' : 'block'; }
+        if (wb && wishBadge) { wb.textContent = wishBadge.textContent; wb.style.display = wishBadge.style.display === 'none' ? 'none' : 'block'; }
+    };
+    const observer = new MutationObserver(syncBadges);
+    [cartBadge, wishBadge].forEach(el => { if (el) observer.observe(el, { childList:true, attributes:true, characterData:true, subtree:true }); });
+    setup(); syncBadges(); updateNav();
+    window.addEventListener('load', setup, { once:true });
+})();
