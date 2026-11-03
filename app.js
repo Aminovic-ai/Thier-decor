@@ -1160,7 +1160,9 @@ function switchLanguage(lang) {
     state.currentLang = lang; save(K.lang, lang);
     document.getElementById('html-root').setAttribute('lang', lang);
     document.getElementById('html-root').setAttribute('dir', lang === 'ar' ? 'rtl' : 'ltr');
-    const langBtn = document.getElementById('lang-btn-text'); if (langBtn) langBtn.textContent = lang === 'ar' ? 'FR' : 'AR';
+    const langLabel = lang === 'ar' ? 'FR' : 'AR';
+    const langBtn = document.getElementById('lang-btn-text'); if (langBtn) langBtn.textContent = langLabel;
+    const mobileLangBtn = document.getElementById('mobile-lang-btn-text'); if (mobileLangBtn) mobileLangBtn.textContent = langLabel;
     document.querySelectorAll('[data-i18n]').forEach(el => { const k = el.getAttribute('data-i18n'); if (i18n[lang][k]) el.textContent = i18n[lang][k]; });
     document.querySelectorAll('[data-i18n-placeholder]').forEach(el => { const k = el.getAttribute('data-i18n-placeholder'); if (i18n[lang][k]) el.setAttribute('placeholder', i18n[lang][k]); });
     
