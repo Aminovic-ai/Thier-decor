@@ -102,6 +102,13 @@
                 </div>
             </div>
         </main>
+        <nav class="mobile-bottom-nav" id="mobile-bottom-nav" aria-label="التنقل الرئيسي">
+            <button type="button" class="mobile-nav-item active" data-mobile-page="shop" onclick="shopGo('shop')"><i class="fas fa-house"></i><span data-i18n="home">الرئيسية</span></button>
+            <button type="button" class="mobile-nav-item" data-mobile-page="categories" onclick="shopGo('shop'); document.getElementById('mobile-category-bar')?.scrollIntoView({behavior:'smooth',block:'nearest'})"><i class="fas fa-border-all"></i><span data-i18n="categories">المتجر</span></button>
+            <button type="button" class="mobile-nav-item" data-mobile-page="wishlist" onclick="shopGo('wishlist')"><i class="fas fa-heart"></i><span data-i18n="wishlist_title">المفضلة</span><b class="mobile-nav-badge" id="mobile-wishlist-badge" style="display:none;">0</b></button>
+            <button type="button" class="mobile-nav-item" data-mobile-page="cart" onclick="shopGo('cart')"><i class="fas fa-bag-shopping"></i><span data-i18n="cart">السلة</span><b class="mobile-nav-badge" id="mobile-cart-badge" style="display:none;">0</b></button>
+            <button type="button" class="mobile-nav-item" data-mobile-page="profile" onclick="handleAccountClick()"><i class="fas fa-user"></i><span data-i18n="my_account">حسابي</span></button>
+        </nav>
     </div>
 
     <div class="screen" id="screen-admin-login">
