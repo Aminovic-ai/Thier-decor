@@ -739,3 +739,46 @@ a { text-underline-offset: 3px; }
   #screen-shop.mobile-categories-open .shop-categories { display: block !important; }
   #screen-shop:not(.mobile-categories-open) .shop-categories { display: none !important; }
 }
+
+
+/* Checkout on phones: the fixed bottom navigation must never cover checkout actions. */
+@media (max-width: 680px) {
+  body:has(#m-checkout.active) #mobile-bottom-nav {
+    display: none !important;
+    pointer-events: none !important;
+  }
+  #m-checkout {
+    z-index: 3000 !important;
+    align-items: flex-start !important;
+    justify-content: center !important;
+    overflow-y: auto !important;
+    padding: max(10px, env(safe-area-inset-top)) 10px calc(14px + env(safe-area-inset-bottom)) !important;
+    -webkit-overflow-scrolling: touch;
+  }
+  #m-checkout .modal-content {
+    width: 100% !important;
+    max-width: 560px !important;
+    max-height: calc(100dvh - 24px - env(safe-area-inset-top) - env(safe-area-inset-bottom)) !important;
+    margin: 0 auto !important;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
+  }
+  #m-checkout .modal-header {
+    flex: 0 0 auto !important;
+  }
+  #m-checkout .modal-body {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    overflow-y: auto !important;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: calc(24px + env(safe-area-inset-bottom)) !important;
+  }
+  #m-checkout .modal-body > button {
+    min-height: 52px !important;
+    margin-bottom: 8px !important;
+    position: relative !important;
+    z-index: 1 !important;
+  }
+}
