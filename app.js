@@ -1190,11 +1190,13 @@ window.switchLanguage = switchLanguage;
 function updateUIBasedOnSession() {
     const topNav = document.getElementById('store-nav-container');
     const contactBtn = document.getElementById('btn-contact-us');
+    const mobileContactBtn = document.getElementById('mobile-contact-btn');
     const logoutBtn = document.getElementById('btn-logout-header');
-    if (topNav) topNav.style.display = 'none'; if (contactBtn) contactBtn.style.display = 'none'; if (logoutBtn) logoutBtn.style.display = 'none';
+    if (topNav) topNav.style.display = 'none'; if (contactBtn) contactBtn.style.display = 'none'; if (mobileContactBtn) mobileContactBtn.style.display = 'none'; if (logoutBtn) logoutBtn.style.display = 'none';
     if (state.session && state.session.role === 'customer') {
         if (topNav) topNav.style.display = 'block';
         if (contactBtn) contactBtn.style.display = 'flex';
+        if (mobileContactBtn) mobileContactBtn.style.display = 'inline-flex';
         if (logoutBtn) logoutBtn.style.display = 'flex';
     }
     updateProductRequestButton();
