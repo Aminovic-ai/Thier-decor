@@ -2050,6 +2050,19 @@ async function updateCustomerProfile() {
 }
 window.updateCustomerProfile = updateCustomerProfile;
 
+// Orders are considered paid by default until the admin explicitly records a partial payment.
+function getRecordedPaidAmount(order) {
+    const total = Math.max(0, Number(order?.total) || 0);
+    const recorded = Number(order?.paidAmount);
+    if (order?.paidAmount === null || order?.paidAmount === undefined || !Number.isFinite(recorded) || recorded <= 0) return total;
+    return Math.min(total, Math.max(0, recorded));
+}
+function getOrderRemainingDebt(order) {
+    return Math.max(0, (Number(order?.total) || 0) - getRecordedPaidAmount(order));
+}
+window.getRecordedPaidAmount = getRecordedPaidAmount;
+window.getOrderRemainingDebt = getOrderRemainingDebt;
+
 function renderMyOrders() {
     const c = document.getElementById('s-orders-list'); if (!c) return;
     if (!state.session) { c.innerHTML = `<div style="text-align:center;padding:40px;">${i18n[state.currentLang].login_to_see_messages}<br><br><button class="btn-primary" onclick="openCustomerAuthModal()">${i18n[state.currentLang].login_btn}</button></div>`; return; }
@@ -2058,7 +2071,7 @@ function renderMyOrders() {
     if (myOrders.length === 0) { c.innerHTML = `<div style="text-align:center;padding:40px;">${i18n[state.currentLang].no_orders}</div>`; return; }
     const statusMap = { 'new': { text: i18n[state.currentLang].new, color: '#d97706', bg: '#fef3c7' }, 'confirmed': { text: i18n[state.currentLang].confirmed, color: '#2563eb', bg: '#dbeafe' }, 'on_the_way': { text: i18n[state.currentLang].on_the_way, color: '#7c3aed', bg: '#ede9fe' }, 'out_for_delivery': { text: i18n[state.currentLang].out_for_delivery, color: '#c026d3', bg: '#fae8ff' }, 'delivered': { text: i18n[state.currentLang].delivered, color: '#059669', bg: '#d1fae5' }, 'cancelled': { text: i18n[state.currentLang].cancelled, color: '#dc2626', bg: '#fee2e2' } };
     c.innerHTML = myOrders.map(o => {
-        const status = statusMap[o.status] || statusMap['new']; const paid = o.paidAmount ?? o.total; const debt = o.total - paid;
+        const status = statusMap[o.status] || statusMap['new']; const debt = getOrderRemainingDebt(o);
         let debtHtml = ''; if (debt > 0) { debtHtml = `<div style="background: #fee2e2; border: 1px solid #ef4444; padding: 10px; border-radius: 8px; margin-top: 10px; display: flex; justify-content: space-between; align-items: center;"><span style="font-weight: bold; color: #b91c1c;"><i class="fas fa-exclamation-triangle"></i> ${i18n[state.currentLang].debt_alert}</span><span style="font-family: monospace; font-size: 1.1rem; font-weight: 900; color: #b91c1c;">${fmtMoney(debt)}</span></div>`; }
         let confirmBtnHtml = ''; if (o.status === 'on_the_way' || o.status === 'out_for_delivery') { confirmBtnHtml = `<button onclick="customerConfirmReceipt(${o.id})" class="btn-primary" style="background:#10b981; margin-top:10px; width:100%; padding:10px;">${i18n[state.currentLang].confirm_receipt}</button>`; }
         const itemsList = o.items.map(i => { const components = i.isPack && Array.isArray(i.packItems) && i.packItems.length ? `<div style="font-size:0.78rem; margin:2px 0 5px 10px; color:var(--text-mid);">${i.packItems.map(comp => `${esc(state.products.find(p => String(p.id) === String(comp.id))?.name || comp.name || 'Produit')} × ${Number(comp.qty)||0}`).join(' · ')}</div>` : ''; return `<div style="display:flex; justify-content:space-between; font-size:0.85rem; color:var(--text-mid); margin-bottom:4px;"><span>${esc(i.name)} (x${i.qty})</span><span>${fmtMoney(i.price * i.qty)}</span></div>${components}`; }).join('');
@@ -2096,7 +2109,7 @@ function printOrderInvoice(orderId) {
     const storeName = state.settings.shopName || 'Thier Décor'; const storePhone = state.settings.shopPhone || ''; const storeAddress = state.settings.shopAddress || '';
     let rows = order.items.map(i => { const components = i.isPack && Array.isArray(i.packItems) && i.packItems.length ? `<br><small style="color:#64748b;">Composition : ${i.packItems.map(comp => `${esc(state.products.find(p => String(p.id) === String(comp.id))?.name || comp.name || 'Produit')} × ${Number(comp.qty)||0}`).join(' · ')}</small>` : ''; return `<tr><td style="padding:12px; border-bottom:1px solid #eee;">${esc(i.name)}${components}</td><td style="padding:12px; border-bottom:1px solid #eee; text-align:center;">${i.qty}</td><td style="padding:12px; border-bottom:1px solid #eee; text-align:right;">${Number(i.price||0).toLocaleString('fr-FR')} DA</td><td style="padding:12px; border-bottom:1px solid #eee; text-align:right;">${(Number(i.price||0) * Number(i.qty||0)).toLocaleString('fr-FR')} DA</td></tr>`; }).join('');
     const date = new Date(order.createdAt).toLocaleDateString('fr-FR');
-    const paid = order.paidAmount ?? order.total; const debt = order.total - paid;
+    const paid = getRecordedPaidAmount(order); const debt = getOrderRemainingDebt(order);
     let debtRow = ''; if (debt > 0) { debtRow = `<div style="display:flex; justify-content:space-between; margin-top:10px; color:#dc2626; font-weight:bold; font-size:16px;"><span>Reste à payer :</span><span>${debt.toLocaleString('fr-FR')} DA</span></div>`; }
     const htmlContent = `<html><head><meta charset="UTF-8"><title>Facture</title><style>body { font-family: sans-serif; padding:40px; } .header { border-bottom: 3px solid #0ea5e9; padding-bottom: 20px; margin-bottom: 30px; display:flex; justify-content:space-between;} table { width: 100%; border-collapse: collapse; } th { background: #f8fafc; padding: 12px; text-align: right; } .totals { width: 50%; float: right; margin-top:20px;} .total-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #eee; }</style></head><body><div class="header"><div><h1>${esc(storeName)}</h1><p>${esc(storePhone)}</p><p>${esc(storeAddress)}</p></div><div><h2>FACTURE</h2><p>N° : #${String(order.id).slice(-6)}</p><p>Date : ${date}</p></div></div><p><strong>Client :</strong> ${esc(order.customerName)}</p><p><strong>Tél :</strong> ${esc(order.customerPhone)}</p><p><strong>Adresse :</strong> ${esc(order.wilaya)} - ${esc(order.commune)} - ${esc(order.address)}</p><br><table><thead><tr><th>Produit</th><th style="text-align: center;">Qté</th><th style="text-align: right;">P.U</th><th style="text-align: right;">Total</th></tr></thead><tbody>${rows}</tbody></table><div class="totals"><div class="total-row"><span>Sous-total :</span><span>${Number(order.itemsTotal ?? (order.items||[]).reduce((sum,i)=>sum+Number(i.price||0)*Number(i.qty||0),0)).toLocaleString('fr-FR')} DA</span></div><div class="total-row"><span>Livraison :</span><span>${(Number(order.deliveryPrice) || 0).toLocaleString('fr-FR')} DA</span></div>${(Number(order.discount) || 0) > 0 ? `<div class="total-row" style="color:#059669"><span>Remise ${order.promoCode ? '«' + esc(order.promoCode) + '»' : ''} :</span><span>− ${(Number(order.discount) || 0).toLocaleString('fr-FR')} DA</span></div>` : ''}<div class="total-row" style="font-weight:bold; font-size:18px;"><span>Total TTC :</span><span>${Number(order.total||0).toLocaleString('fr-FR')} DA</span></div>${debtRow}</div><div style="clear:both; padding-top:50px;"></div><script>window.onload = function() { setTimeout(function(){ window.print(); }, 500); }</script></body></html>`;
     const printWindow = window.open('', '_blank');
@@ -2842,10 +2855,10 @@ window.renderAdminReports = renderAdminReports;
 
 function renderAdminDebts() {
     const c = document.getElementById('a-debts-list'); if (!c) return;
-    const debtOrders = state.orders.filter(o => { const paid = o.paidAmount ?? o.total; const customer = state.customers.find(cust => cust.phone === o.customerPhone || cust.id === o.customerId); return (o.total - paid) > 0 && o.status !== 'cancelled' && customer && customer.isVip; });
+    const debtOrders = state.orders.filter(o => { const customer = state.customers.find(cust => cust.phone === o.customerPhone || cust.id === o.customerId); return getOrderRemainingDebt(o) > 0 && o.status !== 'cancelled' && customer && customer.isVip; });
     if (debtOrders.length === 0) { c.innerHTML = `<div style="text-align:center;padding:20px;">${i18n[state.currentLang].no_debts}</div>`; return; }
     let debtsByCustomer = {};
-    debtOrders.forEach(o => { const paid = o.paidAmount ?? o.total; if (!debtsByCustomer[o.customerPhone]) debtsByCustomer[o.customerPhone] = { name: o.customerName, phone: o.customerPhone, total: 0, count: 0 }; debtsByCustomer[o.customerPhone].total += (o.total - paid); debtsByCustomer[o.customerPhone].count++; });
+    debtOrders.forEach(o => { if (!debtsByCustomer[o.customerPhone]) debtsByCustomer[o.customerPhone] = { name: o.customerName, phone: o.customerPhone, total: 0, count: 0 }; debtsByCustomer[o.customerPhone].total += getOrderRemainingDebt(o); debtsByCustomer[o.customerPhone].count++; });
     c.innerHTML = Object.values(debtsByCustomer).map(cust => `<div class="admin-card" style="border-right: 5px solid var(--danger);"><div><strong>⭐ ${esc(cust.name)}</strong><br><a href="tel:${cust.phone}">${cust.phone}</a><br><small>${cust.count} ${i18n[state.currentLang].my_orders}</small></div><div style="color:var(--danger); font-size:1.2rem; font-weight:900;">${fmtMoney(cust.total)}</div></div>`).join('');
 }
 window.renderAdminDebts = renderAdminDebts;
@@ -3054,7 +3067,7 @@ window.removeCoupon = removeCoupon;
 
 function updateAdminBadges() {
     const newOrders = state.orders.filter(o => normalizeOrderStatus(o.status) === 'new').length; const unreadMsgs = state.messages.filter(m => !m.reply).length; const pendingReqs = state.requests.filter(r => r.status === 'pending').length;
-    const debtOrders = state.orders.filter(o => { const paid = o.paidAmount ?? o.total; const customer = state.customers.find(cust => cust.phone === o.customerPhone || cust.id === o.customerId); return (o.total - paid) > 0 && o.status !== 'cancelled' && customer && customer.isVip; });
+    const debtOrders = state.orders.filter(o => { const customer = state.customers.find(cust => cust.phone === o.customerPhone || cust.id === o.customerId); return getOrderRemainingDebt(o) > 0 && o.status !== 'cancelled' && customer && customer.isVip; });
     const debtCustomers = new Set(debtOrders.map(o => o.customerPhone)).size;
     const setBadge = (id, count) => { const el = document.getElementById(id); if (el) { el.textContent = count; el.style.display = count > 0 ? 'inline-block' : 'none'; } };
     setBadge('badge-orders', newOrders); setBadge('badge-messages', unreadMsgs); setBadge('badge-requests', pendingReqs); setBadge('badge-debts', debtCustomers);
