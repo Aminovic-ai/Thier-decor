@@ -2115,13 +2115,20 @@ async function customerForgotPassword() {
 window.customerForgotPassword = customerForgotPassword;
 
 function renderProfile() {
-    const n = document.getElementById('p-name'), p = document.getElementById('p-phone'), a = document.getElementById('p-address'); if (!n) return;
-    if (!state.session) { n.value = ''; p.value = ''; a.value = ''; return; }
+    const n = document.getElementById('p-name'), p = document.getElementById('p-phone'), a = document.getElementById('p-address');
+    if (!n) return;
+    const welcomeName = document.getElementById('customer-profile-name');
+    if (!state.session) {
+        n.value = ''; if (p) p.value = ''; if (a) a.value = '';
+        if (welcomeName) welcomeName.textContent = state.currentLang === 'fr' ? 'Bienvenue' : 'مرحباً بك';
+        return;
+    }
     const c = state.customers.find(x => String(x.id) === String(state.session.id));
     if (c) {
         n.value = c.name || '';
-        p.value = c.phone || '';
-        a.value = c.address || '';
+        if (p) p.value = c.phone || '';
+        if (a) a.value = c.address || '';
+        if (welcomeName) welcomeName.textContent = (state.currentLang === 'fr' ? 'Bienvenue, ' : 'مرحباً، ') + (c.name || '');
         const pointsEl = document.getElementById('p-points');
         if (pointsEl) pointsEl.textContent = String(c.points || 0);
     }
