@@ -36,6 +36,7 @@
                 <div class="header-search">
                     <input type="text" id="shop-search-input" data-i18n-placeholder="search_placeholder" placeholder="ابحث..." oninput="filterShopProducts(this.value)">
                 </div>
+                <button type="button" class="action-btn mobile-contact-btn" id="mobile-contact-btn" onclick="openMessageModal()" aria-label="اتصل بنا" title="اتصل بنا" style="display:none;"><i class="fas fa-headset"></i><span class="mobile-contact-label" data-i18n="contact_us">اتصل بنا</span></button>
                 <button type="button" class="action-btn mobile-lang-btn" id="mobile-lang-btn" onclick="switchLanguage(document.documentElement.lang === 'ar' ? 'fr' : 'ar')" aria-label="Changer la langue"><i class="fas fa-globe"></i><span id="mobile-lang-btn-text">FR</span></button>
                 <div class="header-actions">
                     <button class="action-btn" onclick="shopGo('wishlist')" style="position:relative;"><i class="fas fa-heart" style="color:#ef4444;"></i> <span class="cart-badge" id="wishlist-badge" style="display:none; background:#ef4444;">0</span></button>
