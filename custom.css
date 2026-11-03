@@ -672,3 +672,52 @@ a { text-underline-offset: 3px; }
 .mobile-nav-badge{top:0!important;min-width:15px!important;height:15px!important;padding:0 4px!important;border:2px solid #fff;font-size:9px!important;font-weight:700!important;line-height:12px!important}
 #screen-shop{padding-bottom:calc(88px + env(safe-area-inset-bottom))!important}
 }
+
+
+/* Customer navigation recovery: keep all customer destinations reachable on phones. */
+@media (max-width: 680px) {
+  #screen-shop .store-nav {
+    display: block !important;
+    position: static !important;
+    height: auto !important;
+    overflow: visible !important;
+    background: transparent !important;
+    border: 0 !important;
+    box-shadow: none !important;
+  }
+  #screen-shop .store-nav .nav-links {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    justify-content: center !important;
+    gap: 7px !important;
+    padding: 8px 10px !important;
+    margin: 0 !important;
+    background: #fff !important;
+    border-top: 1px solid #edf3f7 !important;
+  }
+  #screen-shop .store-nav .nav-links li {
+    display: inline-flex !important;
+    align-items: center !important;
+    flex: 0 0 auto !important;
+    margin: 0 !important;
+    padding: 7px 10px !important;
+    border: 1px solid #e3eef5 !important;
+    border-radius: 18px !important;
+    background: #f7fbfe !important;
+    font-size: .78rem !important;
+  }
+  #screen-shop .store-nav .nav-links li a {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    white-space: nowrap !important;
+    color: #456579 !important;
+  }
+  #screen-shop .store-nav .nav-links li.active {
+    background: #eaf6fd !important;
+    border-color: #b9dff2 !important;
+  }
+  #screen-shop .store-nav .nav-links li.active a {
+    color: #147eaf !important;
+  }
+}
