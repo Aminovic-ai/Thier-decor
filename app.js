@@ -1211,6 +1211,7 @@ function goScreen(id) {
 window.goScreen = goScreen;
 
 function shopGo(id) {
+    if (id !== 'profile' && id !== 'orders' && id !== 'messages' && id !== 'notifications' && id !== 'myrequests') document.getElementById('screen-shop')?.classList.remove('customer-menu-open');
     if ((id === 'orders' || id === 'profile' || id === 'messages' || id === 'myrequests' || id === 'wishlist' || id === 'notifications') && (!state.session || state.session.role !== 'customer')) {
         toast(i18n[state.currentLang].login_first, 'error'); openCustomerAuthModal(); return;
     }
@@ -1876,7 +1877,14 @@ window.confirmShopOrder = confirmShopOrder;
 function callStore() { const phone = state.settings.shopPhone ? state.settings.shopPhone.replace(/[^0-9+]/g, '') : ''; if (!phone) return toast(i18n[state.currentLang].save_failed, 'error'); window.location.href = `tel:${phone}`; }
 window.callStore = callStore;
 
-function handleAccountClick() { if (state.session && state.session.role === 'customer') shopGo('profile'); else openCustomerAuthModal(); }
+function handleAccountClick() {
+    if (state.session && state.session.role === 'customer') {
+        const shop = document.getElementById('screen-shop');
+        if (shop) shop.classList.toggle('customer-menu-open');
+        shopGo('profile');
+        if (shop) shop.classList.add('customer-menu-open');
+    } else openCustomerAuthModal();
+}
 function openCustomerAuthModal() {
     if (state.session) {
         const cust = state.customers.find(x => x.id === state.session.id);
@@ -3240,6 +3248,17 @@ window.renderAdminRequests = renderAdminRequests;
     window.addEventListener('resize', setup, { passive: true });
     document.addEventListener('click', event => {
         if (event.target.closest('.mobile-nav-item')) setTimeout(updateNav, 0);
+    });
+    document.addEventListener('click', event => {
+        const categoryButton = event.target.closest('.mobile-nav-item[data-mobile-page="categories"]');
+        if (!categoryButton) return;
+        const shop = document.getElementById('screen-shop');
+        if (!shop) return;
+        shop.classList.toggle('mobile-categories-open');
+        const bar = document.getElementById('mobile-category-bar');
+        if (bar && shop.classList.contains('mobile-categories-open')) {
+            bar.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
     });
     const cartBadge = document.getElementById('cart-badge');
     const wishBadge = document.getElementById('wishlist-badge');

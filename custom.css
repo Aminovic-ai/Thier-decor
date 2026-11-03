@@ -721,3 +721,21 @@ a { text-underline-offset: 3px; }
     color: #147eaf !important;
   }
 }
+
+
+/* Mobile UX: reveal customer links only after Account is opened,
+   and reveal product categories only after the Categories tab is tapped. */
+@media (max-width: 680px) {
+  #screen-shop .store-nav { display: none !important; }
+  #screen-shop.customer-menu-open .store-nav { display: block !important; }
+  #screen-shop #mobile-category-bar { display: none !important; }
+  #screen-shop.mobile-categories-open #mobile-category-bar {
+    display: block !important;
+    max-height: 96px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    border-bottom: 1px solid #edf3f7;
+  }
+  #screen-shop.mobile-categories-open .shop-categories { display: block !important; }
+  #screen-shop:not(.mobile-categories-open) .shop-categories { display: none !important; }
+}
