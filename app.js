@@ -163,6 +163,8 @@ window.toast = toast;
 
 const i18n = {
     ar: {
+        customer_intro: "مساحتك الخاصة لمتابعة مشترياتك وإدارة حسابك بسهولة", customer_welcome_desc: "كل ما تحتاجه لتجربة تسوق أسهل، في مكان واحد", welcome_back: "أهلاً بعودتك", rewards_label: "مكافآت ثير ديكور", customer_profile_hint: "تأكد من صحة معلوماتك حتى تصلك طلباتك بسهولة", customer_help_text: "تحتاج إلى مساعدة؟ يمكنك مراسلة فريق المتجر من قسم رسائلي",
+
         delivery_method: "طريقة التوصيل", courier_company: "شركة التوصيل", delivery_type: "نوع التوصيل", home_delivery: "التوصيل للمنزل", office_delivery: "التوصيل للمكتب", no_offices: "لا توجد نقاط استلام مسجلة لهذه الولاية", yalidine_network: "Yalidine / Guepex", yalidine_prices_title: "أسعار التوصيل Yalidine / Guepex (58 ولاية)", yalidine_prices_note: "اترك الحقل فارغًا لاستخدام السعر الافتراضي، أو أدخل السعر الذي تريده بالدينار.", save_yalidine_prices: "حفظ أسعار Yalidine / Guepex", tagline: "تسوق أونلاين", my_account: "حسابي", cart: "السلة", home: "الرئيسية", my_orders: "طلباتي", my_messages: "رسائلي", my_requests: "طلباتي الخاصة", settings: "إعداداتي",
         hero_title: "عروض الموسم", hero_desc: "أفضل المنتجات وتوصيل لكل الولايات", available_products: "المنتجات", categories: "الأصناف",
         cart_title: "🛒 السلة", checkout_btn: "إتمام الطلب", orders_title: "📋 طلباتي", profile_title: "👤 الملف الشخصي",
@@ -219,6 +221,8 @@ const i18n = {
         save_error: "خطأ في الحفظ: ", insert_error: "خطأ في الإضافة: ", order_failed: "❌ فشل حفظ الطلب", error_fetch: "حدث خطأ في تحميل البيانات"
     },
     fr: {
+        customer_intro: "Votre espace personnel pour suivre vos achats et gérer votre compte", customer_welcome_desc: "Tout ce qu’il vous faut pour une expérience shopping plus simple, au même endroit", welcome_back: "Heureux de vous revoir", rewards_label: "Récompenses Thier Décor", customer_profile_hint: "Vérifiez vos informations pour recevoir vos commandes sans difficulté", customer_help_text: "Besoin d’aide ? Contactez notre équipe depuis la rubrique Messages",
+
         delivery_method: "Mode de livraison", courier_company: "Transporteur", delivery_type: "Type de livraison", home_delivery: "Livraison à domicile", office_delivery: "Livraison au bureau", no_offices: "Aucun point de retrait enregistré pour cette wilaya", yalidine_network: "Yalidine / Guepex", yalidine_prices_title: "Tarifs Yalidine / Guepex (58 wilayas)", yalidine_prices_note: "Laissez le champ vide pour utiliser le tarif par défaut, ou saisissez un tarif en dinars.", save_yalidine_prices: "Enregistrer les tarifs Yalidine / Guepex",
         tagline: "Achetez en ligne", my_account: "Mon Compte", cart: "Panier", home: "Accueil", my_orders: "Mes Commandes", my_messages: "Mes Messages",
         my_requests: "Mes Demandes", settings: "Paramètres", hero_title: "Offres de la saison", hero_desc: "Meilleurs produits et livraison partout",
