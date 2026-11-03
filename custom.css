@@ -1163,3 +1163,32 @@ a { text-underline-offset: 3px; }
   #screen-admin .admin-header-actions .admin-store-quick{display:none}
   #screen-admin .stat-card h3{font-size:1rem!important}
 }
+
+
+/* Keep language-button press/focus feedback strictly inside its own bounds. */
+#screen-shop #lang-btn,
+#screen-shop #mobile-lang-btn {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  border-radius: 12px;
+  background-clip: padding-box;
+  -webkit-tap-highlight-color: transparent;
+  transform: none;
+}
+#screen-shop #lang-btn:active,
+#screen-shop #mobile-lang-btn:active {
+  transform: none !important;
+  background-color: #e8f1ec !important;
+  box-shadow: inset 0 0 0 1px #cbdccf !important;
+}
+#screen-shop #lang-btn:focus,
+#screen-shop #mobile-lang-btn:focus {
+  outline: none;
+}
+#screen-shop #lang-btn:focus-visible,
+#screen-shop #mobile-lang-btn:focus-visible {
+  outline: none !important;
+  outline-offset: 0 !important;
+  box-shadow: inset 0 0 0 2px rgba(113,143,117,.55) !important;
+}
