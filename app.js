@@ -1575,19 +1575,19 @@ function renderShopHTML(list) {
             <div class="product-img">
                 ${imageSrc ? `<img src="${imageSrc}" loading="lazy" alt="${esc(p.name)}" onerror="this.onerror=null; this.parentElement.innerHTML='<i class=\\'fas fa-image\\' style=\\'color:#cbd5e1;font-size:2rem;\\'></i>';">` : '<i class="fas fa-image" style="color:#cbd5e1;font-size:2rem;"></i>'}
             </div>
+            <div class="product-actions-under-image">
+                <button type="button" class="product-mini-action ${isWish ? 'is-favorite' : ''}" title="${state.currentLang === 'ar' ? 'أضف إلى المفضلة' : 'Ajouter aux favoris'}" aria-label="${state.currentLang === 'ar' ? 'أضف إلى المفضلة' : 'Ajouter aux favoris'}" onclick="event.stopPropagation();toggleWishlist(${p.id})">
+                    <i class="fas fa-heart"></i>
+                </button>
+                <button type="button" class="product-mini-action product-mini-cart" title="${state.currentLang === 'ar' ? 'أضف إلى السلة' : 'Ajouter au panier'}" aria-label="${state.currentLang === 'ar' ? 'أضف إلى السلة' : 'Ajouter au panier'}" onclick="event.stopPropagation();addToCart(${p.id})">
+                    <i class="fas fa-shopping-basket"></i>
+                </button>
+            </div>
             <div class="product-info">
                 <h3>${esc(p.name)}</h3>
                 <div class="product-price-box">
                     ${isPromo ? `<del>${fmtMoney(p.price)}</del>` : ''}
                     <span>${fmtMoney(promoPrice)}</span>
-                </div>
-                <div class="product-actions-under-image">
-                    <button class="product-mini-action ${isWish ? 'is-favorite' : ''}" onclick="event.stopPropagation();toggleWishlist(${p.id})">
-                        <i class="fas fa-heart"></i>
-                    </button>
-                    <button class="product-mini-action product-mini-cart" onclick="event.stopPropagation();addToCart(${p.id})">
-                        <i class="fas fa-shopping-basket"></i>
-                    </button>
                 </div>
             </div>
         </div>`;
