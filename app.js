@@ -3418,7 +3418,7 @@ window.renderAdminRequests = renderAdminRequests;
         return page && page.id.startsWith('s-') ? page.id.slice(2) : 'shop';
     };
     const activeModal = () => {
-        const modals = document.querySelectorAll('#screen-shop .modal-overlay.active');
+        const modals = document.querySelectorAll('.modal-overlay.active');
         return modals.length ? modals[modals.length - 1] : null;
     };
 
