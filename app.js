@@ -3402,3 +3402,96 @@ window.renderAdminRequests = renderAdminRequests;
     setup(); syncBadges(); updateNav();
     window.addEventListener('load', setup, { once:true });
 })();
+
+
+/* Android/mobile browser back-button behavior for the customer storefront. */
+(function initMobileBackNavigation() {
+    if (window.__tdMobileBackNavigationInitialized) return;
+    window.__tdMobileBackNavigationInitialized = true;
+
+    const shopScreen = document.getElementById('screen-shop');
+    if (!shopScreen) return;
+
+    let handlingPopState = false;
+    const activePage = () => {
+        const page = document.querySelector('#screen-shop .page.active');
+        return page && page.id.startsWith('s-') ? page.id.slice(2) : 'shop';
+    };
+    const activeModal = () => {
+        const modals = document.querySelectorAll('#screen-shop .modal-overlay.active');
+        return modals.length ? modals[modals.length - 1] : null;
+    };
+
+    const originalShopGo = shopGo;
+    shopGo = function mobileAwareShopGo(id, ...args) {
+        const previousPage = activePage();
+        const result = originalShopGo.call(this, id, ...args);
+        const nextPage = activePage();
+        if (!handlingPopState && shopScreen.classList.contains('active') && nextPage !== previousPage) {
+            history.pushState({ tdStoreNavigation: true, tdStorePage: nextPage }, '', location.href);
+        }
+        return result;
+    };
+    window.shopGo = shopGo;
+
+    if (!history.state || history.state.tdStoreNavigation !== true) {
+        history.pushState({
+            tdStoreNavigation: true,
+            tdStorePage: activePage(),
+            tdStoreGuard: true
+        }, '', location.href);
+    }
+
+    window.addEventListener('popstate', event => {
+        const modal = activeModal();
+        if (modal) {
+            modal.classList.remove('active');
+            history.pushState({
+                tdStoreNavigation: true,
+                tdStorePage: activePage()
+            }, '', location.href);
+            return;
+        }
+
+        if (event.state && event.state.tdStoreNavigation === true) {
+            const targetPage = event.state.tdStorePage || 'shop';
+            if (targetPage !== activePage()) {
+                handlingPopState = true;
+                originalShopGo(targetPage);
+                handlingPopState = false;
+            }
+            return;
+        }
+
+        if (activePage() === 'shop') {
+            const message = state.currentLang === 'fr'
+                ? 'Voulez-vous quitter la boutique et vous déconnecter ?'
+                : 'هل تريد الخروج من المتجر وتسجيل الخروج؟';
+
+            if (window.confirm(message)) {
+                if (state.session && state.session.role === 'customer') {
+                    handlingPopState = true;
+                    logoutCustomer();
+                    handlingPopState = false;
+                }
+                return;
+            }
+
+            history.pushState({
+                tdStoreNavigation: true,
+                tdStorePage: 'shop',
+                tdStoreGuard: true
+            }, '', location.href);
+            return;
+        }
+
+        handlingPopState = true;
+        originalShopGo('shop');
+        handlingPopState = false;
+        history.pushState({
+            tdStoreNavigation: true,
+            tdStorePage: 'shop',
+            tdStoreGuard: true
+        }, '', location.href);
+    });
+})();
