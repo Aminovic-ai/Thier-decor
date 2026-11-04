@@ -3418,6 +3418,7 @@ window.renderAdminRequests = renderAdminRequests;
         return page && page.id.startsWith('s-') ? page.id.slice(2) : 'shop';
     };
     const activeModal = () => {
+        if (!shopScreen.classList.contains('active')) return null;
         const modals = document.querySelectorAll('.modal-overlay.active');
         return modals.length ? modals[modals.length - 1] : null;
     };
@@ -3443,6 +3444,7 @@ window.renderAdminRequests = renderAdminRequests;
     }
 
     window.addEventListener('popstate', event => {
+        if (!shopScreen.classList.contains('active')) return;
         const modal = activeModal();
         if (modal) {
             modal.classList.remove('active');
