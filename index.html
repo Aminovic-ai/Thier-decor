@@ -10,8 +10,8 @@
     <link rel="icon" href="favicon.png" type="image/png">
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&family=Tajawal:wght@400;700;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="style.css">
-    <link rel="stylesheet" href="custom.css?v=40">
+    <link rel="stylesheet" href="style.css?v=41">
+    <link rel="stylesheet" href="custom.css?v=41">
 </head>
 <body>
     <div class="screen active" id="screen-shop">
@@ -457,8 +457,26 @@
     <script src="supabase-config.js"></script>
     
     <script src="https://cdn.jsdelivr.net/npm/crypto-js@4.1.1/crypto-js.min.js"></script>
-    <script src="app.js"></script>
+    <script src="app.js?v=42"></script>
     <script src="analytics-notifications.js"></script>
+    <script>
+        // Register the storefront service worker and check for fresh assets on each visit.
+        if ('serviceWorker' in navigator) {
+            const hadActiveController = !!navigator.serviceWorker.controller;
+            let refreshedAfterUpdate = false;
+            navigator.serviceWorker.addEventListener('controllerchange', () => {
+                if (hadActiveController && !refreshedAfterUpdate) {
+                    refreshedAfterUpdate = true;
+                    window.location.reload();
+                }
+            });
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' })
+                    .then(registration => registration.update())
+                    .catch(error => console.warn('Store update check unavailable:', error));
+            });
+        }
+    </script>
    
 </body>
 </html>
