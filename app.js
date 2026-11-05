@@ -2465,6 +2465,37 @@ function switchSettingsTab(tab, btn) {
 }
 window.switchSettingsTab = switchSettingsTab;
 
+function toggleAdminSettingsPanel(panel) {
+    const ids = {
+        featured: 'admin-settings-featured-panel',
+        categories: 'admin-settings-categories-panel',
+        ads: 'admin-settings-ads-panel'
+    };
+    const targetId = ids[panel];
+    if (!targetId) return;
+    const target = document.getElementById(targetId);
+    if (!target) return;
+    const shouldOpen = target.hidden;
+    Object.values(ids).forEach(id => {
+        const element = document.getElementById(id);
+        if (element) element.hidden = true;
+    });
+    target.hidden = !shouldOpen;
+    const labels = {
+        featured: ['المنتجات المميزة', 'Produits à la une'],
+        categories: ['ترتيب الأصناف', 'Ordre des catégories'],
+        ads: ['تفاصيل الإشهار', 'Détails de la publicité']
+    };
+    Object.entries(labels).forEach(([key, values]) => {
+        const button = document.querySelector(`.admin-settings-shortcut[onclick="toggleAdminSettingsPanel('${key}')"]`);
+        if (button) button.classList.toggle('active', key === panel && shouldOpen);
+        const label = document.getElementById(`admin-settings-${key}-label`);
+        if (label) label.textContent = state.currentLang === 'fr' ? values[1] : values[0];
+    });
+    if (shouldOpen) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+window.toggleAdminSettingsPanel = toggleAdminSettingsPanel;
+
 function renderAdminHome() {
     const cap = state.products.reduce((s, p) => s + Number(p.cost || 0) * Number(p.qty || 0), 0); const sT = state.orders.reduce((s, o) => s + Number(o.itemsTotal || 0), 0) + Number(state.settings.manualSalesAdjustment || 0); const eT = state.expenses.reduce((s, e) => s + Number(e.amount || 0), 0);
     document.getElementById('a-capital-value').textContent = fmtMoney(cap); document.getElementById('a-total-sales').textContent = fmtMoney(sT); document.getElementById('a-total-expenses').textContent = fmtMoney(eT); document.getElementById('a-net-profit').textContent = fmtMoney(sT - cap - eT);
