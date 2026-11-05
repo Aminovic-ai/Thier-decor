@@ -1,4 +1,4 @@
-const CACHE_NAME = 'thier-decor-v43';
+const CACHE_NAME = 'thier-decor-v44';
 const ASSETS_TO_CACHE = [
     './', './index.html', './admin.html', './style.css?v=41', './custom.css?v=43', './app.js?v=42', './featured-products.js?v=1',
     './analytics-notifications.js', './td-config.js', './supabase-config.js',
@@ -23,7 +23,7 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => {
     const request = event.request;
     const url = new URL(request.url);
-    if (url.origin !== self.location.origin || /supabase\.co|firebaseio\.com|googleapis\.com|gstatic\.com/i.test(url.hostname)) return;
+    if (url.origin !== self.location.origin || /supabase\\.co|firebaseio\\.com|googleapis\\.com|gstatic\\.com/i.test(url.hostname)) return;
     if (request.method !== 'GET') return;
 
     const isPage = request.mode === 'navigate' || url.pathname.endsWith('.html') || url.pathname.endsWith('/');
