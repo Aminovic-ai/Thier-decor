@@ -249,12 +249,18 @@
                         <button class="tab-btn" onclick="switchSettingsTab('coupons', this)" data-i18n="coupons_tab">كوبونات الخصم</button>
                     </div>
                     <div class="settings-content active" id="set-tab-general" style="display:block;">
+                        <div class="admin-settings-shortcuts" role="group" aria-label="أقسام إعدادات المتجر">
+                            <button type="button" class="admin-settings-shortcut" onclick="toggleAdminSettingsPanel('featured')"><i class="fas fa-star"></i><span id="admin-settings-featured-label">المنتجات المميزة</span></button>
+                            <button type="button" class="admin-settings-shortcut" onclick="toggleAdminSettingsPanel('categories')"><i class="fas fa-layer-group"></i><span id="admin-settings-categories-label">ترتيب الأصناف</span></button>
+                            <button type="button" class="admin-settings-shortcut" onclick="toggleAdminSettingsPanel('ads')"><i class="fas fa-images"></i><span id="admin-settings-ads-label">تفاصيل الإشهار</span></button>
+                        </div>
                         <div class="form-card">
                             <div class="form-group"><label data-i18n="shop_name">اسم المتجر</label><input type="text" id="set-shop"></div>
                             <div class="form-group"><label data-i18n="shop_phone">رقم الهاتف</label><input type="text" id="set-phone"></div>
                             <div class="form-group"><label data-i18n="shop_address">عنوان المتجر</label><input type="text" id="set-address"></div>
                             <div class="form-group"><label data-i18n="promo_text">شريط النص المتحرك</label><textarea id="set-promo-text" rows="2"></textarea></div>
                             <label><input type="checkbox" id="set-promo-active"> <span data-i18n="activate_promo">تفعيل شريط النص</span></label>
+                            <div id="admin-settings-ads-panel" class="admin-settings-panel-body" hidden>
                             <div class="ad-management-panel">
                                 <div class="ad-management-heading">
                                     <div class="ad-heading-icon"><i class="fas fa-images"></i></div>
@@ -268,8 +274,10 @@
                                 <div class="form-group ad-upload-group"><label data-i18n="ad_images">صور الإشهار</label><label class="ad-upload-drop" for="set-ad-images"><i class="fas fa-cloud-upload-alt"></i><strong>اضغط لاختيار الصور</strong><small>يمكنك اختيار عدة صور من هاتفك أو حاسوبك</small><input type="file" id="set-ad-images" accept="image/*" multiple onchange="handleAdImageUpload(event)"></label><div id="set-ad-preview" class="image-preview-grid ad-thumbnails"></div></div>
                                 <div class="ad-live-card"><div class="ad-live-title"><i class="far fa-eye"></i><span>معاينة الإشهار</span></div><div id="ad-live-preview" class="ad-live-preview"><div class="ad-empty-preview"><i class="fas fa-images"></i><span>أضف صورًا لمعاينة الإشهار</span></div></div></div>
                             </div>
+                            </div>
                             <button class="btn-primary" onclick="saveSettingsToCloud()" style="margin-top:15px; width:100%;" data-i18n="save_settings">حفظ الإعدادات</button>
                         </div>
+                        <div id="admin-settings-featured-panel" class="admin-settings-panel-body" hidden>
                         <div class="form-card featured-products-admin-card" id="featured-products-admin-panel">
                             <div class="featured-admin-heading">
                                 <span class="featured-admin-icon"><i class="fas fa-star"></i></span>
@@ -279,6 +287,8 @@
                             <div id="featured-products-admin-list" class="featured-products-admin-list"></div>
                             <button type="button" class="btn-primary featured-admin-save" onclick="saveFeaturedProducts()"><i class="fas fa-save"></i> <span id="featured-admin-save-label">حفظ ترتيب المنتجات</span></button>
                     </div>
+                        </div>
+                        <div id="admin-settings-categories-panel" class="admin-settings-panel-body" hidden>
                         <div class="form-card category-order-admin-card" id="category-order-admin-panel">
                             <div class="featured-admin-heading">
                                 <span class="featured-admin-icon"><i class="fas fa-layer-group"></i></span>
@@ -287,6 +297,7 @@
                             <div id="category-order-admin-count" class="featured-admin-count"></div>
                             <div id="category-order-admin-list" class="featured-products-admin-list"></div>
                             <button type="button" class="btn-primary featured-admin-save" onclick="saveCategoryOrder()"><i class="fas fa-save"></i> <span id="category-order-admin-save-label">حفظ ترتيب الأصناف</span></button>
+                        </div>
                         </div>
                         </div>
                     <div class="settings-content" id="set-tab-yalidine-prices" style="display:none;">
