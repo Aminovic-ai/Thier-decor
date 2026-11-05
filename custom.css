@@ -1423,3 +1423,23 @@ a { text-underline-offset: 3px; }
     margin-top: 14px;
   }
 }
+
+
+/* Fix: keep mobile category names visible in the header strip by default. */
+@media (max-width: 680px) {
+  #screen-shop #mobile-category-bar {
+    display: block !important;
+    max-height: 104px;
+    visibility: visible !important;
+    opacity: 1 !important;
+  }
+  #screen-shop #mobile-category-bar .category-icon-item {
+    display: inline-flex !important;
+  }
+  #screen-shop #mobile-category-bar .category-label {
+    display: -webkit-box !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    color: #456b83 !important;
+  }
+}
