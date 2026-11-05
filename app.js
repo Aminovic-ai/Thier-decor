@@ -1673,8 +1673,8 @@ window.renderShop = renderShop;
 
 function getProductVariantKey(product) {
     if (!product || product.isPack) return 'single:' + String(product?.id ?? '');
-    const normalizedName = String(product.name || '').trim().replace(/\\s+/g, ' ').toLocaleLowerCase();
-    const normalizedCategory = String(product.category || '').trim().replace(/\\s+/g, ' ').toLocaleLowerCase();
+    const normalizedName = String(product.name || '').trim().replace(/\s+/g, ' ').toLocaleLowerCase();
+    const normalizedCategory = String(product.category || '').trim().replace(/\s+/g, ' ').toLocaleLowerCase();
     const price = Number(effectiveProductPrice(product)) || 0;
     return JSON.stringify([normalizedName, normalizedCategory, price]);
 }
@@ -1809,7 +1809,7 @@ function showProductView(id) {
         </div>` : '';
     document.getElementById('pv-name').textContent = p.name;
     document.getElementById('pv-price').textContent = fmtMoney(effectiveProductPrice(p));
-    const packDescription = p.isPack && Array.isArray(p.packItems) ? `\\n\\n${i18n[state.currentLang].pack_items}: ${p.packItems.map(item => { const product=state.products.find(x=>x.id===item.id); return product ? `${product.name} × ${item.qty}` : ''; }).filter(Boolean).join(', ')}` : '';
+    const packDescription = p.isPack && Array.isArray(p.packItems) ? `\n\n${i18n[state.currentLang].pack_items}: ${p.packItems.map(item => { const product=state.products.find(x=>x.id===item.id); return product ? `${product.name} × ${item.qty}` : ''; }).filter(Boolean).join(', ')}` : '';
     document.getElementById('pv-desc').textContent = (p.desc || '') + packDescription;
     const variantsBox = document.getElementById('pv-variants');
     if (variantsBox) variantsBox.innerHTML = variantPicker;
