@@ -1706,6 +1706,10 @@ function getCurrentShopProducts() {
 function updateShopSectionHeading() {
     const title = document.getElementById('featured-products-title');
     const description = document.getElementById('featured-products-description');
+    const hint = document.getElementById('shop-category-hint');
+    const context = document.getElementById('shop-products-context');
+    if (hint) hint.textContent = state.currentLang === 'fr' ? 'Choisissez une catégorie pour découvrir ses produits' : 'اختر صنفاً لاكتشاف منتجاته';
+    if (context) context.textContent = state.currentLang === 'fr' ? 'Produits disponibles' : 'المنتجات المتاحة';
     if (!title || !description) return;
     if (currentCategory === 'all') {
         title.textContent = state.currentLang === 'fr' ? 'Sélection du moment' : 'المنتجات المميزة';
@@ -1726,7 +1730,15 @@ window.sortShopProducts = sortShopProducts;
 
 function renderShop() {
     updateShopSectionHeading();
-    renderShopHTML(getCurrentShopProducts());
+    const newProductsBox = document.getElementById('new-products-box');
+    if (newProductsBox) newProductsBox.style.display = 'none';
+    const products = getCurrentShopProducts();
+    if (currentCategory === 'all' && getFeaturedProductIds().length === 0) {
+        const container = document.getElementById('s-products');
+        if (container) container.innerHTML = `<div class="featured-empty-state"><i class="fas fa-star"></i><strong>${state.currentLang === 'fr' ? 'Aucun produit vedette pour le moment' : 'لا توجد منتجات مميزة حالياً'}</strong><span>${state.currentLang === 'fr' ? 'Choisissez les produits à mettre en avant depuis les paramètres administrateur.' : 'اختر المنتجات التي تريد إبرازها من إعدادات المسؤول.'}</span></div>`;
+        return;
+    }
+    renderShopHTML(products);
 }
 window.renderShop = renderShop;
 
@@ -3147,6 +3159,12 @@ let featuredProductDraft = null;
 function renderFeaturedProductsAdmin() {
     const container = document.getElementById('featured-products-admin-list');
     const count = document.getElementById('featured-products-admin-count');
+    const title = document.getElementById('featured-admin-title');
+    const description = document.getElementById('featured-admin-description');
+    const saveLabel = document.getElementById('featured-admin-save-label');
+    if (title) title.textContent = state.currentLang === 'fr' ? 'Produits vedettes' : 'المنتجات المميزة';
+    if (description) description.textContent = state.currentLang === 'fr' ? 'Choisissez les produits à afficher en premier et définissez leur ordre.' : 'اختر المنتجات التي تريد عرضها أولاً ورتب ظهورها للزبائن.';
+    if (saveLabel) saveLabel.textContent = state.currentLang === 'fr' ? 'Enregistrer la sélection' : 'حفظ ترتيب المنتجات';
     if (!container) return;
     if (!Array.isArray(featuredProductDraft)) featuredProductDraft = getFeaturedProductIds();
     const selected = new Set(featuredProductDraft.map(String));
