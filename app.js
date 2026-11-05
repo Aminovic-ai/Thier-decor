@@ -1648,26 +1648,96 @@ function updateStoreBranding() {
 }
 window.updateStoreBranding = updateStoreBranding;
 
+function getFeaturedProductIds() {
+    const stored = state.settings?.customPrices?.__featuredProductIds;
+    return Array.isArray(stored) ? stored.map(String) : [];
+}
+function getFeaturedProducts() {
+    const ids = getFeaturedProductIds();
+    const available = state.products.filter(p => Number(p.qty) > 0);
+    return ids.length ? ids.map(id => available.find(p => String(p.id) === id)).filter(Boolean) : [];
+}
+function categoryIconForName(name) {
+    const value = String(name || '').toLocaleLowerCase();
+    const rules = [
+        [/lamp|مصباح|إضاءة|اضاءة|lum|éclair|eclair/, 'fa-lightbulb'],
+        [/clock|horloge|ساعة|ساعات/, 'fa-clock'],
+        [/déco|deco|ديكور|زينة|décoration/, 'fa-wand-magic-sparkles'],
+        [/gift|cadeau|هدية|هدايا/, 'fa-gift'],
+        [/vase|مزهرية|مزهر|زهور|fleur/, 'fa-seedling'],
+        [/frame|cadre|إطار|اطار|لوحة|tableau/, 'fa-image'],
+        [/kitchen|cuisine|مطبخ|مطبخية/, 'fa-kitchen-set'],
+        [/bed|lit|غرفة|نوم|وسادة/, 'fa-bed'],
+        [/chair|كرسي|أثاث|اثاث|meuble|canapé|canape/, 'fa-couch'],
+        [/bath|حمام|salle de bain/, 'fa-bath'],
+        [/pack|مجموعة|طقم|lot/, 'fa-box-open']
+    ];
+    const match = rules.find(([pattern]) => pattern.test(value));
+    return match ? match[1] : 'fa-shapes';
+}
 function renderCategories() {
     const c = document.getElementById('store-categories'); if (!c) return;
-    const categories = ['all', ...new Set(state.products.map(p => p.category).filter(Boolean))];
-    c.innerHTML = categories.map(cat => `<div class="category-item ${cat === currentCategory ? 'active' : ''}" onclick="filterByCategory('${cat}')">${cat === 'all' ? i18n[state.currentLang].all : esc(cat)}</div>`).join('');
+    const categories = ['all', ...new Set(state.products.map(p => String(p.category || '').trim()).filter(Boolean))];
+    c.innerHTML = categories.map(cat => {
+        const isAll = cat === 'all';
+        const label = isAll ? i18n[state.currentLang].all : cat;
+        const icon = isAll ? 'fa-star' : categoryIconForName(cat);
+        const safeCategory = JSON.stringify(cat).replace(/</g, '\\u003c');
+        return `<button type="button" class="category-item category-icon-item ${cat === currentCategory ? 'active' : ''}" onclick="filterByCategory(${safeCategory})" aria-pressed="${cat === currentCategory ? 'true' : 'false'}"><span class="category-icon"><i class="fas ${icon}" aria-hidden="true"></i></span><span class="category-label">${esc(label)}</span></button>`;
+    }).join('');
 }
 window.renderCategories = renderCategories;
 
-function filterByCategory(cat) { currentCategory = cat; renderCategories(); renderShop(); }
+function filterByCategory(cat) {
+    currentCategory = cat;
+    renderCategories();
+    const search = document.getElementById('shop-search-input');
+    if (search) search.value = '';
+    renderShop();
+}
 window.filterByCategory = filterByCategory;
 
+function getCurrentShopProducts() {
+    const available = state.products.filter(p => Number(p.qty) > 0);
+    if (currentCategory !== 'all') return available.filter(p => String(p.category || '').trim() === currentCategory);
+    return getFeaturedProducts();
+}
+function updateShopSectionHeading() {
+    const title = document.getElementById('featured-products-title');
+    const description = document.getElementById('featured-products-description');
+    const hint = document.getElementById('shop-category-hint');
+    const context = document.getElementById('shop-products-context');
+    if (hint) hint.textContent = state.currentLang === 'fr' ? 'Choisissez une catégorie pour découvrir ses produits' : 'اختر صنفاً لاكتشاف منتجاته';
+    if (context) context.textContent = state.currentLang === 'fr' ? 'Produits disponibles' : 'المنتجات المتاحة';
+    if (!title || !description) return;
+    if (currentCategory === 'all') {
+        title.textContent = state.currentLang === 'fr' ? 'Sélection du moment' : 'المنتجات المميزة';
+        description.textContent = state.currentLang === 'fr' ? 'Nos coups de cœur, sélectionnés pour vous' : 'اختياراتنا المميزة لكم';
+    } else {
+        title.textContent = currentCategory;
+        description.textContent = state.currentLang === 'fr' ? 'Découvrez les produits de cette catégorie' : 'اكتشف منتجات هذا الصنف';
+    }
+}
 function sortShopProducts(val) {
-    let list = state.products.filter(p => p.qty > 0); if (currentCategory !== 'all') list = list.filter(p => p.category === currentCategory);
-    if (val === 'price-asc') list.sort((a,b) => a.price - b.price); else if (val === 'price-desc') list.sort((a,b) => b.price - a.price); else if (val === 'newest') list.sort((a,b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+    let list = getCurrentShopProducts().slice();
+    if (val === 'price-asc') list.sort((a,b) => effectiveProductPrice(a) - effectiveProductPrice(b));
+    else if (val === 'price-desc') list.sort((a,b) => effectiveProductPrice(b) - effectiveProductPrice(a));
+    else if (val === 'newest') list.sort((a,b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
     renderShopHTML(list);
 }
 window.sortShopProducts = sortShopProducts;
 
 function renderShop() {
-    let list = state.products.filter(p => p.qty > 0); if (currentCategory !== 'all') list = list.filter(p => p.category === currentCategory);
-    renderShopHTML(list); renderNewProducts();
+    updateShopSectionHeading();
+    const newProductsBox = document.getElementById('new-products-box');
+    if (newProductsBox) newProductsBox.style.display = 'none';
+    const products = getCurrentShopProducts();
+    if (currentCategory === 'all' && getFeaturedProductIds().length === 0) {
+        const container = document.getElementById('s-products');
+        if (container) container.innerHTML = `<div class="featured-empty-state"><i class="fas fa-star"></i><strong>${state.currentLang === 'fr' ? 'Aucun produit vedette pour le moment' : 'لا توجد منتجات مميزة حالياً'}</strong><span>${state.currentLang === 'fr' ? 'Choisissez les produits à mettre en avant depuis les paramètres administrateur.' : 'اختر المنتجات التي تريد إبرازها من إعدادات المسؤول.'}</span></div>`;
+        return;
+    }
+    renderShopHTML(products);
 }
 window.renderShop = renderShop;
 
@@ -1742,20 +1812,17 @@ function renderShopHTML(list) {
 }
 
 function renderNewProducts() {
-    const box = document.getElementById('new-products-box'); const list = document.getElementById('new-products-list'); if (!box || !list) return;
-    const sevenDaysAgo = Date.now() - (7 * 24 * 60 * 60 * 1000);
-    const candidates = state.products.filter(p => p.qty > 0 && p.createdAt && Number.isFinite(new Date(p.createdAt).getTime()) && new Date(p.createdAt).getTime() > sevenDaysAgo).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-    const seenGroups = new Set();
-    const newProds = candidates.filter(product => { const key = getProductVariantKey(product); if (seenGroups.has(key)) return false; seenGroups.add(key); return true; }).slice(0, 10);
-    if (newProds.length === 0) { box.style.display = 'none'; return; }
-    box.style.display = 'block';
-    list.innerHTML = newProds.map(p => { const count = getProductVariants(p.id).length; return `<div onclick="showProductView(${p.id})" style="min-width:140px; background:#fff; border-radius:10px; border:1px solid var(--border); padding:10px; cursor:pointer; text-align:center;"><div style="height:80px; background:var(--bg-light); border-radius:6px; display:flex; align-items:center; justify-content:center; font-size:2rem; margin-bottom:8px; position:relative;">${p.images && p.images[0] ? `<img src="${esc(p.images[0])}" style="width:100%;height:100%;object-fit:contain;">` : '📦'}${count > 1 ? `<span class="product-variant-count">${state.currentLang === 'fr' ? count + ' modèles' : count + ' أشكال'}</span>` : ''}</div><div style="font-size:0.8rem; font-weight:bold; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${esc(p.name)}</div><div style="font-size:0.9rem; font-weight:900; color:#000; margin-top:5px;">${fmtMoney(effectiveProductPrice(p))}</div></div>`; }).join('');
+    const box = document.getElementById('new-products-box');
+    if (box) box.style.display = 'none';
 }
 window.renderNewProducts = renderNewProducts;
 
 function filterShopProducts(q) {
-    const c = document.getElementById('s-products'); if (!c) return; if (!q.trim()) { renderShop(); return; }
-    const lq = q.toLowerCase(); let list = state.products.filter(p => p.qty > 0 && (p.name.toLowerCase().includes(lq) || (p.category || '').toLowerCase().includes(lq)));
+    const c = document.getElementById('s-products'); if (!c) return;
+    if (!q.trim()) { renderShop(); return; }
+    const lq = q.toLocaleLowerCase();
+    let list = state.products.filter(p => Number(p.qty) > 0 && (String(p.name || '').toLocaleLowerCase().includes(lq) || String(p.category || '').toLocaleLowerCase().includes(lq)));
+    if (currentCategory !== 'all') list = list.filter(p => String(p.category || '').trim() === currentCategory);
     renderShopHTML(list);
 }
 window.filterShopProducts = filterShopProducts;
@@ -3074,7 +3141,7 @@ function renderAdminDebts() {
 window.renderAdminDebts = renderAdminDebts;
 
 function renderAdminSettings() {
-    document.getElementById('set-shop').value = state.settings.shopName || ''; document.getElementById('set-phone').value = state.settings.shopPhone || ''; const addressInput = document.getElementById('set-address'); if (addressInput) addressInput.value = state.settings.shopAddress || ''; 
+    document.getElementById('set-shop').value = state.settings.shopName || ''; document.getElementById('set-phone').value = state.settings.shopPhone || ''; const addressInput = document.getElementById('set-address'); if (addressInput) addressInput.value = state.settings.shopAddress || '';
     document.getElementById('set-promo-text').value = state.settings.promoText || ''; document.getElementById('set-promo-active').checked = !!state.settings.promoActive;
     document.getElementById('set-ad-active').checked = !!state.settings.adActive; document.getElementById('set-ad-text').value = state.settings.adText || '';
     document.getElementById('set-ad-endtime').value = state.settings.adEndTime || ''; tempAdImages = state.settings.adImages || []; renderAdPreviews();
