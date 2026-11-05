@@ -1671,25 +1671,62 @@ function renderShop() {
 }
 window.renderShop = renderShop;
 
+function getProductVariantKey(product) {
+    if (!product || product.isPack) return 'single:' + String(product?.id ?? '');
+    const normalizedName = String(product.name || '').trim().replace(/\\s+/g, ' ').toLocaleLowerCase();
+    const normalizedCategory = String(product.category || '').trim().replace(/\\s+/g, ' ').toLocaleLowerCase();
+    const price = Number(effectiveProductPrice(product)) || 0;
+    return JSON.stringify([normalizedName, normalizedCategory, price]);
+}
+function getProductVariants(productId) {
+    const selected = state.products.find(product => String(product.id) === String(productId));
+    if (!selected) return [];
+    if (selected.isPack) return [selected];
+    const key = getProductVariantKey(selected);
+    return state.products.filter(product => Number(product.qty) > 0 && !product.isPack && getProductVariantKey(product) === key);
+}
+window.getProductVariants = getProductVariants;
+function addProductFromCard(productId) {
+    const variants = getProductVariants(productId);
+    if (variants.length > 1) return showProductView(productId);
+    return addToCart(productId);
+}
+window.addProductFromCard = addProductFromCard;
+
 function renderShopHTML(list) {
     const c = document.getElementById('s-products'); if (!c) return;
     if (list.length === 0) { c.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:40px;">${i18n[state.currentLang].no_products}</div>`; return; }
-    
-    c.innerHTML = list.map(p => {
+
+    const visibleIds = new Set(list.map(product => String(product.id)));
+    const seenGroups = new Set();
+    const cards = [];
+    list.forEach(product => {
+        const key = getProductVariantKey(product);
+        if (seenGroups.has(key)) return;
+        seenGroups.add(key);
+        const variants = getProductVariants(product.id).filter(variant => visibleIds.has(String(variant.id)));
+        cards.push({ product, variants: variants.length ? variants : [product] });
+    });
+
+    c.innerHTML = cards.map(({ product: p, variants }) => {
         const imageSrc = (p.images && p.images[0] && p.images[0].length > 10) ? esc(p.images[0]) : null;
         const promoPrice = effectiveProductPrice(p);
         const isPromo = promoPrice < Number(p.price);
         const isWish = state.wishlist.includes(p.id);
+        const variantBadge = variants.length > 1
+            ? `<span class="product-variant-count">${state.currentLang === 'fr' ? variants.length + ' modèles' : variants.length + ' أشكال'}</span>`
+            : '';
 
         return `<div class="product-card" onclick="showProductView(${p.id})">
             <div class="product-img">
                 ${imageSrc ? `<img src="${imageSrc}" loading="lazy" alt="${esc(p.name)}" onerror="this.onerror=null; this.parentElement.innerHTML='<i class=\\'fas fa-image\\' style=\\'color:#cbd5e1;font-size:2rem;\\'></i>';">` : '<i class="fas fa-image" style="color:#cbd5e1;font-size:2rem;"></i>'}
+                ${variantBadge}
             </div>
             <div class="product-actions-under-image">
                 <button type="button" class="product-mini-action ${isWish ? 'is-favorite' : ''}" title="${state.currentLang === 'ar' ? 'أضف إلى المفضلة' : 'Ajouter aux favoris'}" aria-label="${state.currentLang === 'ar' ? 'أضف إلى المفضلة' : 'Ajouter aux favoris'}" onclick="event.stopPropagation();toggleWishlist(${p.id})">
                     <i class="fas fa-heart"></i>
                 </button>
-                <button type="button" class="product-mini-action product-mini-cart" title="${state.currentLang === 'ar' ? 'أضف إلى السلة' : 'Ajouter au panier'}" aria-label="${state.currentLang === 'ar' ? 'أضف إلى السلة' : 'Ajouter au panier'}" onclick="event.stopPropagation();addToCart(${p.id})">
+                <button type="button" class="product-mini-action product-mini-cart" title="${state.currentLang === 'ar' ? 'اختر الشكل' : 'Choisir le modèle'}" aria-label="${state.currentLang === 'ar' ? 'اختر الشكل' : 'Choisir le modèle'}" onclick="event.stopPropagation();addProductFromCard(${p.id})">
                     <i class="fas fa-shopping-basket"></i>
                 </button>
             </div>
@@ -1706,10 +1743,13 @@ function renderShopHTML(list) {
 
 function renderNewProducts() {
     const box = document.getElementById('new-products-box'); const list = document.getElementById('new-products-list'); if (!box || !list) return;
-    const sevenDaysAgo = Date.now() - (7 * 24 * 60 * 60 * 1000); const newProds = state.products.filter(p => p.qty > 0 && p.createdAt && Number.isFinite(new Date(p.createdAt).getTime()) && new Date(p.createdAt).getTime() > sevenDaysAgo).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(0, 10);
+    const sevenDaysAgo = Date.now() - (7 * 24 * 60 * 60 * 1000);
+    const candidates = state.products.filter(p => p.qty > 0 && p.createdAt && Number.isFinite(new Date(p.createdAt).getTime()) && new Date(p.createdAt).getTime() > sevenDaysAgo).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    const seenGroups = new Set();
+    const newProds = candidates.filter(product => { const key = getProductVariantKey(product); if (seenGroups.has(key)) return false; seenGroups.add(key); return true; }).slice(0, 10);
     if (newProds.length === 0) { box.style.display = 'none'; return; }
     box.style.display = 'block';
-    list.innerHTML = newProds.map(p => `<div onclick="showProductView(${p.id})" style="min-width:140px; background:#fff; border-radius:10px; border:1px solid var(--border); padding:10px; cursor:pointer; text-align:center;"><div style="height:80px; background:var(--bg-light); border-radius:6px; display:flex; align-items:center; justify-content:center; font-size:2rem; margin-bottom:8px;">${p.images && p.images[0] ? `<img src="${esc(p.images[0])}" style="width:100%;height:100%;object-fit:contain;">` : '📦'}</div><div style="font-size:0.8rem; font-weight:bold; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${esc(p.name)}</div><div style="font-size:0.9rem; font-weight:900; color:#000; margin-top:5px;">${fmtMoney(effectiveProductPrice(p))}</div></div>`).join('');
+    list.innerHTML = newProds.map(p => { const count = getProductVariants(p.id).length; return `<div onclick="showProductView(${p.id})" style="min-width:140px; background:#fff; border-radius:10px; border:1px solid var(--border); padding:10px; cursor:pointer; text-align:center;"><div style="height:80px; background:var(--bg-light); border-radius:6px; display:flex; align-items:center; justify-content:center; font-size:2rem; margin-bottom:8px; position:relative;">${p.images && p.images[0] ? `<img src="${esc(p.images[0])}" style="width:100%;height:100%;object-fit:contain;">` : '📦'}${count > 1 ? `<span class="product-variant-count">${state.currentLang === 'fr' ? count + ' modèles' : count + ' أشكال'}</span>` : ''}</div><div style="font-size:0.8rem; font-weight:bold; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${esc(p.name)}</div><div style="font-size:0.9rem; font-weight:900; color:#000; margin-top:5px;">${fmtMoney(effectiveProductPrice(p))}</div></div>`; }).join('');
 }
 window.renderNewProducts = renderNewProducts;
 
@@ -1750,14 +1790,38 @@ function renderWishlist() {
 window.updateWishlistBadge = updateWishlistBadge; window.renderWishlist = renderWishlist;
 
 function showProductView(id) {
-    const p = state.products.find(x => x.id === id); if (!p) return;
-    document.getElementById('pv-name').textContent = p.name; document.getElementById('pv-price').textContent = fmtMoney(effectiveProductPrice(p)); const packDescription = p.isPack && Array.isArray(p.packItems) ? `\n\n${i18n[state.currentLang].pack_items}: ${p.packItems.map(item => { const product=state.products.find(x=>x.id===item.id); return product ? `${product.name} × ${item.qty}` : ''; }).filter(Boolean).join(', ')}` : ''; document.getElementById('pv-desc').textContent = (p.desc || '') + packDescription;
+    const p = state.products.find(x => String(x.id) === String(id)); if (!p) return;
+    const variants = getProductVariants(p.id);
+    const variantPicker = variants.length > 1 ? `
+        <div class="product-variants-picker">
+            <div class="product-variants-heading">${state.currentLang === 'fr' ? 'Choisissez la couleur ou la forme' : 'اختر اللون أو الشكل'} <small>${state.currentLang === 'fr' ? variants.length + ' modèles disponibles' : variants.length + ' أشكال متوفرة'}</small></div>
+            <div class="product-variants-list">
+                ${variants.map((variant, index) => {
+                    const thumb = Array.isArray(variant.images) && variant.images[0] ? esc(variant.images[0]) : '';
+                    const selected = String(variant.id) === String(p.id);
+                    const label = state.currentLang === 'fr' ? 'Modèle ' + (index + 1) : 'الشكل ' + (index + 1);
+                    return `<button type="button" class="product-variant-option ${selected ? 'active' : ''}" onclick="showProductView(${Number(variant.id)})" aria-label="${label}" title="${label}">
+                        ${thumb ? `<img src="${thumb}" alt="">` : '<span class="product-variant-no-image"><i class="fas fa-image"></i></span>'}
+                        <span>${label}</span><small>${state.currentLang === 'fr' ? 'Stock: ' : 'المتوفر: '}${Math.max(0, Number(variant.qty) || 0)}</small>
+                    </button>`;
+                }).join('')}
+            </div>
+        </div>` : '';
+    document.getElementById('pv-name').textContent = p.name;
+    document.getElementById('pv-price').textContent = fmtMoney(effectiveProductPrice(p));
+    const packDescription = p.isPack && Array.isArray(p.packItems) ? `\\n\\n${i18n[state.currentLang].pack_items}: ${p.packItems.map(item => { const product=state.products.find(x=>x.id===item.id); return product ? `${product.name} × ${item.qty}` : ''; }).filter(Boolean).join(', ')}` : '';
+    document.getElementById('pv-desc').textContent = (p.desc || '') + packDescription;
+    const variantsBox = document.getElementById('pv-variants');
+    if (variantsBox) variantsBox.innerHTML = variantPicker;
     const imgBox = document.getElementById('pv-image-box');
-    if (p.images && p.images.length > 0) { imgBox.innerHTML = `<div class="product-gallery">${p.images.map(img => `<img src="${esc(img)}">`).join('')}</div>`; }
+    if (p.images && p.images.length > 0) { imgBox.innerHTML = `<div class="product-gallery">${p.images.map(img => `<img src="${esc(img)}" alt="${esc(p.name)}">`).join('')}</div>`; }
     else { imgBox.innerHTML = '<div style="height:200px;background:#f1f5f9;text-align:center;font-size:3rem;">📦</div>'; }
-    const revList = document.getElementById('pv-reviews-list'); if (p.reviews && p.reviews.length > 0) { revList.innerHTML = p.reviews.map(r => `<div style="border-bottom:1px dashed #eee; padding:5px 0;"><strong>${esc(r.name)}</strong> <span style="color:#f59e0b;">${'⭐'.repeat(r.stars)}</span><br><small>${esc(r.text)}</small></div>`).join(''); } else { revList.innerHTML = `<small>${i18n[state.currentLang].no_reviews}</small>`; }
-    document.getElementById('pv-add-to-cart').setAttribute('data-id', p.id);
-    document.getElementById('pv-add-to-cart').onclick = () => { addToCart(p.id); closeModal('m-product-view'); };
+    const revList = document.getElementById('pv-reviews-list');
+    if (p.reviews && p.reviews.length > 0) { revList.innerHTML = p.reviews.map(r => `<div style="border-bottom:1px dashed #eee; padding:5px 0;"><strong>${esc(r.name)}</strong> <span style="color:#f59e0b;">${'⭐'.repeat(r.stars)}</span><br><small>${esc(r.text)}</small></div>`).join(''); }
+    else { revList.innerHTML = `<small>${i18n[state.currentLang].no_reviews}</small>`; }
+    const addButton = document.getElementById('pv-add-to-cart');
+    addButton.setAttribute('data-id', p.id);
+    addButton.onclick = () => { addToCart(p.id); closeModal('m-product-view'); };
     openModal('m-product-view');
 }
 window.showProductView = showProductView;
@@ -1800,7 +1864,11 @@ window.updateCartBadge = updateCartBadge; window.updateCartQty = updateCartQty; 
 function renderCart() {
     const c = document.getElementById('s-cart-items'); const sum = document.getElementById('s-cart-summary'); if (!c) return;
     if (state.cart.length === 0) { c.innerHTML = `<div style="text-align:center;padding:40px;">${i18n[state.currentLang].cart_empty}</div>`; sum.innerHTML = ''; return; }
-    c.innerHTML = state.cart.map(i => `<div class="admin-card"><div><strong>${esc(i.name)}</strong><br><small>${fmtMoney(i.price)} x ${i.qty}</small></div><div style="display:flex;gap:10px;align-items:center;"><button onclick="updateCartQty(${i.id},-1)" style="padding:5px;">-</button><span>${i.qty}</span><button onclick="updateCartQty(${i.id},1)" style="padding:5px;">+</button><button onclick="removeFromCart(${i.id})" style="color:red;border:none;background:none;">🗑</button></div></div>`).join('');
+    c.innerHTML = state.cart.map(i => {
+        const product = state.products.find(p => String(p.id) === String(i.id));
+        const image = product && Array.isArray(product.images) && product.images[0] ? esc(product.images[0]) : '';
+        return `<div class="admin-card cart-variant-row">${image ? `<img class="cart-variant-thumb" src="${image}" alt="">` : ''}<div class="cart-variant-info"><strong>${esc(i.name)}</strong><br><small>${fmtMoney(i.price)} x ${i.qty}</small></div><div style="display:flex;gap:10px;align-items:center;"><button onclick="updateCartQty(${i.id},-1)" style="padding:5px;">-</button><span>${i.qty}</span><button onclick="updateCartQty(${i.id},1)" style="padding:5px;">+</button><button onclick="removeFromCart(${i.id})" style="color:red;border:none;background:none;">🗑</button></div></div>`;
+    }).join('');
     sum.innerHTML = `<div class="delivery-cost-box">${i18n[state.currentLang].total_price} ${fmtMoney(state.cart.reduce((s, i) => s + i.price * i.qty, 0))}</div>`;
 }
 window.renderCart = renderCart;
@@ -2450,7 +2518,13 @@ window.deleteOrder = deleteOrder;
 
 function viewOrderDetails(orderId) {
     const order = state.orders.find(o => o.id === orderId); if (!order) return; const customer = state.customers.find(c => c.phone === order.customerPhone); const isVip = customer && customer.isVip;
-    const itemsHtml = order.items.map(i => { const components = i.isPack && Array.isArray(i.packItems) && i.packItems.length ? `<div style="font-size:0.8rem;color:var(--text-mid);margin-top:4px;">${i.packItems.map(comp => `${esc(state.products.find(p => String(p.id) === String(comp.id))?.name || comp.name || 'Produit')} × ${Number(comp.qty)||0}`).join(' · ')}</div>` : ''; return `<div style="display:flex; justify-content:space-between; border-bottom:1px solid var(--border); padding:10px 0;"><div><strong>${esc(i.name)}</strong><br><small style="color:var(--text-mid);">${i.qty} × ${fmtMoney(i.price)}</small>${components}</div><div style="font-weight:900;">${fmtMoney(i.price * i.qty)}</div></div>`; }).join('');
+    const itemsHtml = order.items.map(i => {
+        const variantProduct = state.products.find(product => String(product.id) === String(i.id));
+        const variantImage = variantProduct && Array.isArray(variantProduct.images) && variantProduct.images[0] ? esc(variantProduct.images[0]) : '';
+        const imageHtml = variantImage ? `<img class="order-variant-thumb" src="${variantImage}" alt="" loading="lazy">` : '<span class="order-variant-thumb order-variant-placeholder"><i class="fas fa-image"></i></span>';
+        const components = i.isPack && Array.isArray(i.packItems) && i.packItems.length ? `<div style="font-size:0.8rem;color:var(--text-mid);margin-top:4px;">${i.packItems.map(comp => `${esc(state.products.find(p => String(p.id) === String(comp.id))?.name || comp.name || 'Produit')} × ${Number(comp.qty)||0}`).join(' · ')}</div>` : '';
+        return `<div class="order-variant-row">${imageHtml}<div class="order-variant-info"><strong>${esc(i.name)}</strong><br><small style="color:var(--text-mid);">${i.qty} × ${fmtMoney(i.price)}</small>${components}</div><div style="font-weight:900;">${fmtMoney(i.price * i.qty)}</div></div>`;
+    }).join('');
     const paid = order.paidAmount ?? order.total; const debt = order.total - paid;
     let actionButtons = `<div style="margin-top:20px; border-top:2px dashed var(--border); padding-top:15px;"><h4 style="margin-bottom:10px; color:var(--primary);">Actions</h4><button onclick="makeDeliveryFree(${order.id})" class="btn-secondary" style="margin-bottom:10px; background:#10b981; color:white;"><i class="fas fa-truck"></i> ${i18n[state.currentLang].free_delivery}</button><button onclick="openEditOrder(${order.id})" class="btn-secondary" style="margin-bottom:10px; background:#f59e0b; color:white;"><i class="fas fa-edit"></i> ${i18n[state.currentLang].edit_order}</button>`;
     const itemsOnly = order.itemsTotal ?? (order.total - (order.deliveryPrice || 0));
