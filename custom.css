@@ -1852,3 +1852,25 @@ a { text-underline-offset: 3px; }
 #screen-shop .mobile-nav-item.active:before {
   background: #a83f68 !important;
 }
+
+
+/* Product-card favorite action: match the strong berry shopping-bag action. */
+#screen-shop .product-actions-under-image .product-mini-action[onclick*="toggleWishlist"] {
+  background: linear-gradient(135deg,#b94e78,#963657) !important;
+  border: 1px solid #963657 !important;
+  color: #fff !important;
+  box-shadow: 0 4px 12px rgba(150,54,87,.20) !important;
+}
+#screen-shop .product-actions-under-image .product-mini-action[onclick*="toggleWishlist"] i {
+  color: #fff !important;
+}
+#screen-shop .product-actions-under-image .product-mini-action[onclick*="toggleWishlist"].is-favorite {
+  background: linear-gradient(135deg,#a83f68,#87304f) !important;
+  border-color: #87304f !important;
+  color: #fff !important;
+}
+#screen-shop .store-nav .nav-links li,
+#screen-shop .store-nav .nav-links li a { cursor: pointer; }
+#screen-shop .store-nav .nav-links li a i { color: #a83f68 !important; }
+#screen-shop .store-nav .nav-links li.active a,
+#screen-shop .store-nav .nav-links li.active a i { color: #87304f !important; }
