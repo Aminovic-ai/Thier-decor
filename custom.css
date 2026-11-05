@@ -1379,3 +1379,67 @@ a { text-underline-offset: 3px; }
 .featured-empty-state>i{font-size:1.45rem;color:#7db8d8}
 .featured-empty-state strong{color:#456b83;font-size:.9rem}
 .featured-empty-state span{max-width:420px;font-size:.76rem;line-height:1.7}
+
+
+/* Mobile category strip: keep it compact and remove the now-empty showcase shell. */
+@media (max-width: 680px) {
+  #screen-shop .shop-category-showcase {
+    display: none !important;
+  }
+  #mobile-category-bar {
+    padding: 8px 12px 10px;
+    border-top: 1px solid #edf3f7;
+    border-bottom: 1px solid #e8f0f5;
+  }
+  #mobile-category-bar #store-categories {
+    display: flex !important;
+    width: max-content;
+    min-width: 100%;
+    grid-template-columns: none !important;
+    gap: 9px !important;
+    overflow: visible !important;
+    padding: 0 !important;
+  }
+  #mobile-category-bar .category-icon-item {
+    flex: 0 0 88px;
+    width: 88px;
+    min-width: 88px;
+    min-height: 68px;
+    padding: 7px 6px !important;
+    border-radius: 13px !important;
+    gap: 5px;
+  }
+  #mobile-category-bar .category-icon {
+    width: 27px;
+    height: 27px;
+    font-size: 1rem;
+  }
+  #mobile-category-bar .category-label {
+    font-size: .7rem;
+    line-height: 1.2;
+  }
+  #featured-products-section {
+    scroll-margin-top: 145px;
+    margin-top: 14px;
+  }
+}
+
+
+/* Fix: keep mobile category names visible in the header strip by default. */
+@media (max-width: 680px) {
+  #screen-shop #mobile-category-bar {
+    display: block !important;
+    max-height: 104px;
+    visibility: visible !important;
+    opacity: 1 !important;
+  }
+  #screen-shop #mobile-category-bar .category-icon-item {
+    display: inline-flex !important;
+  }
+  #screen-shop #mobile-category-bar .category-label {
+    display: -webkit-box !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    color: #456b83 !important;
+  }
+}
