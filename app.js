@@ -1660,30 +1660,31 @@ function getFeaturedProducts() {
 function categoryIconForName(name) {
     const value = String(name || '').toLocaleLowerCase();
     const rules = [
-        [/lamp|مصباح|إضاءة|اضاءة|lum|éclair|eclair/, 'fa-lightbulb'],
-        [/clock|horloge|ساعة|ساعات/, 'fa-clock'],
-        [/déco|deco|ديكور|زينة|décoration/, 'fa-wand-magic-sparkles'],
-        [/gift|cadeau|هدية|هدايا/, 'fa-gift'],
-        [/vase|مزهرية|مزهر|زهور|fleur/, 'fa-seedling'],
-        [/frame|cadre|إطار|اطار|لوحة|tableau/, 'fa-image'],
-        [/kitchen|cuisine|مطبخ|مطبخية/, 'fa-kitchen-set'],
-        [/bed|lit|غرفة|نوم|وسادة/, 'fa-bed'],
-        [/chair|كرسي|أثاث|اثاث|meuble|canapé|canape/, 'fa-couch'],
-        [/bath|حمام|salle de bain/, 'fa-bath'],
-        [/pack|مجموعة|طقم|lot/, 'fa-box-open']
+        [/lamp|مصباح|إضاءة|اضاءة|lum|éclair|eclair/, '✺'],
+        [/clock|horloge|ساعة|ساعات/, '◷'],
+        [/déco|deco|ديكور|زينة|décoration/, '✦'],
+        [/gift|cadeau|هدية|هدايا/, '♧'],
+        [/vase|مزهرية|مزهر|زهور|fleur/, '❀'],
+        [/frame|cadre|إطار|اطار|لوحة|tableau/, '▧'],
+        [/kitchen|cuisine|مطبخ|مطبخية/, '⌂'],
+        [/bed|lit|غرفة|نوم|وسادة/, '⌑'],
+        [/chair|كرسي|أثاث|اثاث|meuble|canapé|canape/, '▱'],
+        [/bath|حمام|salle de bain/, '◉'],
+        [/pack|مجموعة|طقم|lot/, '▣']
     ];
     const match = rules.find(([pattern]) => pattern.test(value));
-    return match ? match[1] : 'fa-shapes';
+    return match ? match[1] : '◇';
 }
 function renderCategories() {
     const c = document.getElementById('store-categories'); if (!c) return;
-    const categories = ['all', ...new Set(state.products.map(p => String(p.category || '').trim()).filter(Boolean))];
+    const products = Array.isArray(state.products) ? state.products : [];
+    const categories = ['all', ...new Set(products.map(p => String(p.category || '').trim()).filter(Boolean))];
     c.innerHTML = categories.map(cat => {
         const isAll = cat === 'all';
         const label = isAll ? i18n[state.currentLang].all : cat;
-        const icon = isAll ? 'fa-star' : categoryIconForName(cat);
+        const icon = isAll ? '✦' : categoryIconForName(cat);
         const safeCategory = JSON.stringify(cat).replace(/</g, '\\u003c');
-        return `<button type="button" class="category-item category-icon-item ${cat === currentCategory ? 'active' : ''}" onclick="filterByCategory(${safeCategory})" aria-pressed="${cat === currentCategory ? 'true' : 'false'}"><span class="category-icon"><i class="fas ${icon}" aria-hidden="true"></i></span><span class="category-label">${esc(label)}</span></button>`;
+        return `<button type="button" class="category-item category-icon-item ${cat === currentCategory ? 'active' : ''}" onclick="filterByCategory(${safeCategory})" aria-pressed="${cat === currentCategory ? 'true' : 'false'}"><span class="category-icon" aria-hidden="true">${icon}</span><span class="category-label">${esc(label)}</span></button>`;
     }).join('');
 }
 window.renderCategories = renderCategories;
