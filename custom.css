@@ -1304,3 +1304,22 @@ a { text-underline-offset: 3px; }
   .featured-admin-order { gap: 2px; }
   .featured-admin-order .btn-icon { width: 30px; height: 30px; }
 }
+
+/* Grouped product variants: one storefront card, separate stock-tracked choices */
+.product-variant-count{position:absolute;inset-inline-end:8px;top:8px;z-index:2;padding:4px 8px;border-radius:999px;background:rgba(20,105,153,.92);color:#fff;font-size:.68rem;font-weight:800;box-shadow:0 2px 8px rgba(15,70,110,.15)}
+.product-variants-picker{margin:12px 0 14px;padding:12px;border:1px solid #dcecf7;border-radius:13px;background:#f8fcff}
+.product-variants-heading{display:flex;align-items:center;justify-content:space-between;gap:8px;font-weight:800;color:#245c7d;margin-bottom:10px}
+.product-variants-heading small{font-size:.72rem;color:#71899a;font-weight:600}
+.product-variants-list{display:flex;gap:9px;overflow-x:auto;padding:2px 2px 8px;scrollbar-width:thin}
+.product-variant-option{flex:0 0 88px;min-height:112px;padding:7px;border:1.5px solid #dce8f0;border-radius:11px;background:#fff;color:#34566b;display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer}
+.product-variant-option.active{border-color:#269bd8;background:#eaf7ff;box-shadow:0 0 0 2px rgba(38,155,216,.12)}
+.product-variant-option img,.product-variant-no-image{width:62px;height:62px;object-fit:contain;border-radius:7px;background:#f5f9fc}
+.product-variant-no-image{display:grid;place-items:center;color:#9aabba}
+.product-variant-option>span:not(.product-variant-no-image){font-size:.75rem;font-weight:800}
+.product-variant-option small{font-size:.65rem;color:#71899a}
+.cart-variant-row{display:flex;align-items:center;gap:10px}
+.cart-variant-thumb,.order-variant-thumb{width:58px;height:58px;flex:0 0 58px;object-fit:contain;border-radius:9px;background:#f4f8fb;border:1px solid #e4edf3}
+.cart-variant-info,.order-variant-info{flex:1;min-width:0}
+.order-variant-row{display:flex;align-items:center;gap:12px;border-bottom:1px solid var(--border);padding:10px 0}
+.order-variant-placeholder{display:grid;place-items:center;color:#a5b4c2}
+@media(max-width:480px){.product-variants-picker{padding:9px}.product-variant-option{flex-basis:78px;min-height:104px}.product-variant-option img,.product-variant-no-image{width:54px;height:54px}.order-variant-row{gap:8px}.order-variant-thumb{width:50px;height:50px;flex-basis:50px}}

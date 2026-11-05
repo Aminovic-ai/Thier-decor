@@ -27,7 +27,18 @@
     const grid = document.getElementById('featured-products-grid');
     if (!section || !grid) return;
     const productsById = new Map(getProducts().map(product => [String(product.id), product]));
-    const featured = getStoredIds().map(id => productsById.get(id)).filter(product => product && Number(product.qty) > 0);
+    const selected = getStoredIds().map(id => productsById.get(id)).filter(product => product && Number(product.qty) > 0);
+    const seen = new Set();
+    const featured = selected.filter(product => {
+      const key = product.isPack ? 'pack:' + String(product.id) : JSON.stringify([
+        String(product.name || '').trim().replace(/\s+/g, ' ').toLocaleLowerCase(),
+        String(product.category || '').trim().replace(/\s+/g, ' ').toLocaleLowerCase(),
+        Number(typeof window.effectiveProductPrice === 'function' ? window.effectiveProductPrice(product) : product.price) || 0
+      ]);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
     if (!featured.length) {
       section.style.display = 'none';
       grid.innerHTML = '';
@@ -44,13 +55,15 @@
       const original = Number(product.price) || 0;
       const isPromo = price < original;
       const isWish = Array.isArray(getState().wishlist) && getState().wishlist.includes(product.id);
+      const variants = typeof window.getProductVariants === 'function' ? window.getProductVariants(id) : [product];
       const name = escapeHtml(product.name || '');
+      const variantBadge = variants.length > 1 ? `<span class="product-variant-count">${tr(variants.length + ' أشكال', variants.length + ' modèles')}</span>` : '';
       return `<div class="product-card featured-product-card" onclick="showProductView(${id})">
         <span class="featured-product-badge">${tr('مميز', 'Sélection')}</span>
-        <div class="product-img">${safeImage ? `<img src="${safeImage}" loading="lazy" alt="${name}" onerror="this.onerror=null;this.parentElement.innerHTML='<i class=\\'fas fa-image\\' style=\\'color:#cbd5e1;font-size:2rem;\\'></i>';">` : '<i class="fas fa-image" style="color:#cbd5e1;font-size:2rem;"></i>'}</div>
+        <div class="product-img">${safeImage ? `<img src="${safeImage}" loading="lazy" alt="${name}" onerror="this.onerror=null;this.parentElement.innerHTML='<i class=\\'fas fa-image\\' style=\\'color:#cbd5e1;font-size:2rem;\\'></i>';">` : '<i class="fas fa-image" style="color:#cbd5e1;font-size:2rem;"></i>'}${variantBadge}</div>
         <div class="product-actions-under-image">
           <button type="button" class="product-mini-action ${isWish ? 'is-favorite' : ''}" title="${tr('أضف إلى المفضلة', 'Ajouter aux favoris')}" aria-label="${tr('أضف إلى المفضلة', 'Ajouter aux favoris')}" onclick="event.stopPropagation();toggleWishlist(${id})"><i class="fas fa-heart"></i></button>
-          <button type="button" class="product-mini-action product-mini-cart" title="${tr('أضف إلى السلة', 'Ajouter au panier')}" aria-label="${tr('أضف إلى السلة', 'Ajouter au panier')}" onclick="event.stopPropagation();addToCart(${id})"><i class="fas fa-shopping-basket"></i></button>
+          <button type="button" class="product-mini-action product-mini-cart" title="${tr('اختر الشكل', 'Choisir le modèle')}" aria-label="${tr('اختر الشكل', 'Choisir le modèle')}" onclick="event.stopPropagation();addProductFromCard(${id})"><i class="fas fa-shopping-basket"></i></button>
         </div>
         <div class="product-info"><h3>${name}</h3><div class="product-price-box">${isPromo ? `<del>${money(original)}</del>` : ''}<span>${money(price)}</span></div></div>
       </div>`;
