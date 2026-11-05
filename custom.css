@@ -1396,3 +1396,8 @@ a { text-underline-offset: 3px; }
  .shop-products-tools select{max-width:145px}
 }
 @media(max-width:360px){.category-icon-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+
+.featured-empty-state{grid-column:1/-1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:9px;min-height:170px;padding:24px 16px;border:1px dashed #cfe6f4;border-radius:15px;background:#f8fcff;text-align:center;color:#7b9bad}
+.featured-empty-state>i{font-size:1.45rem;color:#7db8d8}
+.featured-empty-state strong{color:#456b83;font-size:.9rem}
+.featured-empty-state span{max-width:420px;font-size:.76rem;line-height:1.7}
