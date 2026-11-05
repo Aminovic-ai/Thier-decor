@@ -2450,7 +2450,21 @@ window.deleteOrder = deleteOrder;
 
 function viewOrderDetails(orderId) {
     const order = state.orders.find(o => o.id === orderId); if (!order) return; const customer = state.customers.find(c => c.phone === order.customerPhone); const isVip = customer && customer.isVip;
-    const itemsHtml = order.items.map(i => { const components = i.isPack && Array.isArray(i.packItems) && i.packItems.length ? `<div style="font-size:0.8rem;color:var(--text-mid);margin-top:4px;">${i.packItems.map(comp => `${esc(state.products.find(p => String(p.id) === String(comp.id))?.name || comp.name || 'Produit')} × ${Number(comp.qty)||0}`).join(' · ')}</div>` : ''; return `<div style="display:flex; justify-content:space-between; border-bottom:1px solid var(--border); padding:10px 0;"><div><strong>${esc(i.name)}</strong><br><small style="color:var(--text-mid);">${i.qty} × ${fmtMoney(i.price)}</small>${components}</div><div style="font-weight:900;">${fmtMoney(i.price * i.qty)}</div></div>`; }).join('');
+    const itemsHtml = order.items.map(i => {
+        const product = state.products.find(p => String(p.id) === String(i.id));
+        const image = Array.isArray(product?.images) ? product.images.find(src => typeof src === 'string' && src.trim().length > 10) : '';
+        const imageHtml = image
+            ? `<img src="${esc(image)}" alt="${esc(i.name)}" loading="lazy" style="width:76px;height:76px;object-fit:contain;border-radius:10px;border:1px solid var(--border);background:#fff;padding:4px;flex-shrink:0;" onerror="this.style.display='none';">`
+            : `<div aria-hidden="true" style="width:76px;height:76px;display:flex;align-items:center;justify-content:center;border-radius:10px;border:1px solid var(--border);background:var(--primary-light);color:var(--text-mid);flex-shrink:0;"><i class="fas fa-image"></i></div>`;
+        const components = i.isPack && Array.isArray(i.packItems) && i.packItems.length
+            ? `<div style="font-size:0.8rem;color:var(--text-mid);margin-top:4px;">${i.packItems.map(comp => `${esc(state.products.find(p => String(p.id) === String(comp.id))?.name || comp.name || 'Produit')} × ${Number(comp.qty)||0}`).join(' · ')}</div>`
+            : '';
+        return `<div style="display:flex;align-items:center;gap:12px;border-bottom:1px solid var(--border);padding:10px 0;">
+            ${imageHtml}
+            <div style="flex:1;min-width:0;"><strong>${esc(i.name)}</strong><br><small style="color:var(--text-mid);">${i.qty} × ${fmtMoney(i.price)}</small>${components}</div>
+            <div style="font-weight:900;white-space:nowrap;">${fmtMoney(i.price * i.qty)}</div>
+        </div>`;
+    }).join('');
     const paid = order.paidAmount ?? order.total; const debt = order.total - paid;
     let actionButtons = `<div style="margin-top:20px; border-top:2px dashed var(--border); padding-top:15px;"><h4 style="margin-bottom:10px; color:var(--primary);">Actions</h4><button onclick="makeDeliveryFree(${order.id})" class="btn-secondary" style="margin-bottom:10px; background:#10b981; color:white;"><i class="fas fa-truck"></i> ${i18n[state.currentLang].free_delivery}</button><button onclick="openEditOrder(${order.id})" class="btn-secondary" style="margin-bottom:10px; background:#f59e0b; color:white;"><i class="fas fa-edit"></i> ${i18n[state.currentLang].edit_order}</button>`;
     const itemsOnly = order.itemsTotal ?? (order.total - (order.deliveryPrice || 0));
