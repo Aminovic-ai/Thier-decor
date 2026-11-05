@@ -1678,11 +1678,12 @@ function categoryIconForName(name) {
 function normalizeStoreCategory(value) {
     return String(value || '')
         .normalize('NFKC')
-        .replace(/[\\u064B-\\u065F\\u0670\\u0640]/g, '')
-        .replace(/\\s+/g, ' ')
+        .replace(/[\u064B-\u065F\u0670\u0640]/g, '')
+        .replace(/\s+/g, ' ')
         .trim()
         .toLocaleLowerCase();
 }
+window.normalizeStoreCategory = normalizeStoreCategory;
 function renderCategories() {
     const c = document.getElementById('store-categories'); if (!c) return;
     const products = Array.isArray(state.products) ? state.products : [];
@@ -1692,14 +1693,23 @@ function renderCategories() {
         const key = normalizeStoreCategory(label);
         if (key && !categoryMap.has(key)) categoryMap.set(key, label);
     });
-    const categories = ['all', ...categoryMap.values()];
+    const storedOrder = Array.isArray(state.settings?.customPrices?.__categoryOrder)
+        ? state.settings.customPrices.__categoryOrder.map(normalizeStoreCategory) : [];
+    const orderedCategories = [...categoryMap.values()].sort((a, b) => {
+        const ai = storedOrder.indexOf(normalizeStoreCategory(a));
+        const bi = storedOrder.indexOf(normalizeStoreCategory(b));
+        if (ai < 0 && bi < 0) return 0;
+        if (ai < 0) return 1;
+        if (bi < 0) return -1;
+        return ai - bi;
+    });
+    const categories = ['all', ...orderedCategories];
     c.innerHTML = categories.map(cat => {
         const isAll = cat === 'all';
         const label = isAll ? i18n[state.currentLang].all : cat;
         const active = isAll ? currentCategory === 'all' : normalizeStoreCategory(cat) === normalizeStoreCategory(currentCategory);
         const icon = isAll ? '✦' : categoryIconForName(cat);
-        const safeCategory = JSON.stringify(cat).replace(/</g, '\\u003c');
-        return `<button type="button" class="category-item category-icon-item ${active ? 'active' : ''}" onclick="filterByCategory(${safeCategory})" aria-pressed="${active ? 'true' : 'false'}"><span class="category-icon" aria-hidden="true">${icon}</span><span class="category-label">${esc(label)}</span></button>`;
+        return `<button type="button" class="category-item category-icon-item ${active ? 'active' : ''}" data-store-category="${esc(cat)}" aria-pressed="${active ? 'true' : 'false'}"><span class="category-icon" aria-hidden="true">${icon}</span><span class="category-label">${esc(label)}</span></button>`;
     }).join('');
 }
 window.renderCategories = renderCategories;
@@ -1707,8 +1717,10 @@ window.renderCategories = renderCategories;
 function filterByCategory(cat) {
     currentCategory = cat;
     renderCategories();
-    const search = document.getElementById('shop-search-input');
+    const search = document.getElementById('shop-search-input') || document.querySelector('#screen-shop .header-search input');
     if (search) search.value = '';
+    const sort = document.getElementById('shop-sort');
+    if (sort) sort.value = 'default';
     renderShop();
     const section = document.getElementById('featured-products-section');
     if (section && cat !== 'all' && window.matchMedia('(max-width: 680px)').matches) {
@@ -1716,6 +1728,12 @@ function filterByCategory(cat) {
     }
 }
 window.filterByCategory = filterByCategory;
+document.addEventListener('click', event => {
+    const button = event.target.closest?.('#store-categories [data-store-category]');
+    if (!button) return;
+    event.preventDefault();
+    filterByCategory(button.dataset.storeCategory || 'all');
+});
 
 function getCurrentShopProducts() {
     const available = state.products.filter(p => Number(p.qty) > 0);
@@ -1845,7 +1863,7 @@ function filterShopProducts(q) {
     if (!q.trim()) { renderShop(); return; }
     const lq = q.toLocaleLowerCase();
     let list = state.products.filter(p => Number(p.qty) > 0 && (String(p.name || '').toLocaleLowerCase().includes(lq) || String(p.category || '').toLocaleLowerCase().includes(lq)));
-    if (currentCategory !== 'all') list = list.filter(p => String(p.category || '').trim() === currentCategory);
+    if (currentCategory !== 'all') list = list.filter(p => normalizeStoreCategory(p.category) === normalizeStoreCategory(currentCategory));
     renderShopHTML(list);
 }
 window.filterShopProducts = filterShopProducts;
