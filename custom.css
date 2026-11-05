@@ -1590,3 +1590,184 @@ a { text-underline-offset: 3px; }
 .admin-settings-panel-body{margin:0 0 16px;scroll-margin-top:16px}
 .admin-settings-panel-body[hidden]{display:none!important}
 @media(max-width:600px){.admin-settings-shortcuts{grid-template-columns:1fr;gap:8px}.admin-settings-shortcut{justify-content:flex-start;min-height:48px;padding:10px 14px}}
+
+
+/* THIER DÉCOR — Soft rose customer palette.
+   Scoped to the storefront/customer experience; administrator colors stay unchanged. */
+#screen-shop {
+  --primary: #b9788e;
+  --primary-hover: #96596f;
+  --accent: #96596f;
+  --primary-light: #fff0f4;
+  --border: #f0dce3;
+  --bg-light: #fff7f8;
+  --text-dark: #493743;
+  --text-mid: #806b77;
+  background: #fffafb;
+  color: #493743;
+}
+#screen-shop .store-header {
+  background: rgba(255,250,251,.97) !important;
+  border-bottom: 1px solid #efd9e1 !important;
+  box-shadow: 0 5px 20px rgba(137,82,103,.06);
+}
+#screen-shop .logo-text h1,
+#screen-shop .section-header h2 { color: #694858; }
+#screen-shop .logo-text span { color: #9b7c8b; }
+#screen-shop .action-btn,
+#screen-shop .mobile-contact-btn,
+#screen-shop .mobile-lang-btn {
+  background: #fff5f7 !important;
+  border-color: #efd9e1 !important;
+  color: #87596d !important;
+}
+#screen-shop .action-btn:hover,
+#screen-shop .mobile-contact-btn:hover,
+#screen-shop .mobile-lang-btn:hover {
+  background: #fbe8ee !important;
+  border-color: #d9a7b5 !important;
+  color: #75475c !important;
+}
+#screen-shop .action-btn i,
+#screen-shop .mobile-contact-btn i { color: #a96e83 !important; }
+#screen-shop .cart-btn,
+#screen-shop .product-mini-cart,
+#screen-shop .customer-save-profile {
+  background: linear-gradient(135deg,#c98da1,#a96c83) !important;
+  border-color: #b77b90 !important;
+  color: #fff !important;
+}
+#screen-shop .cart-btn i,
+#screen-shop .product-mini-cart i { color: #fff !important; }
+#screen-shop .header-search input,
+#screen-shop input:not([type="checkbox"]):not([type="radio"]),
+#screen-shop select,
+#screen-shop textarea {
+  border-color: #ead5de;
+  background-color: #fffdfd;
+}
+#screen-shop .header-search input:focus,
+#screen-shop input:focus,
+#screen-shop select:focus,
+#screen-shop textarea:focus {
+  border-color: #c98da1 !important;
+  box-shadow: 0 0 0 3px rgba(201,141,161,.16) !important;
+  outline: none;
+}
+#screen-shop #mobile-category-bar {
+  border-top-color: #f4e4e9;
+  border-bottom-color: #f0dce3;
+  background: #fffafb;
+}
+#screen-shop .category-text-item,
+#screen-shop #store-categories .category-text-item {
+  border-color: #efdae2 !important;
+  background: #fff !important;
+  color: #79576a !important;
+}
+#screen-shop .category-text-item:hover,
+#screen-shop #store-categories .category-text-item:hover {
+  border-color: #d9a7b5 !important;
+  background: #fff5f7 !important;
+}
+#screen-shop .category-text-item.active,
+#screen-shop #store-categories .category-text-item.active {
+  border-color: #d4a0b1 !important;
+  background: #fbeaf0 !important;
+  color: #8c536b !important;
+  box-shadow: 0 3px 10px rgba(169,108,131,.10) !important;
+}
+#screen-shop .product-card,
+#screen-shop .featured-product-card {
+  border-color: #f0e1e6 !important;
+  background: #fff !important;
+  box-shadow: 0 5px 16px rgba(117,75,92,.055) !important;
+}
+#screen-shop .product-img { background: #fff8f9 !important; }
+#screen-shop .product-info h3 { color: #55414d !important; }
+#screen-shop .product-price-box { color: #a65f7a !important; }
+#screen-shop .product-mini-action {
+  border-color: #efdee4 !important;
+  background: #fff7f9 !important;
+  color: #8b6475 !important;
+}
+#screen-shop .product-mini-action.is-favorite {
+  color: #e05275 !important;
+  border-color: #f3cbd6 !important;
+  background: #fff0f4 !important;
+}
+#screen-shop .featured-products-section,
+#screen-shop .shop-category-showcase {
+  border-color: #f0dce3 !important;
+  background: linear-gradient(145deg,#fff 0%,#fff5f7 100%) !important;
+  box-shadow: 0 8px 24px rgba(137,82,103,.055) !important;
+}
+#screen-shop .featured-products-heading h2,
+#screen-shop .shop-category-heading h2 { color: #704b5d !important; }
+#screen-shop .featured-products-heading p,
+#screen-shop .shop-category-heading p { color: #9a7b89 !important; }
+#screen-shop .btn-primary,
+#screen-shop button.btn-primary {
+  background: linear-gradient(135deg,#c98da1,#a96c83) !important;
+  border-color: #b77b90 !important;
+  color: #fff !important;
+  box-shadow: 0 5px 13px rgba(169,108,131,.15) !important;
+}
+#screen-shop .btn-primary:hover { background: linear-gradient(135deg,#b9788e,#96596f) !important; }
+#screen-shop .btn-secondary {
+  background: #fff4f6 !important;
+  border-color: #ead2dc !important;
+  color: #87596d !important;
+}
+#screen-shop .customer-page-heading h2 { color: #694858; }
+#screen-shop .customer-eyebrow,
+#screen-shop .customer-panel-kicker { color: #a66f84; }
+#screen-shop .customer-heading-icon,
+#screen-shop .customer-shortcut-icon {
+  background: #fbeaf0 !important;
+  color: #a96c83 !important;
+}
+#screen-shop .customer-welcome-card {
+  background: linear-gradient(118deg,#765365 0%,#a66f84 58%,#c58da0 100%) !important;
+  box-shadow: 0 14px 32px rgba(117,75,92,.16) !important;
+}
+#screen-shop .customer-shortcut {
+  border: 1px solid #efdae2 !important;
+  background: #fff !important;
+  color: #694858 !important;
+  box-shadow: 0 5px 15px rgba(117,75,92,.05);
+}
+#screen-shop .customer-shortcut:hover {
+  border-color: #d9a7b5 !important;
+  background: #fff5f7 !important;
+}
+#screen-shop .customer-profile-panel,
+#screen-shop .customer-panel,
+#screen-shop .order-card,
+#screen-shop .cart-summary {
+  border-color: #efdae2 !important;
+  background: #fff !important;
+  box-shadow: 0 7px 22px rgba(117,75,92,.045);
+}
+#screen-shop .customer-help-note {
+  background: #fff5f7;
+  border-color: #f0dce3;
+  color: #806b77;
+}
+#screen-shop .modal-content {
+  border-color: #efd9e1;
+  box-shadow: 0 18px 55px rgba(93,55,73,.18);
+}
+#screen-shop .modal-header {
+  background: #fff5f7 !important;
+  border-bottom-color: #f0dce3 !important;
+  color: #694858;
+}
+#screen-shop .close-modal {
+  background: #fbeaf0 !important;
+  color: #87596d !important;
+}
+@media (max-width: 680px) {
+  #screen-shop .store-header { box-shadow: 0 3px 14px rgba(137,82,103,.07); }
+  #screen-shop .product-card { border-radius: 16px !important; }
+}
