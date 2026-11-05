@@ -1675,16 +1675,31 @@ function categoryIconForName(name) {
     const match = rules.find(([pattern]) => pattern.test(value));
     return match ? match[1] : '◇';
 }
+function normalizeStoreCategory(value) {
+    return String(value || '')
+        .normalize('NFKC')
+        .replace(/[\\u064B-\\u065F\\u0670\\u0640]/g, '')
+        .replace(/\\s+/g, ' ')
+        .trim()
+        .toLocaleLowerCase();
+}
 function renderCategories() {
     const c = document.getElementById('store-categories'); if (!c) return;
     const products = Array.isArray(state.products) ? state.products : [];
-    const categories = ['all', ...new Set(products.map(p => String(p.category || '').trim()).filter(Boolean))];
+    const categoryMap = new Map();
+    products.forEach(product => {
+        const label = String(product.category || '').trim();
+        const key = normalizeStoreCategory(label);
+        if (key && !categoryMap.has(key)) categoryMap.set(key, label);
+    });
+    const categories = ['all', ...categoryMap.values()];
     c.innerHTML = categories.map(cat => {
         const isAll = cat === 'all';
         const label = isAll ? i18n[state.currentLang].all : cat;
+        const active = isAll ? currentCategory === 'all' : normalizeStoreCategory(cat) === normalizeStoreCategory(currentCategory);
         const icon = isAll ? '✦' : categoryIconForName(cat);
         const safeCategory = JSON.stringify(cat).replace(/</g, '\\u003c');
-        return `<button type="button" class="category-item category-icon-item ${cat === currentCategory ? 'active' : ''}" onclick="filterByCategory(${safeCategory})" aria-pressed="${cat === currentCategory ? 'true' : 'false'}"><span class="category-icon" aria-hidden="true">${icon}</span><span class="category-label">${esc(label)}</span></button>`;
+        return `<button type="button" class="category-item category-icon-item ${active ? 'active' : ''}" onclick="filterByCategory(${safeCategory})" aria-pressed="${active ? 'true' : 'false'}"><span class="category-icon" aria-hidden="true">${icon}</span><span class="category-label">${esc(label)}</span></button>`;
     }).join('');
 }
 window.renderCategories = renderCategories;
@@ -1695,12 +1710,19 @@ function filterByCategory(cat) {
     const search = document.getElementById('shop-search-input');
     if (search) search.value = '';
     renderShop();
+    const section = document.getElementById('featured-products-section');
+    if (section && cat !== 'all' && window.matchMedia('(max-width: 680px)').matches) {
+        window.requestAnimationFrame(() => section.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+    }
 }
 window.filterByCategory = filterByCategory;
 
 function getCurrentShopProducts() {
     const available = state.products.filter(p => Number(p.qty) > 0);
-    if (currentCategory !== 'all') return available.filter(p => String(p.category || '').trim() === currentCategory);
+    if (currentCategory !== 'all') {
+        const selectedKey = normalizeStoreCategory(currentCategory);
+        return available.filter(p => normalizeStoreCategory(p.category) === selectedKey);
+    }
     return getFeaturedProducts();
 }
 function updateShopSectionHeading() {
