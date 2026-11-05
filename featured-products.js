@@ -183,7 +183,7 @@
   let categoryOrderDirty = false;
   const normalizeCategory = value => typeof window.normalizeStoreCategory === 'function'
     ? window.normalizeStoreCategory(value)
-    : String(value || '').normalize('NFKC').replace(/[\\u064B-\\u065F\\u0670\\u0640]/g, '').replace(/\\s+/g, ' ').trim().toLocaleLowerCase();
+    : String(value || '').normalize('NFKC').replace(/[\u064B-\u065F\u0670\u0640]/g, '').replace(/\s+/g, ' ').trim().toLocaleLowerCase();
   const getCategoryNames = () => {
     const names = [];
     const seen = new Set();
@@ -279,6 +279,7 @@
       new MutationObserver(() => {
         renderFeaturedStorefront();
         renderAdminSelector();
+        renderCategoryOrderSelector();
       }).observe(shopProducts, { childList: true, subtree: true });
     }
     const languageButtons = ['lang-btn', 'mobile-lang-btn'];
