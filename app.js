@@ -3035,8 +3035,39 @@ async function handleImageUpload(event) {
 }
 window.handleImageUpload = handleImageUpload;
 
-function renderImagePreviews() { const grid = document.getElementById('pf-preview'); grid.innerHTML = tempUploadedImages.map((img, index) => `<div style="position:relative;"><img src="${img}" style="width:100%; height:100px; object-fit:contain; background:#e5e7eb; padding:6px; border-radius:8px; border:1px solid #d1d5db;"><button onclick="removeUploadedImage(${index})" style="position:absolute; top:-5px; right:-5px; background:var(--danger); color:#fff; border:none; border-radius:50%; width:20px; height:20px; cursor:pointer;">✕</button></div>`).join(''); }
-function removeUploadedImage(index) { tempUploadedImages.splice(index, 1); renderImagePreviews(); }
+function renderImagePreviews() {
+    const grid = document.getElementById('pf-preview');
+    if (!grid) return;
+    const isFrench = state.currentLang === 'fr';
+    if (!tempUploadedImages.length) {
+        grid.innerHTML = '';
+        return;
+    }
+    grid.innerHTML = tempUploadedImages.map((img, index) => {
+        const isMain = index === 0;
+        const mainLabel = isFrench ? 'Image principale' : 'الصورة الرئيسية';
+        const chooseLabel = isFrench ? 'Définir comme principale' : 'اجعلها الصورة الرئيسية';
+        return `<div class="td-image-choice" style="position:relative;display:flex;flex-direction:column;gap:7px;padding:8px;border:1px solid ${isMain ? '#2563eb' : '#dbe3ee'};border-radius:12px;background:${isMain ? '#eff6ff' : '#fff'};min-width:0;">
+            <img src="${esc(img)}" alt="${isFrench ? 'Aperçu du produit' : 'معاينة صورة المنتج'}" style="width:100%;height:112px;object-fit:contain;background:#f8fafc;padding:5px;border-radius:8px;">
+            ${isMain ? `<span style="display:block;text-align:center;font-size:12px;font-weight:800;color:#1d4ed8;">★ ${mainLabel}</span>` : `<button type="button" onclick="setMainUploadedImage(${index})" style="width:100%;padding:7px 5px;border:1px solid #2563eb;border-radius:8px;background:#fff;color:#1d4ed8;font-size:11px;font-weight:700;cursor:pointer;">☆ ${chooseLabel}</button>`}
+            <button type="button" aria-label="${isFrench ? 'Supprimer cette image' : 'حذف الصورة'}" title="${isFrench ? 'Supprimer' : 'حذف'}" onclick="removeUploadedImage(${index})" style="position:absolute;top:4px;right:4px;background:var(--danger);color:#fff;border:0;border-radius:50%;width:25px;height:25px;cursor:pointer;">✕</button>
+        </div>`;
+    }).join('');
+}
+function setMainUploadedImage(index) {
+    const selectedIndex = Number(index);
+    if (!Number.isInteger(selectedIndex) || selectedIndex < 0 || selectedIndex >= tempUploadedImages.length) return;
+    if (selectedIndex === 0) return;
+    const selectedImage = tempUploadedImages.splice(selectedIndex, 1)[0];
+    tempUploadedImages.unshift(selectedImage);
+    renderImagePreviews();
+    toast(state.currentLang === 'fr' ? 'Image principale sélectionnée' : 'تم اختيار الصورة الرئيسية');
+}
+window.setMainUploadedImage = setMainUploadedImage;
+function removeUploadedImage(index) {
+    tempUploadedImages.splice(Number(index), 1);
+    renderImagePreviews();
+}
 window.removeUploadedImage = removeUploadedImage;
 
 async function saveProduct() {
