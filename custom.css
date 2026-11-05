@@ -1323,3 +1323,8 @@ a { text-underline-offset: 3px; }
 .order-variant-row{display:flex;align-items:center;gap:12px;border-bottom:1px solid var(--border);padding:10px 0}
 .order-variant-placeholder{display:grid;place-items:center;color:#a5b4c2}
 @media(max-width:480px){.product-variants-picker{padding:9px}.product-variant-option{flex-basis:78px;min-height:104px}.product-variant-option img,.product-variant-no-image{width:54px;height:54px}.order-variant-row{gap:8px}.order-variant-thumb{width:50px;height:50px;flex-basis:50px}}
+
+
+/* Use the existing Thier Decor brand artwork instead of the TD text mark. */
+.logo-icon.has-brand-image { background:#fff !important; padding:2px; box-shadow:0 3px 12px rgba(30,75,105,.12) !important; border:1px solid rgba(100,145,175,.18); }
+.logo-icon .brand-logo-image { display:block; width:100%; height:100%; object-fit:contain; border-radius:inherit; }
