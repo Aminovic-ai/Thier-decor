@@ -31,8 +31,8 @@
     const seen = new Set();
     const featured = selected.filter(product => {
       const key = product.isPack ? 'pack:' + String(product.id) : JSON.stringify([
-        String(product.name || '').trim().replace(/\\s+/g, ' ').toLocaleLowerCase(),
-        String(product.category || '').trim().replace(/\\s+/g, ' ').toLocaleLowerCase(),
+        String(product.name || '').trim().replace(/\s+/g, ' ').toLocaleLowerCase(),
+        String(product.category || '').trim().replace(/\s+/g, ' ').toLocaleLowerCase(),
         Number(typeof window.effectiveProductPrice === 'function' ? window.effectiveProductPrice(product) : product.price) || 0
       ]);
       if (seen.has(key)) return false;
