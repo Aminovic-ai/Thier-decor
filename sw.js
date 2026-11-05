@@ -23,7 +23,7 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => {
     const request = event.request;
     const url = new URL(request.url);
-    if (url.origin !== self.location.origin || /supabase\\.co|firebaseio\\.com|googleapis\\.com|gstatic\\.com/i.test(url.hostname)) return;
+    if (url.origin !== self.location.origin || /supabase\.co|firebaseio\.com|googleapis\.com|gstatic\.com/i.test(url.hostname)) return;
     if (request.method !== 'GET') return;
 
     const isPage = request.mode === 'navigate' || url.pathname.endsWith('.html') || url.pathname.endsWith('/');
@@ -45,7 +45,7 @@ self.addEventListener('fetch', event => {
                 return fetch(request).then(response => {
                     if (response && response.ok) {
                         const responseToCache = response.clone();
-                        caches.open(CACHE_NAME).then(cache => cache.put(request, responseToCache));
+                        caches.open(CACHE_NAME).then(cache => cache.put(request, response.clone()));
                     }
                     return response;
                 });
