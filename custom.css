@@ -1333,7 +1333,7 @@ a { text-underline-offset: 3px; }
 /* Direct quantity entry in the customer cart. */
 .cart-qty-control{display:flex;align-items:center;justify-content:center;gap:6px;flex:0 0 auto}
 .cart-qty-step,.cart-qty-remove{width:32px;height:32px;display:inline-flex;align-items:center;justify-content:center;border:1px solid #dce8f0;border-radius:9px;background:#f7fbfe;color:#315b78;cursor:pointer}
-.cart-qty-input{width:54px;height:34px;min-width:0;padding:4px 5px;text-align:center;font:700 .95rem inherit;color:#23445d;background:#fff;border:1px solid #cbdce8;border-radius:9px;outline:none;appearance:textfield;-moz-appearance:textfield}
+.cart-qty-input{width:54px;height:34px;min-width:0;padding:4px 5px;text-align:center;font-weight:700;font-size:.95rem;font-family:inherit;color:#23445d;background:#fff;border:1px solid #cbdce8;border-radius:9px;outline:none;appearance:textfield;-moz-appearance:textfield}
 .cart-qty-input:focus{border-color:#329bd2;box-shadow:0 0 0 3px rgba(50,155,210,.13)}
 .cart-qty-input::-webkit-inner-spin-button,.cart-qty-input::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
 .cart-qty-remove{color:#d9534f;background:#fff8f7;border-color:#f0d6d3}
