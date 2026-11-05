@@ -1648,26 +1648,85 @@ function updateStoreBranding() {
 }
 window.updateStoreBranding = updateStoreBranding;
 
+function getFeaturedProductIds() {
+    return Array.isArray(state.settings?.featuredProductIds)
+        ? state.settings.featuredProductIds.map(String)
+        : [];
+}
+function getFeaturedProducts() {
+    const ids = getFeaturedProductIds();
+    const available = state.products.filter(p => Number(p.qty) > 0);
+    return ids.length ? ids.map(id => available.find(p => String(p.id) === id)).filter(Boolean) : [];
+}
+function categoryIconForName(name) {
+    const value = String(name || '').toLocaleLowerCase();
+    const rules = [
+        [/lamp|مصباح|إضاءة|اضاءة|lum|éclair|eclair/, 'fa-lightbulb'],
+        [/clock|horloge|ساعة|ساعات/, 'fa-clock'],
+        [/déco|deco|ديكور|زينة|décoration/, 'fa-wand-magic-sparkles'],
+        [/gift|cadeau|هدية|هدايا/, 'fa-gift'],
+        [/vase|مزهرية|مزهر|زهور|fleur/, 'fa-seedling'],
+        [/frame|cadre|إطار|اطار|لوحة|tableau/, 'fa-image'],
+        [/kitchen|cuisine|مطبخ|مطبخية/, 'fa-kitchen-set'],
+        [/bed|lit|غرفة|نوم|وسادة/, 'fa-bed'],
+        [/chair|كرسي|أثاث|اثاث|meuble|canapé|canape/, 'fa-couch'],
+        [/bath|حمام|salle de bain/, 'fa-bath'],
+        [/pack|مجموعة|طقم|lot/, 'fa-box-open']
+    ];
+    const match = rules.find(([pattern]) => pattern.test(value));
+    return match ? match[1] : 'fa-shapes';
+}
 function renderCategories() {
     const c = document.getElementById('store-categories'); if (!c) return;
-    const categories = ['all', ...new Set(state.products.map(p => p.category).filter(Boolean))];
-    c.innerHTML = categories.map(cat => `<div class="category-item ${cat === currentCategory ? 'active' : ''}" onclick="filterByCategory('${cat}')">${cat === 'all' ? i18n[state.currentLang].all : esc(cat)}</div>`).join('');
+    const categories = ['all', ...new Set(state.products.filter(p => Number(p.qty) > 0).map(p => String(p.category || '').trim()).filter(Boolean))];
+    c.innerHTML = categories.map(cat => {
+        const isAll = cat === 'all';
+        const label = isAll ? i18n[state.currentLang].all : cat;
+        const icon = isAll ? 'fa-star' : categoryIconForName(cat);
+        const safeCategory = JSON.stringify(cat).replace(/</g, '\\u003c');
+        return `<button type="button" class="category-item category-icon-item ${cat === currentCategory ? 'active' : ''}" onclick="filterByCategory(${safeCategory})" aria-pressed="${cat === currentCategory ? 'true' : 'false'}"><span class="category-icon"><i class="fas ${icon}" aria-hidden="true"></i></span><span class="category-label">${esc(label)}</span></button>`;
+    }).join('');
 }
 window.renderCategories = renderCategories;
 
-function filterByCategory(cat) { currentCategory = cat; renderCategories(); renderShop(); }
+function filterByCategory(cat) {
+    currentCategory = cat;
+    renderCategories();
+    const search = document.getElementById('shop-search-input');
+    if (search) search.value = '';
+    renderShop();
+}
 window.filterByCategory = filterByCategory;
 
+function getCurrentShopProducts() {
+    const available = state.products.filter(p => Number(p.qty) > 0);
+    if (currentCategory !== 'all') return available.filter(p => String(p.category || '').trim() === currentCategory);
+    return getFeaturedProducts();
+}
+function updateShopSectionHeading() {
+    const title = document.getElementById('featured-products-title');
+    const description = document.getElementById('featured-products-description');
+    if (!title || !description) return;
+    if (currentCategory === 'all') {
+        title.textContent = state.currentLang === 'fr' ? 'Sélection du moment' : 'المنتجات المميزة';
+        description.textContent = state.currentLang === 'fr' ? 'Nos coups de cœur, sélectionnés pour vous' : 'اختياراتنا المميزة لكم';
+    } else {
+        title.textContent = currentCategory;
+        description.textContent = state.currentLang === 'fr' ? 'Découvrez les produits de cette catégorie' : 'اكتشف منتجات هذا الصنف';
+    }
+}
 function sortShopProducts(val) {
-    let list = state.products.filter(p => p.qty > 0); if (currentCategory !== 'all') list = list.filter(p => p.category === currentCategory);
-    if (val === 'price-asc') list.sort((a,b) => a.price - b.price); else if (val === 'price-desc') list.sort((a,b) => b.price - a.price); else if (val === 'newest') list.sort((a,b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+    let list = getCurrentShopProducts().slice();
+    if (val === 'price-asc') list.sort((a,b) => effectiveProductPrice(a) - effectiveProductPrice(b));
+    else if (val === 'price-desc') list.sort((a,b) => effectiveProductPrice(b) - effectiveProductPrice(a));
+    else if (val === 'newest') list.sort((a,b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
     renderShopHTML(list);
 }
 window.sortShopProducts = sortShopProducts;
 
 function renderShop() {
-    let list = state.products.filter(p => p.qty > 0); if (currentCategory !== 'all') list = list.filter(p => p.category === currentCategory);
-    renderShopHTML(list); renderNewProducts();
+    updateShopSectionHeading();
+    renderShopHTML(getCurrentShopProducts());
 }
 window.renderShop = renderShop;
 
@@ -1754,8 +1813,11 @@ function renderNewProducts() {
 window.renderNewProducts = renderNewProducts;
 
 function filterShopProducts(q) {
-    const c = document.getElementById('s-products'); if (!c) return; if (!q.trim()) { renderShop(); return; }
-    const lq = q.toLowerCase(); let list = state.products.filter(p => p.qty > 0 && (p.name.toLowerCase().includes(lq) || (p.category || '').toLowerCase().includes(lq)));
+    const c = document.getElementById('s-products'); if (!c) return;
+    if (!q.trim()) { renderShop(); return; }
+    const lq = q.toLocaleLowerCase();
+    let list = state.products.filter(p => Number(p.qty) > 0 && (String(p.name || '').toLocaleLowerCase().includes(lq) || String(p.category || '').toLocaleLowerCase().includes(lq)));
+    if (currentCategory !== 'all') list = list.filter(p => String(p.category || '').trim() === currentCategory);
     renderShopHTML(list);
 }
 window.filterShopProducts = filterShopProducts;
@@ -3074,11 +3136,74 @@ function renderAdminDebts() {
 window.renderAdminDebts = renderAdminDebts;
 
 function renderAdminSettings() {
-    document.getElementById('set-shop').value = state.settings.shopName || ''; document.getElementById('set-phone').value = state.settings.shopPhone || ''; const addressInput = document.getElementById('set-address'); if (addressInput) addressInput.value = state.settings.shopAddress || ''; 
+    document.getElementById('set-shop').value = state.settings.shopName || ''; document.getElementById('set-phone').value = state.settings.shopPhone || ''; const addressInput = document.getElementById('set-address'); if (addressInput) addressInput.value = state.settings.shopAddress || '';
     document.getElementById('set-promo-text').value = state.settings.promoText || ''; document.getElementById('set-promo-active').checked = !!state.settings.promoActive;
     document.getElementById('set-ad-active').checked = !!state.settings.adActive; document.getElementById('set-ad-text').value = state.settings.adText || '';
     document.getElementById('set-ad-endtime').value = state.settings.adEndTime || ''; tempAdImages = state.settings.adImages || []; renderAdPreviews();
+    featuredProductDraft = getFeaturedProductIds();
+    renderFeaturedProductsAdmin();
 }
+let featuredProductDraft = null;
+function renderFeaturedProductsAdmin() {
+    const container = document.getElementById('featured-products-admin-list');
+    const count = document.getElementById('featured-products-admin-count');
+    if (!container) return;
+    if (!Array.isArray(featuredProductDraft)) featuredProductDraft = getFeaturedProductIds();
+    const selected = new Set(featuredProductDraft.map(String));
+    const selectedProducts = featuredProductDraft.map(id => state.products.find(p => String(p.id) === String(id))).filter(Boolean);
+    const remaining = state.products.filter(p => !selected.has(String(p.id))).sort((a,b) => String(a.name || '').localeCompare(String(b.name || ''), state.currentLang === 'fr' ? 'fr' : 'ar'));
+    const ordered = [...selectedProducts, ...remaining];
+    if (count) count.textContent = state.currentLang === 'fr' ? selected.size + ' produit(s) sélectionné(s)' : selected.size + ' منتج(ات) مختار(ة)';
+    if (!ordered.length) {
+        container.innerHTML = `<div class="featured-admin-empty">${state.currentLang === 'fr' ? 'Ajoutez d’abord des produits au catalogue.' : 'أضف منتجات إلى المتجر أولاً.'}</div>`;
+        return;
+    }
+    container.innerHTML = ordered.map(product => {
+        const id = String(product.id);
+        const active = selected.has(id);
+        const image = product.images && product.images[0] ? `<img src="${esc(product.images[0])}" alt="">` : '<i class="fas fa-image"></i>';
+        const position = featuredProductDraft.indexOf(id);
+        return `<div class="featured-admin-row ${active ? 'is-selected' : ''}">
+            <label class="featured-admin-product"><input type="checkbox" class="featured-admin-check" value="${esc(id)}" ${active ? 'checked' : ''} onchange="toggleFeaturedProductDraft(this)"><span class="featured-admin-thumb">${image}</span><span class="featured-admin-product-copy"><strong>${esc(product.name)}</strong><small>${esc(product.category || '')} · ${fmtMoney(effectiveProductPrice(product))}</small></span></label>
+            ${active ? `<span class="featured-admin-order">${position + 1}</span><span class="featured-admin-move"><button type="button" title="${state.currentLang === 'fr' ? 'Monter' : 'تحريك للأعلى'}" aria-label="${state.currentLang === 'fr' ? 'Monter' : 'تحريك للأعلى'}" onclick="moveFeaturedProduct('${esc(id)}',-1)" ${position === 0 ? 'disabled' : ''}><i class="fas fa-chevron-up"></i></button><button type="button" title="${state.currentLang === 'fr' ? 'Descendre' : 'تحريك للأسفل'}" aria-label="${state.currentLang === 'fr' ? 'Descendre' : 'تحريك للأسفل'}" onclick="moveFeaturedProduct('${esc(id)}',1)" ${position === featuredProductDraft.length - 1 ? 'disabled' : ''}><i class="fas fa-chevron-down"></i></button></span>` : ''}
+        </div>`;
+    }).join('');
+}
+window.renderFeaturedProductsAdmin = renderFeaturedProductsAdmin;
+function toggleFeaturedProductDraft(input) {
+    const id = String(input.value);
+    const current = [...document.querySelectorAll('.featured-admin-check:checked')].map(el => String(el.value));
+    featuredProductDraft = current;
+    if (!input.checked) featuredProductDraft = featuredProductDraft.filter(value => value !== id);
+    renderFeaturedProductsAdmin();
+}
+window.toggleFeaturedProductDraft = toggleFeaturedProductDraft;
+function moveFeaturedProduct(id, direction) {
+    const from = featuredProductDraft.indexOf(String(id));
+    const to = from + Number(direction);
+    if (from < 0 || to < 0 || to >= featuredProductDraft.length) return;
+    const next = [...featuredProductDraft];
+    [next[from], next[to]] = [next[to], next[from]];
+    featuredProductDraft = next;
+    renderFeaturedProductsAdmin();
+}
+window.moveFeaturedProduct = moveFeaturedProduct;
+async function saveFeaturedProducts() {
+    const ids = [...featuredProductDraft].map(String);
+    try {
+        await callAdminWorker('adminUpdateSettings', { settings: { featuredProductIds: ids } });
+        state.settings.featuredProductIds = ids;
+        save(K.settings, state.settings);
+        renderCategories();
+        if (currentCategory === 'all') renderShop();
+        renderFeaturedProductsAdmin();
+        toast('✓ ' + (state.currentLang === 'fr' ? 'Sélection enregistrée' : 'تم حفظ المنتجات المميزة'));
+    } catch (error) {
+        toast((state.currentLang === 'fr' ? 'Échec de l’enregistrement : ' : 'تعذر حفظ الاختيار: ') + (error.message || ''), 'error');
+    }
+}
+window.saveFeaturedProducts = saveFeaturedProducts;
+
 window.renderAdminSettings = renderAdminSettings;
 document.addEventListener('input', event => { if (event.target && event.target.id === 'set-ad-text') renderAdPreviews(); });
 
