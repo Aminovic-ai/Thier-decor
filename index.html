@@ -11,7 +11,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&family=Tajawal:wght@400;700;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="style.css?v=41">
-    <link rel="stylesheet" href="custom.css?v=42">
+    <link rel="stylesheet" href="custom.css?v=43">
 </head>
 <body>
     <div class="screen active" id="screen-shop">
@@ -67,6 +67,13 @@
                     <div id="new-products-list" style="display:flex; gap:12px; overflow-x:auto; padding:15px 0;"></div>
                 </div>
                 <section class="hero-banner"><h2 data-i18n="hero_title">عروض الموسم</h2></section>
+                <section id="featured-products-section" class="featured-products-section" style="display:none;" aria-labelledby="featured-products-title">
+                    <div class="featured-products-heading">
+                        <div><span class="featured-products-kicker">THIER DÉCOR</span><h2 id="featured-products-title">منتجات مختارة</h2><p id="featured-products-description">اختيارات مميزة اخترناها لكم</p></div>
+                        <span class="featured-products-heading-icon"><i class="fas fa-star"></i></span>
+                    </div>
+                    <div id="featured-products-grid" class="store-products-grid"></div>
+                </section>
                 <div class="shop-layout">
                     <aside class="shop-categories"><h3 data-i18n="categories">الأصناف</h3><div id="store-categories" class="category-list"></div></aside>
                     <div class="shop-products-area">
@@ -267,6 +274,15 @@
                             <button class="btn-primary" onclick="saveSettingsToCloud()" style="margin-top:15px; width:100%;" data-i18n="save_settings">حفظ الإعدادات</button>
                         </div>
                     </div>
+                        <div class="form-card featured-products-admin-card" id="featured-products-admin-panel">
+                            <div class="featured-admin-heading">
+                                <span class="featured-admin-icon"><i class="fas fa-star"></i></span>
+                                <div><h3 id="featured-admin-title">المنتجات المميزة</h3><p id="featured-admin-description">اختر المنتجات التي تريد عرضها أولاً ورتب ظهورها للزبائن.</p></div>
+                            </div>
+                            <div id="featured-products-admin-count" class="featured-admin-count"></div>
+                            <div id="featured-products-admin-list" class="featured-products-admin-list"></div>
+                            <button type="button" class="btn-primary featured-admin-save" onclick="saveFeaturedProducts()"><i class="fas fa-save"></i> <span id="featured-admin-save-label">حفظ ترتيب المنتجات</span></button>
+                        </div>
                     <div class="settings-content" id="set-tab-yalidine-prices" style="display:none;">
                         <div class="form-card" style="max-width:900px;">
                             <h3 style="color:var(--primary);margin-bottom:10px;" data-i18n="yalidine_prices_title">🚚 أسعار التوصيل Yalidine / Guepex (58 ولاية)</h3>
@@ -458,6 +474,7 @@
     
     <script src="https://cdn.jsdelivr.net/npm/crypto-js@4.1.1/crypto-js.min.js"></script>
     <script src="app.js?v=42"></script>
+    <script src="featured-products.js?v=1"></script>
     <script src="analytics-notifications.js"></script>
     <script>
         // Register the storefront service worker and check for fresh assets on each visit.
