@@ -1677,7 +1677,7 @@ function categoryIconForName(name) {
 }
 function renderCategories() {
     const c = document.getElementById('store-categories'); if (!c) return;
-    const categories = ['all', ...new Set(state.products.filter(p => Number(p.qty) > 0).map(p => String(p.category || '').trim()).filter(Boolean))];
+    const categories = ['all', ...new Set(state.products.map(p => String(p.category || '').trim()).filter(Boolean))];
     c.innerHTML = categories.map(cat => {
         const isAll = cat === 'all';
         const label = isAll ? i18n[state.currentLang].all : cat;
@@ -1812,14 +1812,8 @@ function renderShopHTML(list) {
 }
 
 function renderNewProducts() {
-    const box = document.getElementById('new-products-box'); const list = document.getElementById('new-products-list'); if (!box || !list) return;
-    const sevenDaysAgo = Date.now() - (7 * 24 * 60 * 60 * 1000);
-    const candidates = state.products.filter(p => p.qty > 0 && p.createdAt && Number.isFinite(new Date(p.createdAt).getTime()) && new Date(p.createdAt).getTime() > sevenDaysAgo).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-    const seenGroups = new Set();
-    const newProds = candidates.filter(product => { const key = getProductVariantKey(product); if (seenGroups.has(key)) return false; seenGroups.add(key); return true; }).slice(0, 10);
-    if (newProds.length === 0) { box.style.display = 'none'; return; }
-    box.style.display = 'block';
-    list.innerHTML = newProds.map(p => { const count = getProductVariants(p.id).length; return `<div onclick="showProductView(${p.id})" style="min-width:140px; background:#fff; border-radius:10px; border:1px solid var(--border); padding:10px; cursor:pointer; text-align:center;"><div style="height:80px; background:var(--bg-light); border-radius:6px; display:flex; align-items:center; justify-content:center; font-size:2rem; margin-bottom:8px; position:relative;">${p.images && p.images[0] ? `<img src="${esc(p.images[0])}" style="width:100%;height:100%;object-fit:contain;">` : '📦'}${count > 1 ? `<span class="product-variant-count">${state.currentLang === 'fr' ? count + ' modèles' : count + ' أشكال'}</span>` : ''}</div><div style="font-size:0.8rem; font-weight:bold; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${esc(p.name)}</div><div style="font-size:0.9rem; font-weight:900; color:#000; margin-top:5px;">${fmtMoney(effectiveProductPrice(p))}</div></div>`; }).join('');
+    const box = document.getElementById('new-products-box');
+    if (box) box.style.display = 'none';
 }
 window.renderNewProducts = renderNewProducts;
 
