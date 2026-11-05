@@ -1217,16 +1217,43 @@ function goScreen(id) {
 window.goScreen = goScreen;
 
 function shopGo(id) {
-    if (id !== 'profile' && id !== 'orders' && id !== 'messages' && id !== 'notifications' && id !== 'myrequests') document.getElementById('screen-shop')?.classList.remove('customer-menu-open');
-    if ((id === 'orders' || id === 'profile' || id === 'messages' || id === 'myrequests' || id === 'wishlist' || id === 'notifications') && (!state.session || state.session.role !== 'customer')) {
-        toast(i18n[state.currentLang].login_first, 'error'); openCustomerAuthModal(); return;
+    const allowedPages = new Set(['shop', 'wishlist', 'cart', 'orders', 'myrequests', 'messages', 'notifications', 'profile']);
+    if (!allowedPages.has(id)) return;
+    const targetPage = document.getElementById('s-' + id);
+    const shopScreen = document.getElementById('screen-shop');
+    if (!targetPage || !shopScreen) {
+        console.error('Store page is missing:', 's-' + id);
+        return;
     }
-    document.querySelectorAll('#screen-shop .page').forEach(p => p.classList.remove('active')); document.getElementById('s-' + id).classList.add('active');
-    const navLinks = document.querySelectorAll('.store-nav .nav-links li'); navLinks.forEach(li => li.classList.remove('active'));
+    if (!['profile', 'orders', 'messages', 'notifications', 'myrequests'].includes(id)) shopScreen.classList.remove('customer-menu-open');
+    const customerPages = new Set(['orders', 'profile', 'messages', 'myrequests', 'wishlist', 'notifications']);
+    if (customerPages.has(id) && (!state.session || state.session.role !== 'customer')) {
+        toast(i18n[state.currentLang].login_first, 'error');
+        openCustomerAuthModal();
+        return;
+    }
+    document.querySelectorAll('#screen-shop .page').forEach(page => page.classList.remove('active'));
+    targetPage.classList.add('active');
     const navMap = { shop: 0, orders: 1, messages: 2, notifications: 3, myrequests: 4, profile: 5 };
-    const navIndex = navMap[id];
-    if (navIndex !== undefined && navLinks[navIndex]) navLinks[navIndex].classList.add('active');
-    if (id === 'shop') renderShop(); if (id === 'cart') renderCart(); if (id === 'orders') renderMyOrders(); if (id === 'profile') renderProfile(); if (id === 'messages') renderCustomerMessages(); if (id === 'notifications' && typeof window.renderCustomerNotifications === 'function') window.renderCustomerNotifications(); if (id === 'myrequests') renderMyRequests(); if (id === 'wishlist') renderWishlist();
+    document.querySelectorAll('.store-nav .nav-links li').forEach((item, index) => item.classList.toggle('active', navMap[id] === index));
+    document.querySelectorAll('#mobile-bottom-nav .mobile-nav-item').forEach(item => {
+        const page = item.dataset.mobilePage;
+        const active = page === id || (page === 'categories' && id === 'shop');
+        item.classList.toggle('active', active);
+        item.setAttribute('aria-current', active ? 'page' : 'false');
+    });
+    try {
+        if (id === 'shop') renderShop();
+        else if (id === 'cart') renderCart();
+        else if (id === 'orders') renderMyOrders();
+        else if (id === 'profile') renderProfile();
+        else if (id === 'messages') renderCustomerMessages();
+        else if (id === 'notifications' && typeof window.renderCustomerNotifications === 'function') window.renderCustomerNotifications();
+        else if (id === 'myrequests') renderMyRequests();
+        else if (id === 'wishlist') renderWishlist();
+    } catch (error) {
+        console.error('Unable to render store page:', id, error);
+    }
     window.scrollTo(0, 0);
 }
 window.shopGo = shopGo;
