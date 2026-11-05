@@ -1657,24 +1657,6 @@ function getFeaturedProducts() {
     const available = state.products.filter(p => Number(p.qty) > 0);
     return ids.length ? ids.map(id => available.find(p => String(p.id) === id)).filter(Boolean) : [];
 }
-function categoryIconForName(name) {
-    const value = String(name || '').toLocaleLowerCase();
-    const rules = [
-        [/lamp|مصباح|إضاءة|اضاءة|lum|éclair|eclair/, '✺'],
-        [/clock|horloge|ساعة|ساعات/, '◷'],
-        [/déco|deco|ديكور|زينة|décoration/, '✦'],
-        [/gift|cadeau|هدية|هدايا/, '♧'],
-        [/vase|مزهرية|مزهر|زهور|fleur/, '❀'],
-        [/frame|cadre|إطار|اطار|لوحة|tableau/, '▧'],
-        [/kitchen|cuisine|مطبخ|مطبخية/, '⌂'],
-        [/bed|lit|غرفة|نوم|وسادة/, '⌑'],
-        [/chair|كرسي|أثاث|اثاث|meuble|canapé|canape/, '▱'],
-        [/bath|حمام|salle de bain/, '◉'],
-        [/pack|مجموعة|طقم|lot/, '▣']
-    ];
-    const match = rules.find(([pattern]) => pattern.test(value));
-    return match ? match[1] : '◇';
-}
 function normalizeStoreCategory(value) {
     return String(value || '')
         .normalize('NFKC')
@@ -1708,8 +1690,7 @@ function renderCategories() {
         const isAll = cat === 'all';
         const label = isAll ? i18n[state.currentLang].all : cat;
         const active = isAll ? currentCategory === 'all' : normalizeStoreCategory(cat) === normalizeStoreCategory(currentCategory);
-        const icon = isAll ? '✦' : categoryIconForName(cat);
-        return `<button type="button" class="category-item category-icon-item ${active ? 'active' : ''}" data-store-category="${esc(cat)}" aria-pressed="${active ? 'true' : 'false'}"><span class="category-icon" aria-hidden="true">${icon}</span><span class="category-label">${esc(label)}</span></button>`;
+        return `<button type="button" class="category-item category-text-item ${active ? 'active' : ''}" data-store-category="${esc(cat)}" aria-pressed="${active ? 'true' : 'false'}"><span class="category-label">${esc(label)}</span></button>`;
     }).join('');
 }
 window.renderCategories = renderCategories;
