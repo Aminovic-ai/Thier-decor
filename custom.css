@@ -1771,3 +1771,84 @@ a { text-underline-offset: 3px; }
   #screen-shop .store-header { box-shadow: 0 3px 14px rgba(137,82,103,.07); }
   #screen-shop .product-card { border-radius: 16px !important; }
 }
+
+
+/* Customer account navigation fixes — keep category strip on the shop page only. */
+@media (max-width: 680px) {
+  #screen-shop:not(:has(#s-shop.active)) #mobile-category-bar,
+  #screen-shop:has(.page:not(#s-shop).active) #mobile-category-bar {
+    display: none !important;
+    visibility: hidden !important;
+    max-height: 0 !important;
+    overflow: hidden !important;
+    pointer-events: none !important;
+  }
+}
+
+/* Strong, consistent berry accent for customer navigation and shopping actions. */
+#screen-shop {
+  --td-berry: #a83f68;
+  --td-berry-dark: #87304f;
+  --td-berry-soft: #fbe8ef;
+}
+#screen-shop .store-nav .nav-links li a {
+  color: #75485a !important;
+  border-radius: 11px;
+  transition: background .18s ease, color .18s ease;
+}
+#screen-shop .store-nav .nav-links li a i {
+  color: #a34a6a !important;
+}
+#screen-shop .store-nav .nav-links li.active a,
+#screen-shop .store-nav .nav-links li a:hover {
+  color: var(--td-berry-dark) !important;
+  background: var(--td-berry-soft) !important;
+}
+#screen-shop .store-nav .nav-links li.active a i,
+#screen-shop .store-nav .nav-links li a:hover i {
+  color: var(--td-berry) !important;
+}
+#screen-shop .header-actions button[onclick*="wishlist"] {
+  background: linear-gradient(135deg,#b94e78,#963657) !important;
+  border-color: #963657 !important;
+  color: #fff !important;
+  box-shadow: 0 4px 12px rgba(150,54,87,.2);
+}
+#screen-shop .header-actions button[onclick*="wishlist"] i {
+  color: #fff !important;
+}
+#screen-shop .cart-btn,
+#screen-shop .product-mini-cart {
+  background: linear-gradient(135deg,#b94e78,#963657) !important;
+  border-color: #963657 !important;
+  color: #fff !important;
+  box-shadow: 0 4px 12px rgba(150,54,87,.2);
+}
+#screen-shop .cart-btn i,
+#screen-shop .product-mini-cart i {
+  color: #fff !important;
+}
+#screen-shop .mobile-nav-item {
+  color: #75485a !important;
+}
+#screen-shop .mobile-nav-item i {
+  color: #a34a6a !important;
+}
+#screen-shop .mobile-nav-item.active {
+  color: #87304f !important;
+  background: linear-gradient(180deg,#fbe8ef 0%,#fff5f8 100%) !important;
+}
+#screen-shop .mobile-nav-item.active i {
+  color: #a83f68 !important;
+}
+#screen-shop .mobile-nav-item[data-mobile-page="wishlist"] i,
+#screen-shop .mobile-nav-item[data-mobile-page="cart"] i {
+  color: #a83f68 !important;
+}
+#screen-shop .mobile-nav-item[data-mobile-page="wishlist"].active i,
+#screen-shop .mobile-nav-item[data-mobile-page="cart"].active i {
+  color: #87304f !important;
+}
+#screen-shop .mobile-nav-item.active:before {
+  background: #a83f68 !important;
+}
