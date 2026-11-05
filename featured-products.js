@@ -177,14 +177,109 @@
     renderAdminSelector();
   });
 
+
+  const CATEGORY_ORDER_KEY = '__categoryOrder';
+  let draftCategoryOrder = [];
+  let categoryOrderDirty = false;
+  const normalizeCategory = value => typeof window.normalizeStoreCategory === 'function'
+    ? window.normalizeStoreCategory(value)
+    : String(value || '').normalize('NFKC').replace(/[\u064B-\u065F\u0670\u0640]/g, '').replace(/\s+/g, ' ').trim().toLocaleLowerCase();
+  const getCategoryNames = () => {
+    const names = [];
+    const seen = new Set();
+    getProducts().forEach(product => {
+      const name = String(product.category || '').trim();
+      const key = normalizeCategory(name);
+      if (key && !seen.has(key)) { seen.add(key); names.push(name); }
+    });
+    return names;
+  };
+  const getStoredCategoryOrder = () => Array.isArray(getCustomPrices()[CATEGORY_ORDER_KEY])
+    ? getCustomPrices()[CATEGORY_ORDER_KEY].map(String) : [];
+  function getEffectiveCategoryOrder() {
+    const names = getCategoryNames();
+    const byKey = new Map(names.map(name => [normalizeCategory(name), name]));
+    const saved = getStoredCategoryOrder().map(normalizeCategory);
+    const ordered = saved.map(key => byKey.get(key)).filter(Boolean);
+    names.forEach(name => { if (!ordered.some(item => normalizeCategory(item) === normalizeCategory(name))) ordered.push(name); });
+    return ordered;
+  }
+  function renderCategoryOrderSelector() {
+    const list = document.getElementById('category-order-admin-list');
+    if (!list) return;
+    if (!categoryOrderDirty) draftCategoryOrder = getEffectiveCategoryOrder();
+    const count = document.getElementById('category-order-admin-count');
+    const title = document.getElementById('category-order-admin-title');
+    const description = document.getElementById('category-order-admin-description');
+    const saveLabel = document.getElementById('category-order-admin-save-label');
+    if (title) title.textContent = tr('ترتيب الأصناف', 'Ordre des catégories');
+    if (description) description.textContent = tr('غيّر ترتيب ظهور الأصناف في واجهة الزائر والزبون.', 'Changez l’ordre d’affichage des catégories dans la boutique.');
+    if (saveLabel) saveLabel.textContent = tr('حفظ ترتيب الأصناف', 'Enregistrer l’ordre');
+    if (count) count.textContent = tr(draftCategoryOrder.length + ' صنفاً · استعمل الأسهم لتغيير الترتيب.', draftCategoryOrder.length + ' catégorie(s) · Utilisez les flèches pour réorganiser.');
+    if (!draftCategoryOrder.length) {
+      list.innerHTML = '<div class="featured-empty-state"><strong>' + tr('لا توجد أصناف بعد. أضف منتجات مع تحديد الصنف أولاً.', 'Aucune catégorie. Ajoutez d’abord des produits avec une catégorie.') + '</strong></div>';
+      return;
+    }
+    list.innerHTML = draftCategoryOrder.map((name, index) => `<div class="featured-admin-row category-order-row">
+      <div class="featured-admin-product"><span class="category-order-number">${index + 1}</span><span class="featured-admin-product-info"><strong>${escapeHtml(name)}</strong><small>${tr('ترتيب الظهور في المتجر', 'Ordre dans la boutique')}</small></span></div>
+      <div class="featured-admin-order">
+        <button type="button" class="btn-icon" data-category-move="up" data-category-index="${index}" title="${tr('تقديم', 'Monter')}" aria-label="${tr('تقديم', 'Monter')}" ${index === 0 ? 'disabled' : ''}><i class="fas fa-arrow-up"></i></button>
+        <button type="button" class="btn-icon" data-category-move="down" data-category-index="${index}" title="${tr('تأخير', 'Descendre')}" aria-label="${tr('تأخير', 'Descendre')}" ${index === draftCategoryOrder.length - 1 ? 'disabled' : ''}><i class="fas fa-arrow-down"></i></button>
+      </div>
+    </div>`).join('');
+  }
+  async function saveCategoryOrder() {
+    if (saving) return;
+    const state = getState();
+    if (typeof window.callAdminWorker !== 'function') {
+      window.toast?.(tr('خدمة الإدارة غير متاحة حالياً.', 'Service administrateur indisponible.'), 'error');
+      return;
+    }
+    const customPrices = JSON.parse(JSON.stringify(getCustomPrices()));
+    const currentKeys = new Set(getCategoryNames().map(normalizeCategory));
+    customPrices[CATEGORY_ORDER_KEY] = [...new Set(draftCategoryOrder.map(normalizeCategory))].filter(key => currentKeys.has(key));
+    const button = document.querySelector('#category-order-admin-panel .featured-admin-save');
+    saving = true;
+    if (button) button.disabled = true;
+    try {
+      await window.callAdminWorker('adminUpdateSettings', { settings: { customPrices } });
+      state.settings = state.settings || {};
+      state.settings.customPrices = customPrices;
+      try { localStorage.setItem('td_set', JSON.stringify(state.settings)); } catch (_) {}
+      categoryOrderDirty = false;
+      draftCategoryOrder = getEffectiveCategoryOrder();
+      window.renderCategories?.();
+      renderCategoryOrderSelector();
+      window.toast?.('✓ ' + tr('تم حفظ ترتيب الأصناف بنجاح', 'Ordre des catégories enregistré'));
+    } catch (error) {
+      window.toast?.('✕ ' + (error?.message || tr('تعذر حفظ الترتيب.', 'Impossible d’enregistrer l’ordre.')), 'error');
+    } finally {
+      saving = false;
+      if (button) button.disabled = false;
+    }
+  }
+  window.saveCategoryOrder = saveCategoryOrder;
+  document.addEventListener('click', event => {
+    const button = event.target.closest?.('[data-category-move]');
+    if (!button) return;
+    const index = Number(button.dataset.categoryIndex);
+    const next = button.dataset.categoryMove === 'up' ? index - 1 : index + 1;
+    if (!Number.isInteger(index) || next < 0 || next >= draftCategoryOrder.length) return;
+    [draftCategoryOrder[index], draftCategoryOrder[next]] = [draftCategoryOrder[next], draftCategoryOrder[index]];
+    categoryOrderDirty = true;
+    renderCategoryOrderSelector();
+  });
+
   document.addEventListener('DOMContentLoaded', () => {
     renderAdminSelector();
+    renderCategoryOrderSelector();
     renderFeaturedStorefront();
     const shopProducts = document.getElementById('s-products');
     if (shopProducts && 'MutationObserver' in window) {
       new MutationObserver(() => {
         renderFeaturedStorefront();
         renderAdminSelector();
+        renderCategoryOrderSelector();
       }).observe(shopProducts, { childList: true, subtree: true });
     }
     const languageButtons = ['lang-btn', 'mobile-lang-btn'];
@@ -192,12 +287,13 @@
       const button = document.getElementById(id);
       if (button) button.addEventListener('click', () => setTimeout(() => {
         renderAdminSelector();
+        renderCategoryOrderSelector();
         renderFeaturedStorefront();
       }, 0));
     });
     const settings = document.getElementById('sec-settings');
     if (settings && 'MutationObserver' in window) {
-      new MutationObserver(() => renderAdminSelector()).observe(settings, { attributes: true, attributeFilter: ['style'] });
+      new MutationObserver(() => { renderAdminSelector(); renderCategoryOrderSelector(); }).observe(settings, { attributes: true, attributeFilter: ['style'] });
     }
   });
 })();

@@ -1443,3 +1443,16 @@ a { text-underline-offset: 3px; }
     color: #456b83 !important;
   }
 }
+
+
+/* Category order controls in admin settings. */
+.category-order-number{
+  display:grid;place-items:center;width:30px;height:30px;flex:0 0 30px;
+  border-radius:9px;background:#eaf6fd;color:#1686bd;font-size:.82rem;font-weight:900
+}
+.category-order-row .featured-admin-product{cursor:default}
+.category-order-admin-card{margin-top:16px}
+@media(max-width:680px){
+  #category-order-admin-panel .featured-admin-row{padding:9px;gap:6px}
+  #category-order-admin-panel .featured-admin-order .btn-icon{width:31px;height:31px}
+}
