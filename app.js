@@ -1871,7 +1871,7 @@ function updateCartQtyDirect(id, value) {
     const product = state.products.find(p => String(p.id) === String(id));
     const maxQty = product ? Math.max(0, Number(product.qty) || 0) : Number.MAX_SAFE_INTEGER;
     const raw = String(value ?? '').trim();
-    if (!/^\\d+$/.test(raw)) { renderCart(); return; }
+    if (!/^\d+$/.test(raw)) { renderCart(); return; }
     const qty = Number(raw);
     if (!Number.isSafeInteger(qty) || qty < 1) { renderCart(); return; }
     if (qty > maxQty) { item.qty = maxQty; toast(i18n[state.currentLang].max_stock, 'error'); } else item.qty = qty;
