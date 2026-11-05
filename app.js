@@ -2467,6 +2467,19 @@ async function submitCustomerMessage() {
 window.openMessageModal = openMessageModal; window.submitCustomerMessage = submitCustomerMessage;
 
 
+
+function renderCustomerNotifications() {
+    const container = document.getElementById('s-customer-notifications-list');
+    if (!container) return;
+    // The current customer API does not expose a notification feed yet.
+    // Show a clear empty state rather than leaving a blank page or broken action.
+    const message = state.currentLang === 'fr'
+        ? 'Aucune notification pour le moment.'
+        : 'لا توجد إشعارات حالياً.';
+    container.innerHTML = `<div class="customer-empty-state" role="status" style="text-align:center;padding:42px 18px;color:var(--text-mid);"><i class="fas fa-bell" style="display:block;font-size:2rem;margin-bottom:12px;color:var(--primary);"></i><strong>${message}</strong></div>`;
+}
+window.renderCustomerNotifications = renderCustomerNotifications;
+
 function renderCustomerMessages() {
     const c = document.getElementById('s-customer-messages-list'); if (!c || !state.session) return;
     const cust = state.customers.find(x => x.id === state.session.id); const myMessages = state.messages.filter(m => m.customerId === state.session.id || m.phone === (cust ? cust.phone : ''));
