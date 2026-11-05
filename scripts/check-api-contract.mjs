@@ -24,9 +24,9 @@ if (missing.length) {
 }
 
 // Asset query strings are used for cache-busting (for example, app.js?v=44).
-const configIndex = index.search(/src=["']td-config\\.js(?:\\?[^"']*)?["']/);
-const appIndex = index.search(/src=["']app\\.js(?:\\?[^"']*)?["']/);
-const analyticsIndex = index.search(/src=["']analytics-notifications\\.js(?:\\?[^"']*)?["']/);
+const configIndex = index.search(/src=["']td-config\.js(?:\?[^"']*)?["']/);
+const appIndex = index.search(/src=["']app\.js(?:\?[^"']*)?["']/);
+const analyticsIndex = index.search(/src=["']analytics-notifications\.js(?:\?[^"']*)?["']/);
 if (configIndex < 0 || appIndex < 0 || analyticsIndex < 0 ||
     !(configIndex < appIndex && appIndex < analyticsIndex)) {
   throw new Error("Script order must be td-config.js, app.js, then analytics-notifications.js.");
