@@ -1857,9 +1857,29 @@ function addToCart(id) {
 window.addToCart = addToCart;
 
 function updateCartBadge() { const b = document.getElementById('cart-badge'); if (b) { const q = state.cart.reduce((s, i) => s + i.qty, 0); b.textContent = q; b.style.display = q > 0 ? 'flex' : 'none'; } }
-function updateCartQty(id, d) { const item = state.cart.find(c => c.id === id); if (!item) return; item.qty += d; if (item.qty <= 0) state.cart = state.cart.filter(c => c.id !== id); save(K.cart, state.cart); renderCart(); updateCartBadge(); }
+function updateCartQty(id, d) {
+    const item = state.cart.find(c => String(c.id) === String(id)); if (!item) return;
+    const product = state.products.find(p => String(p.id) === String(id));
+    const maxQty = product ? Math.max(0, Number(product.qty) || 0) : Number.MAX_SAFE_INTEGER;
+    const nextQty = Number(item.qty) + Number(d);
+    if (nextQty > maxQty) return toast(i18n[state.currentLang].max_stock, 'error');
+    if (nextQty <= 0) state.cart = state.cart.filter(c => String(c.id) !== String(id)); else item.qty = nextQty;
+    save(K.cart, state.cart); renderCart(); updateCartBadge();
+}
+function updateCartQtyDirect(id, value) {
+    const item = state.cart.find(c => String(c.id) === String(id)); if (!item) return;
+    const product = state.products.find(p => String(p.id) === String(id));
+    const maxQty = product ? Math.max(0, Number(product.qty) || 0) : Number.MAX_SAFE_INTEGER;
+    const raw = String(value ?? '').trim();
+    if (!/^\\d+$/.test(raw)) { renderCart(); return; }
+    const qty = Number(raw);
+    if (!Number.isSafeInteger(qty) || qty < 1) { renderCart(); return; }
+    if (qty > maxQty) { item.qty = maxQty; toast(i18n[state.currentLang].max_stock, 'error'); } else item.qty = qty;
+    if (item.qty < 1) state.cart = state.cart.filter(c => String(c.id) !== String(id));
+    save(K.cart, state.cart); renderCart(); updateCartBadge();
+}
 function removeFromCart(id) { state.cart = state.cart.filter(c => c.id !== id); save(K.cart, state.cart); renderCart(); updateCartBadge(); }
-window.updateCartBadge = updateCartBadge; window.updateCartQty = updateCartQty; window.removeFromCart = removeFromCart;
+window.updateCartBadge = updateCartBadge; window.updateCartQty = updateCartQty; window.updateCartQtyDirect = updateCartQtyDirect; window.removeFromCart = removeFromCart;
 
 function renderCart() {
     const c = document.getElementById('s-cart-items'); const sum = document.getElementById('s-cart-summary'); if (!c) return;
@@ -1867,7 +1887,7 @@ function renderCart() {
     c.innerHTML = state.cart.map(i => {
         const product = state.products.find(p => String(p.id) === String(i.id));
         const image = product && Array.isArray(product.images) && product.images[0] ? esc(product.images[0]) : '';
-        return `<div class="admin-card cart-variant-row">${image ? `<img class="cart-variant-thumb" src="${image}" alt="">` : ''}<div class="cart-variant-info"><strong>${esc(i.name)}</strong><br><small>${fmtMoney(i.price)} x ${i.qty}</small></div><div style="display:flex;gap:10px;align-items:center;"><button onclick="updateCartQty(${i.id},-1)" style="padding:5px;">-</button><span>${i.qty}</span><button onclick="updateCartQty(${i.id},1)" style="padding:5px;">+</button><button onclick="removeFromCart(${i.id})" style="color:red;border:none;background:none;">🗑</button></div></div>`;
+        return `<div class="admin-card cart-variant-row">${image ? `<img class="cart-variant-thumb" src="${image}" alt="">` : ''}<div class="cart-variant-info"><strong>${esc(i.name)}</strong><br><small>${fmtMoney(i.price)} x ${i.qty}</small></div><div class="cart-qty-control"><button type="button" class="cart-qty-step" onclick="updateCartQty(${i.id},-1)" aria-label="${state.currentLang === 'ar' ? 'إنقاص الكمية' : 'Diminuer la quantité'}" title="${state.currentLang === 'ar' ? 'إنقاص الكمية' : 'Diminuer la quantité'}"><i class="fas fa-minus"></i></button><input class="cart-qty-input" type="number" inputmode="numeric" pattern="[0-9]*" min="1" max="${product ? Math.max(0, Number(product.qty) || 0) : ''}" step="1" value="${Math.max(1, Number(i.qty) || 1)}" aria-label="${state.currentLang === 'ar' ? 'الكمية' : 'Quantité'}" onchange="updateCartQtyDirect(${i.id},this.value)" onkeydown="if(event.key==='Enter'){this.blur();}"><button type="button" class="cart-qty-step" onclick="updateCartQty(${i.id},1)" aria-label="${state.currentLang === 'ar' ? 'زيادة الكمية' : 'Augmenter la quantité'}" title="${state.currentLang === 'ar' ? 'زيادة الكمية' : 'Augmenter la quantité'}"><i class="fas fa-plus"></i></button><button type="button" class="cart-qty-remove" onclick="removeFromCart(${i.id})" aria-label="${state.currentLang === 'ar' ? 'حذف المنتج' : 'Supprimer le produit'}" title="${state.currentLang === 'ar' ? 'حذف المنتج' : 'Supprimer le produit'}"><i class="fas fa-trash-alt"></i></button></div></div>`;
     }).join('');
     sum.innerHTML = `<div class="delivery-cost-box">${i18n[state.currentLang].total_price} ${fmtMoney(state.cart.reduce((s, i) => s + i.price * i.qty, 0))}</div>`;
 }
