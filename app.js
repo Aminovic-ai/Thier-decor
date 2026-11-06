@@ -3723,8 +3723,20 @@ window.renderAdminRequests = renderAdminRequests;
     window.toggleMobileCategories = function () {
         const shop = document.getElementById('screen-shop');
         const button = document.querySelector('#mobile-bottom-nav [data-mobile-page="categories"]');
+        if (!shop || !state.session || state.session.role !== 'customer') return;
+
+        // Rebuild the category strip on demand in case the initial mobile setup ran too early.
+        setup();
+        shop.classList.add('customer-session-active');
+
+        const activePage = shop.querySelector('.page.active');
+        if (activePage && activePage.id !== 's-shop' && typeof window.shopGo === 'function') {
+            window.shopGo('shop');
+        }
+
         const bar = document.getElementById('mobile-category-bar');
-        if (!shop || !bar || !button || !shop.classList.contains('customer-session-active')) return;
+        if (!bar || !button) return;
+
         const opening = !shop.classList.contains('mobile-categories-open');
         shop.classList.toggle('mobile-categories-open', opening);
         button.setAttribute('aria-expanded', opening ? 'true' : 'false');
