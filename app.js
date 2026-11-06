@@ -1192,8 +1192,10 @@ function updateUIBasedOnSession() {
     const contactBtn = document.getElementById('btn-contact-us');
     const mobileContactBtn = document.getElementById('mobile-contact-btn');
     const logoutBtn = document.getElementById('btn-logout-header');
+    const categoriesTab = document.querySelector('#mobile-bottom-nav [data-mobile-page="categories"]');
     const shopScreen = document.getElementById('screen-shop');
     const isCustomer = Boolean(state.session && state.session.role === 'customer');
+    if (categoriesTab) categoriesTab.style.display = isCustomer ? 'flex' : 'none';
     if (shopScreen) shopScreen.classList.toggle('customer-session-active', isCustomer);
     if (topNav) topNav.style.display = 'none'; if (contactBtn) contactBtn.style.display = 'none'; if (mobileContactBtn) mobileContactBtn.style.display = 'none'; if (logoutBtn) logoutBtn.style.display = 'none';
     if (isCustomer) {
