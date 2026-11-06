@@ -535,7 +535,18 @@ async function createCustomerOrder(request, body, env) {
     return fail("استخدام نقاط الولاء غير متاح مؤقتاً حتى تكتمل ترقية قاعدة البيانات. ألغِ خيار النقاط وأعد الطلب.", 409);
   }
 
-  const wilayaCode = Number(order.wilayaCode);
+  let wilayaCode = Number(order.wilayaCode);
+  if (!Number.isSafeInteger(wilayaCode) || wilayaCode <= 0) {
+    // Compatibility for already-open storefront tabs that do not send wilayaCode yet.
+    const wilayaName = String(order.wilaya || "").trim();
+    if (wilayaName) {
+      const matchingWilayas = await dbRequest(
+        env,
+        "td_delivery_defaults?select=code,name&name=eq." + encodeURIComponent(wilayaName) + "&limit=1"
+      );
+      wilayaCode = Number(matchingWilayas?.[0]?.code);
+    }
+  }
   if (!Number.isSafeInteger(wilayaCode) || wilayaCode <= 0) {
     return fail("تعذر تحديد ولاية التوصيل. حدّث الصفحة وأعد اختيار الولاية.", 400);
   }
