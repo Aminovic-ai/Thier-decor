@@ -1921,3 +1921,107 @@ a { text-underline-offset: 3px; }
     pointer-events: none !important;
   }
 }
+
+
+/* Mobile header: logo, contact, search and language on one compact row. */
+@media (max-width: 680px) {
+  #screen-shop .store-header .header-main {
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    align-items: center !important;
+    gap: 6px !important;
+    padding: 8px 10px !important;
+    min-width: 0 !important;
+  }
+  #screen-shop .header-logo {
+    order: 0 !important;
+    display: flex !important;
+    flex: 0 1 112px !important;
+    width: auto !important;
+    min-width: 0 !important;
+    max-width: 112px !important;
+    min-height: 42px !important;
+    margin: 0 !important;
+    gap: 5px !important;
+    overflow: hidden !important;
+  }
+  #screen-shop .header-logo .logo-icon {
+    width: 36px !important;
+    height: 36px !important;
+    flex: 0 0 36px !important;
+  }
+  #screen-shop .header-logo .logo-text {
+    display: block !important;
+    min-width: 0 !important;
+    overflow: hidden !important;
+  }
+  #screen-shop .header-logo .logo-text h1 {
+    margin: 0 !important;
+    font-size: .76rem !important;
+    line-height: 1.2 !important;
+    white-space: nowrap !important;
+  }
+  #screen-shop .header-logo .logo-text span {
+    display: block !important;
+    font-size: .58rem !important;
+    line-height: 1.2 !important;
+    white-space: nowrap !important;
+  }
+  #screen-shop .mobile-contact-btn {
+    order: 1 !important;
+    display: inline-flex !important;
+    flex: 0 0 38px !important;
+    width: 38px !important;
+    min-width: 38px !important;
+    min-height: 40px !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 6px !important;
+    margin: 0 !important;
+    border-radius: 10px !important;
+  }
+  #screen-shop .mobile-contact-btn .mobile-contact-label {
+    display: none !important;
+  }
+  #screen-shop .header-search {
+    order: 2 !important;
+    display: block !important;
+    flex: 1 1 65px !important;
+    width: auto !important;
+    min-width: 55px !important;
+    margin: 0 !important;
+  }
+  #screen-shop .header-search input {
+    width: 100% !important;
+    min-width: 0 !important;
+    min-height: 40px !important;
+    height: 40px !important;
+    padding: 7px 9px !important;
+    border-radius: 10px !important;
+    font-size: .78rem !important;
+  }
+  #screen-shop .mobile-lang-btn {
+    order: 3 !important;
+    display: inline-flex !important;
+    flex: 0 0 44px !important;
+    width: 44px !important;
+    min-width: 44px !important;
+    min-height: 40px !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 3px !important;
+    padding: 5px !important;
+    margin: 0 !important;
+    border-radius: 10px !important;
+    font-size: .75rem !important;
+  }
+}
+@media (max-width: 360px) {
+  #screen-shop .store-header .header-main { gap: 4px !important; padding-inline: 7px !important; }
+  #screen-shop .header-logo { flex-basis: 96px !important; max-width: 96px !important; }
+  #screen-shop .header-logo .logo-icon { width: 32px !important; height: 32px !important; flex-basis: 32px !important; }
+  #screen-shop .header-logo .logo-text h1 { font-size: .68rem !important; }
+  #screen-shop .header-logo .logo-text span { font-size: .54rem !important; }
+  #screen-shop .mobile-contact-btn { flex-basis: 34px !important; width: 34px !important; min-width: 34px !important; }
+  #screen-shop .mobile-lang-btn { flex-basis: 40px !important; width: 40px !important; min-width: 40px !important; }
+}
