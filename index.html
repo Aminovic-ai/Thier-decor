@@ -125,7 +125,7 @@
             <button type="button" class="mobile-nav-item active" data-mobile-page="shop" onclick="shopGo('shop')"><i class="fas fa-house"></i><span data-i18n="home">الرئيسية</span></button>
             <button type="button" class="mobile-nav-item" data-mobile-page="wishlist" onclick="shopGo('wishlist')"><i class="fas fa-heart"></i><span data-i18n="wishlist_title">المفضلة</span><b class="mobile-nav-badge" id="mobile-wishlist-badge" style="display:none;">0</b></button>
             <button type="button" class="mobile-nav-item" data-mobile-page="cart" onclick="shopGo('cart')"><i class="fas fa-bag-shopping"></i><span data-i18n="cart">السلة</span><b class="mobile-nav-badge" id="mobile-cart-badge" style="display:none;">0</b></button>
-            <button type="button" class="mobile-nav-item" data-mobile-page="categories" style="display:none;"><i class="fas fa-layer-group"></i><span data-i18n="categories">الأصناف</span></button>
+            <button type="button" class="mobile-nav-item" data-mobile-page="categories" style="display:none;" onclick="window.toggleMobileCategories && window.toggleMobileCategories()" aria-controls="mobile-category-bar" aria-expanded="false"><i class="fas fa-layer-group"></i><span data-i18n="categories">الأصناف</span></button>
             <button type="button" class="mobile-nav-item" data-mobile-page="profile" onclick="handleAccountClick()"><i class="fas fa-user"></i><span data-i18n="my_account">حسابي</span></button>
         </nav>
     </div>
