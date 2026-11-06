@@ -25,6 +25,22 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="style.css?v=41">
     <link rel="stylesheet" href="custom.css?v=54">
+    <style>
+        #guest-register-cta{margin:18px auto 22px;padding:clamp(18px,3vw,28px);max-width:1180px;border:1px solid #bfdbfe;border-radius:18px;background:linear-gradient(120deg,#eff6ff 0%,#f8fbff 55%,#e0f2fe 100%);box-shadow:0 8px 24px rgba(37,99,235,.09);display:flex;align-items:center;justify-content:space-between;gap:18px}
+        #guest-register-cta .guest-cta-copy{min-width:0}
+        #guest-register-cta h2{margin:0 0 7px;color:#12345a;font-size:clamp(1.15rem,2.4vw,1.65rem);font-weight:900}
+        #guest-register-cta p{margin:0;color:#475569;font-size:clamp(.9rem,1.7vw,1.02rem);line-height:1.7}
+        #guest-register-cta .guest-cta-button{flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;gap:10px;padding:13px 22px;border:0;border-radius:12px;background:linear-gradient(135deg,#2563eb,#0ea5e9);color:#fff;font:inherit;font-weight:900;font-size:1rem;text-decoration:none;box-shadow:0 6px 16px rgba(37,99,235,.22);cursor:pointer;transition:transform .2s,box-shadow .2s}
+        #guest-register-cta .guest-cta-button:hover{transform:translateY(-2px);box-shadow:0 9px 20px rgba(37,99,235,.28)}
+        #guest-register-cta .guest-cta-fr{display:none}
+        html[lang="fr"] #guest-register-cta{direction:ltr}
+        html[lang="fr"] #guest-register-cta .guest-cta-ar{display:none}
+        html[lang="fr"] #guest-register-cta .guest-cta-fr{display:inline}
+        html[lang="fr"] #guest-register-cta .guest-cta-copy .guest-cta-fr{display:block}
+        html[lang="fr"] #guest-register-cta .guest-cta-copy .guest-cta-ar{display:none}
+        .customer-session-active #guest-register-cta{display:none!important}
+        @media(max-width:640px){#guest-register-cta{margin:12px 10px 18px;padding:17px 15px;flex-direction:column;align-items:stretch;text-align:center;gap:13px}#guest-register-cta .guest-cta-button{width:100%;box-sizing:border-box;padding:13px 16px}}
+    </style>
 </head>
 <body>
     <div class="screen active" id="screen-shop">
@@ -73,6 +89,16 @@
         </header>
         <main class="store-main">
             <div class="page active" id="s-shop">
+                <section id="guest-register-cta" aria-labelledby="guest-register-title">
+                    <div class="guest-cta-copy">
+                        <h2 id="guest-register-title"><span class="guest-cta-ar">مرحباً بكم في Thier Décor ✨</span><span class="guest-cta-fr">Bienvenue chez Thier Décor ✨</span></h2>
+                        <p><span class="guest-cta-ar">جديد في Thier Décor؟ سجّل الآن لتتمكن من الطلب والشراء بسهولة ومتابعة طلباتك.</span><span class="guest-cta-fr">Nouveau chez Thier Décor ? Créez votre compte pour commander facilement et suivre vos commandes.</span></p>
+                    </div>
+                    <button type="button" class="guest-cta-button" onclick="openCustomerAuthModal(); switchAuthMode('register')">
+                        <i class="fas fa-user-plus" aria-hidden="true"></i>
+                        <span class="guest-cta-ar">إنشاء حساب جديد</span><span class="guest-cta-fr">Créer un compte</span>
+                    </button>
+                </section>
                 <div id="new-products-box" style="display:none; margin-bottom:20px;">
                     <div style="background: linear-gradient(135deg, #f59e0b, #f97316); color:#fff; padding:15px 20px; border-radius:12px; display:flex; justify-content:space-between; align-items:center;">
                         <div><h3 data-i18n="new_products_title" style="margin:0; font-size:1.1rem; font-weight:900;">✨ منتجات جديدة وصلت!</h3></div><i class="fas fa-gift" style="font-size:2.5rem; opacity:0.5;"></i>
