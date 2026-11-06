@@ -431,45 +431,196 @@ async function createCustomerOrder(request, body, env) {
       encodeURIComponent(session.sub) + "&limit=1"
   );
   const customer = customerRows?.[0];
-  if (!customer || customer.isBlocked === true) {
-    return fail("الحساب غير متاح.", 403);
-  }
+  if (!customer || customer.isBlocked === true) return fail("الحساب غير متاح.", 403);
 
   const orderId = Number(order.id);
   if (!Number.isSafeInteger(orderId) || orderId <= 0) return fail("رقم الطلبية غير صالح.");
-  if (!Array.isArray(order.items) || order.items.length < 1 || order.items.length > 100) return fail("قائمة المنتجات غير صالحة.");
-  const safeItems = [];
+  if (!Array.isArray(order.items) || order.items.length < 1 || order.items.length > 100) {
+    return fail("قائمة المنتجات غير صالحة.");
+  }
+
+  // The live Supabase td_create_order function currently expects the legacy
+  // full order-item snapshot and totals. Rebuild both here from trusted DB rows.
+  // Never accept browser-supplied names, prices, costs, pack composition or totals.
+  const requested = [];
+  const ids = [];
   for (const item of order.items) {
     const productId = Number(item?.id);
     const quantity = Number(item?.qty);
-    if (!Number.isSafeInteger(productId) || productId <= 0 || !Number.isSafeInteger(quantity) || quantity <= 0 || quantity > 1000) {
+    if (!Number.isSafeInteger(productId) || productId <= 0 ||
+        !Number.isSafeInteger(quantity) || quantity <= 0 || quantity > 1000) {
       return fail("معرّف المنتج أو الكمية غير صالحين.");
     }
-    // Only IDs and quantities cross the trust boundary. Names, prices, costs and pack data
-    // are rebuilt from the products table by td_build_order_items inside the DB transaction.
-    safeItems.push({ id: productId, qty: quantity });
+    requested.push({ id: productId, qty: quantity });
+    ids.push(productId);
   }
 
+  const uniqueIds = [...new Set(ids)];
+  const productRows = await dbRequest(
+    env,
+    "products?select=id,name,price,cost,qty,isPack,packItems,promoPrice,promoStart,promoEnd&id=in.(" +
+      uniqueIds.join(",") + ")"
+  );
+  const productMap = new Map((productRows || []).map(row => [String(row.id), row]));
+  if (productMap.size !== uniqueIds.length) {
+    return fail("أحد المنتجات لم يعد متوفراً. حدّث السلة وحاول مجدداً.", 409);
+  }
+
+  const today = new Date().toISOString().slice(0, 10);
+  const money = value => Math.round((Number(value) + Number.EPSILON) * 100) / 100;
+  const canonicalItems = [];
+  let subtotal = 0;
+
+  for (const requestedItem of requested) {
+    const product = productMap.get(String(requestedItem.id));
+    if (!product) return fail("أحد المنتجات لم يعد متوفراً.", 409);
+
+    const regularPrice = Number(product.price);
+    if (!Number.isFinite(regularPrice) || regularPrice < 0) {
+      return fail("يوجد سعر غير صالح لأحد المنتجات. يرجى التواصل مع المتجر.", 409);
+    }
+    const promoPrice = Number(product.promoPrice);
+    const promoIsActive = Number.isFinite(promoPrice) && promoPrice > 0 &&
+      promoPrice < regularPrice &&
+      (!product.promoStart || String(product.promoStart) <= today) &&
+      (!product.promoEnd || String(product.promoEnd) >= today);
+    const unitPrice = promoIsActive ? promoPrice : regularPrice;
+
+    const isPack = product.isPack === true;
+    const packItems = isPack && Array.isArray(product.packItems)
+      ? product.packItems.map(component => ({
+          id: Number(component?.id),
+          qty: Number(component?.qty)
+        }))
+      : [];
+
+    if (isPack && (!packItems.length || packItems.some(component =>
+      !Number.isSafeInteger(component.id) || component.id <= 0 ||
+      !Number.isSafeInteger(component.qty) || component.qty <= 0
+    ))) {
+      return fail("مكونات إحدى الحزم غير صالحة. يرجى التواصل مع المتجر.", 409);
+    }
+
+    canonicalItems.push({
+      id: Number(product.id),
+      name: String(product.name || ""),
+      price: money(unitPrice),
+      cost: money(product.cost || 0),
+      qty: requestedItem.qty,
+      isPack,
+      packItems
+    });
+    subtotal += unitPrice * requestedItem.qty;
+  }
+  subtotal = money(subtotal);
+
+  const promoCode = String(order.promoCode || order.couponCode || "").trim().toUpperCase().slice(0, 80);
+  let discountPercent = 0;
+  let discountAmount = 0;
+  if (promoCode) {
+    const validation = await dbRequest(env, "rpc/td_check_promo", {
+      method: "POST",
+      body: JSON.stringify({ p_code: promoCode, p_phone: customer.phone })
+    });
+    if (!validation || validation.valid !== true) {
+      return fail("الكوبون غير صالح أو منتهي أو غير متاح لهذا الحساب.", 409);
+    }
+    discountPercent = Math.max(0, Math.min(100, Number(validation.discount) || 0));
+    discountAmount = money(subtotal * discountPercent / 100);
+  }
+
+  // The audited live td_create_order function does not yet implement loyalty
+  // redemption. Reject the request rather than granting free delivery client-side.
+  if (order.useLoyaltyPoints === true) {
+    return fail("استخدام نقاط الولاء غير متاح مؤقتاً حتى تكتمل ترقية قاعدة البيانات. ألغِ خيار النقاط وأعد الطلب.", 409);
+  }
+
+  let wilayaCode = Number(order.wilayaCode);
+  if (!Number.isSafeInteger(wilayaCode) || wilayaCode <= 0) {
+    // Compatibility for already-open storefront tabs that do not send wilayaCode yet.
+    const wilayaName = String(order.wilaya || "").trim();
+    if (wilayaName) {
+      const matchingWilayas = await dbRequest(
+        env,
+        "td_delivery_defaults?select=code,name&name=eq." + encodeURIComponent(wilayaName) + "&limit=1"
+      );
+      wilayaCode = Number(matchingWilayas?.[0]?.code);
+    }
+  }
+  if (!Number.isSafeInteger(wilayaCode) || wilayaCode <= 0) {
+    return fail("تعذر تحديد ولاية التوصيل. حدّث الصفحة وأعد اختيار الولاية.", 400);
+  }
+  const courier = String(order.courier || "noest").trim().toLowerCase();
+  const rawDeliveryType = String(order.deliveryType || "home").trim().toLowerCase();
+  const deliveryType = ["stopdesk", "desk", "office", "bureau", "pickup", "pointrelais"].includes(rawDeliveryType)
+    ? "desk" : "home";
+  const deliveryRows = await dbRequest(env, "rpc/td_compute_delivery_price", {
+    method: "POST",
+    body: JSON.stringify({
+      p_wilaya_code: wilayaCode,
+      p_courier: courier,
+      p_delivery_type: deliveryType
+    })
+  });
+  const deliveryPrice = money(deliveryRows);
+  if (!Number.isFinite(deliveryPrice) || deliveryPrice < 0) {
+    return fail("تعذر حساب سعر التوصيل. حاول مجدداً.", 409);
+  }
+
+  const finalTotal = money(Math.max(0, subtotal - discountAmount) + deliveryPrice);
   const trustedOrder = {
     id: orderId,
     customerId: customer.id,
     customerName: customer.name,
     customerPhone: customer.phone,
-    items: safeItems,
-    couponCode: String(order.couponCode || "").trim().slice(0, 80) || null,
-    promoCode: String(order.promoCode || "").trim().slice(0, 80) || null,
-    courier: String(order.courier || "").trim().slice(0, 60),
-    deliveryType: String(order.deliveryType || "").trim().slice(0, 40),
+    items: canonicalItems,
+    itemsTotal: subtotal,
+    discount: discountAmount,
+    couponCode: promoCode || null,
+    promoCode: promoCode || null,
+    promoDiscountPercent: discountPercent,
+    promoDiscountAmount: discountAmount,
+    deliveryPrice,
+    total: finalTotal,
+    courier,
+    deliveryType: rawDeliveryType,
     wilaya: String(order.wilaya || "").trim().slice(0, 120),
     commune: String(order.commune || "").trim().slice(0, 120),
     address: String(order.address || "").trim().slice(0, 500),
     stationCode: String(order.stationCode || "").trim().slice(0, 80),
     stationName: String(order.stationName || "").trim().slice(0, 160),
     stationAddress: String(order.stationAddress || "").trim().slice(0, 300),
+    status: "new",
+    createdAt: new Date().toISOString(),
+    paidAmount: 0,
+    trackingNumber: null,
     weight: String(order.weight || "").trim().slice(0, 40),
-    phone2: String(order.phone2 || "").trim().slice(0, 40),
-    useLoyaltyPoints: order.useLoyaltyPoints === true
+    phone2: String(order.phone2 || "").trim().slice(0, 40)
   };
+
+  // Preserve idempotency on retries if the same order ID was already committed.
+  const existingRows = await dbRequest(
+    env,
+    "orders?select=*&id=eq." + encodeURIComponent(orderId) + "&limit=1"
+  );
+  if (existingRows?.length) {
+    const existing = existingRows[0];
+    if (String(existing.customerId || "") !== String(customer.id)) {
+      return fail("رقم الطلبية مستخدم مسبقاً.", 409);
+    }
+    const refreshed = await dbRequest(
+      env,
+      "customers?select=id,name,phone,points,isVip,isTop,isBlocked,wishlist,address&id=eq." +
+        encodeURIComponent(session.sub) + "&limit=1"
+    );
+    return json({
+      success: true,
+      order: existing,
+      customer: safeCustomer(refreshed?.[0] || customer),
+      pointsRedeemed: 0,
+      alreadyCreated: true
+    });
+  }
 
   let created;
   try {
@@ -479,24 +630,34 @@ async function createCustomerOrder(request, body, env) {
     });
   } catch (error) {
     const reason = String(error?.message || "");
+    // A timeout/retry may occur after the DB transaction committed. Read by the
+    // idempotency key before reporting failure to avoid duplicate checkout attempts.
+    const retryRows = await dbRequest(
+      env,
+      "orders?select=*&id=eq." + encodeURIComponent(orderId) + "&limit=1"
+    ).catch(() => []);
+    if (retryRows?.length && String(retryRows[0].customerId || "") === String(customer.id)) {
+      const refreshed = await dbRequest(
+        env,
+        "customers?select=id,name,phone,points,isVip,isTop,isBlocked,wishlist,address&id=eq." +
+          encodeURIComponent(session.sub) + "&limit=1"
+      );
+      return json({ success: true, order: retryRows[0], customer: safeCustomer(refreshed?.[0] || customer), pointsRedeemed: 0, alreadyCreated: true });
+    }
     if (reason.includes("Insufficient stock")) {
       return fail("بعض المنتجات لم تعد متوفرة بالكمية المطلوبة. حدّث السلة وحاول مجدداً.", 409);
-    }
-    if (reason.includes("At least 200 loyalty points")) {
-      return fail("رصيد نقاطك غير كافٍ. ألغِ خيار التوصيل المجاني أو اجمع نقاطاً إضافية.", 409);
     }
     if (reason.includes("Coupon could not be consumed")) {
       return fail("الكوبون منتهي أو غير صالح أو استُنفدت استعمالاته.", 409);
     }
     if (reason.includes("Order ID already belongs")) {
-      return fail("تعذر التحقق من الطلبية. حدّث الصفحة قبل إعادة المحاولة.", 409);
+      return fail("رقم الطلبية مستخدم مسبقاً.", 409);
     }
     console.error("Customer order RPC failed:", error);
     return fail("تعذر إتمام الطلبية. تحقق من الاتصال وحاول مجدداً.", 409);
   }
-  if (!created?.ok || !created.order_id) {
-    return fail("لم يتم تأكيد إنشاء الطلبية.", 409);
-  }
+
+  if (!created?.ok || !created.order_id) return fail("لم يتم تأكيد إنشاء الطلبية.", 409);
 
   const [orders, refreshedCustomers] = await Promise.all([
     dbRequest(env, "orders?select=*&id=eq." + encodeURIComponent(created.order_id) + "&limit=1"),
@@ -510,7 +671,7 @@ async function createCustomerOrder(request, body, env) {
     success: true,
     order: orders[0],
     customer: safeCustomer(refreshedCustomers[0]),
-    pointsRedeemed: Number(created.points_redeemed || 0)
+    pointsRedeemed: 0
   });
 }
 

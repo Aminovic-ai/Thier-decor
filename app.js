@@ -2152,7 +2152,7 @@ async function confirmShopOrder() {
 
     // Stock availability, authoritative prices and coupon consumption are checked atomically by the Worker RPC.
 
-    const order = { id: (lastKnownOrderId || (lastKnownOrderId = Date.now())), customerId: state.session.id, customerName: c.name, customerPhone: c.phone, items: orderItems, itemsTotal: itemsTotal + discountAmount, discount: discountAmount, couponCode: appliedCoupon ? appliedCoupon.code : null, promoCode: appliedCoupon ? appliedCoupon.code : null, promoDiscountPercent: appliedCoupon ? appliedCoupon.discount : 0, promoDiscountAmount: discountAmount, deliveryPrice: delPrice, total: total, courier, deliveryType: type, wilaya: wData.name, commune: finalCommune, address: finalAddress, stationCode: stationCode || null, stationName: stationName || null, stationAddress: stationAddress || null, status: 'new', createdAt: new Date().toISOString(), useLoyaltyPoints };
+    const order = { id: (lastKnownOrderId || (lastKnownOrderId = Date.now())), customerId: state.session.id, customerName: c.name, customerPhone: c.phone, items: orderItems, itemsTotal: itemsTotal + discountAmount, discount: discountAmount, couponCode: appliedCoupon ? appliedCoupon.code : null, promoCode: appliedCoupon ? appliedCoupon.code : null, promoDiscountPercent: appliedCoupon ? appliedCoupon.discount : 0, promoDiscountAmount: discountAmount, deliveryPrice: delPrice, total: total, courier, deliveryType: type, wilaya: wData.name, wilayaCode, commune: finalCommune, address: finalAddress, stationCode: stationCode || null, stationName: stationName || null, stationAddress: stationAddress || null, status: 'new', createdAt: new Date().toISOString(), useLoyaltyPoints };
 
     if (state.session.customerToken) {
         orderSubmitting = true;
