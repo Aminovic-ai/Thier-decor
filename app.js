@@ -1669,19 +1669,26 @@ function renderPromoBanner() {
 window.renderPromoBanner = renderPromoBanner;
 
 function updateStoreBranding() {
-    const nameEl = document.getElementById('shop-name-header'); if (nameEl && state.settings.shopName) nameEl.textContent = state.settings.shopName;
+    const nameEl = document.getElementById('shop-name-header');
+    if (nameEl && state.settings.shopName) nameEl.textContent = state.settings.shopName;
     const logoEl = document.getElementById('shop-logo-img-container');
-    if (logoEl) {
-        if (state.settings.logoUrl) {
-            logoEl.innerHTML = `<img class="brand-logo-image" src="${esc(state.settings.logoUrl)}" alt="Thier Décor">`;
-            logoEl.style.background = 'transparent';
-            logoEl.style.color = 'transparent';
-        } else {
-            logoEl.innerHTML = '<img class="brand-logo-image" src="icon-192.png?v=3" alt="Thier Décor">';
-            logoEl.style.background = '#fff';
-            logoEl.style.color = 'transparent';
-        }
-    }
+    if (!logoEl) return;
+
+    const defaultLogo = 'icon-192.png?v=4';
+    const customLogo = String(state.settings.logoUrl || '').trim();
+    const img = document.createElement('img');
+    img.className = 'brand-logo-image';
+    img.alt = 'Thier Décor';
+    img.onerror = function () {
+        if (this.dataset.fallbackApplied === '1') return;
+        this.dataset.fallbackApplied = '1';
+        this.src = defaultLogo;
+        logoEl.style.background = '#fff';
+    };
+    img.src = customLogo || defaultLogo;
+    logoEl.replaceChildren(img);
+    logoEl.style.background = '#fff';
+    logoEl.style.color = 'transparent';
 }
 window.updateStoreBranding = updateStoreBranding;
 
