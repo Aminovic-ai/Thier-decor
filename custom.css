@@ -1874,3 +1874,50 @@ a { text-underline-offset: 3px; }
 #screen-shop .store-nav .nav-links li a i { color: #a83f68 !important; }
 #screen-shop .store-nav .nav-links li.active a,
 #screen-shop .store-nav .nav-links li.active a i { color: #87304f !important; }
+
+
+/* Storefront identity and customer category visibility (mobile). */
+@media (max-width: 680px) {
+  #screen-shop .header-logo {
+    display: flex !important;
+    order: 0 !important;
+    flex: 0 0 100% !important;
+    width: 100% !important;
+    min-height: 48px;
+    align-items: center;
+    justify-content: flex-start;
+    margin: 0 0 5px;
+  }
+  #screen-shop .header-logo .logo-icon {
+    width: 45px;
+    height: 45px;
+    flex: 0 0 45px;
+  }
+  #screen-shop .header-logo .logo-text { display: block !important; }
+  #screen-shop .header-search {
+    order: 1 !important;
+    flex: 1 1 100% !important;
+    width: 100% !important;
+  }
+  #screen-shop.customer-session-active #mobile-category-bar {
+    display: block !important;
+    visibility: visible !important;
+    max-height: 100px !important;
+    height: auto !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    pointer-events: auto !important;
+  }
+  #screen-shop.customer-session-active:not(:has(#s-shop.active)) #mobile-category-bar {
+    display: none !important;
+    visibility: hidden !important;
+    max-height: 0 !important;
+    pointer-events: none !important;
+  }
+  #screen-shop:not(.customer-session-active) #mobile-category-bar {
+    display: none !important;
+    visibility: hidden !important;
+    max-height: 0 !important;
+    pointer-events: none !important;
+  }
+}
