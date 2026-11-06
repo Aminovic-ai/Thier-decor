@@ -91,7 +91,7 @@ function constantTimeEqual(a, b) {
   for (let i = 0; i < length; i++) diff |= (left.charCodeAt(i) || 0) ^ (right.charCodeAt(i) || 0);
   return diff === 0;
 }
-async function pbkdf2Hash(value, saltBytes = null, iterations = 310000, env = null) {
+async function pbkdf2Hash(value, saltBytes = null, iterations = 100000, env = null) {
   if (!Number.isInteger(iterations) || iterations < 100000 || iterations > 1000000) {
     throw new Error("Invalid PBKDF2 work factor");
   }
@@ -402,7 +402,7 @@ async function customerLogin(request, body, env) {
   if (!verification.valid) return fail("كلمة المرور غير صحيحة.", 401);
   if (customer.isBlocked === true) return fail("هذا الحساب محظور.", 403);
   if (verification.needsUpgrade) {
-    customer.password = await pbkdf2Hash(password, null, 310000, env);
+    customer.password = await pbkdf2Hash(password, null, 100000, env);
     await dbRequest(env, "customers?id=eq." + encodeURIComponent(customer.id), {
       method: "PATCH", headers: { "Prefer": "return=minimal" },
       body: JSON.stringify({ password: customer.password })
@@ -709,12 +709,12 @@ async function customerRegister(request, body, env) {
     id: Date.now(),
     name,
     phone,
-    password: await pbkdf2Hash(password, null, 310000, env),
+    password: await pbkdf2Hash(password, null, 100000, env),
     isVip: false,
     isTop: false,
     isBlocked: false,
     points: 0,
-    recoveryPin: await pbkdf2Hash(recoveryPin, null, 310000, env),
+    recoveryPin: await pbkdf2Hash(recoveryPin, null, 100000, env),
     wishlist: []
   };
 
@@ -769,8 +769,8 @@ async function customerResetPassword(request, body, env) {
   const pinVerification = await verifyStoredSecret(customer.recoveryPin, recoveryPin, env);
   if (!pinVerification.valid) return fail("رقم الهاتف أو رمز الاسترجاع غير صحيح.", 401);
   if (customer.isBlocked === true) return fail("هذا الحساب محظور.", 403);
-  const patch = { password: await pbkdf2Hash(password, null, 310000, env) };
-  if (pinVerification.needsUpgrade) patch.recoveryPin = await pbkdf2Hash(recoveryPin, null, 310000, env);
+  const patch = { password: await pbkdf2Hash(password, null, 100000, env) };
+  if (pinVerification.needsUpgrade) patch.recoveryPin = await pbkdf2Hash(recoveryPin, null, 100000, env);
   await dbRequest(env, "customers?id=eq." + encodeURIComponent(customer.id), {
     method: "PATCH", headers: { "Prefer": "return=minimal" }, body: JSON.stringify(patch)
   });
