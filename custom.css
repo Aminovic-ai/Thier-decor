@@ -2039,7 +2039,7 @@ a { text-underline-offset: 3px; }
     overflow: hidden !important;
     pointer-events: none !important;
   }
-  #screen-shop.customer-session-active.mobile-categories-open:has(#s-shop.active) #mobile-category-bar {
+  #screen-shop.customer-session-active.mobile-categories-open #mobile-category-bar {
     display: block !important;
     visibility: visible !important;
     max-height: 110px !important;
@@ -2049,7 +2049,7 @@ a { text-underline-offset: 3px; }
     overflow-y: hidden !important;
     pointer-events: auto !important;
   }
-  #screen-shop.customer-session-active.mobile-categories-open:has(#s-shop.active) .shop-categories {
+  #screen-shop.customer-session-active.mobile-categories-open .shop-categories {
     display: block !important;
     visibility: visible !important;
   }
