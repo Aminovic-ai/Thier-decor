@@ -3677,8 +3677,7 @@ window.renderAdminRequests = renderAdminRequests;
 (function initMobileStoreNavigation() {
     const setup = () => {
         const header = document.querySelector('#screen-shop .store-header');
-        const categories = document.getElementById('store-categories');
-        if (!header || !categories) return;
+        if (!header) return;
         let bar = document.getElementById('mobile-category-bar');
         if (!bar) {
             bar = document.createElement('div');
@@ -3686,6 +3685,18 @@ window.renderAdminRequests = renderAdminRequests;
             bar.setAttribute('aria-label', state.currentLang === 'fr' ? 'Catégories' : 'أصناف المنتجات');
             header.appendChild(bar);
         }
+
+        // The current storefront markup may not contain the category host.
+        // Create it before rendering so the customer category tab has real buttons to show.
+        let categories = document.getElementById('store-categories');
+        if (!categories) {
+            categories = document.createElement('div');
+            categories.id = 'store-categories';
+            categories.className = 'category-list category-text-list';
+            bar.appendChild(categories);
+            if (typeof window.renderCategories === 'function') window.renderCategories();
+        }
+
         const aside = categories.closest('.shop-categories');
         if (window.matchMedia('(max-width: 680px)').matches) {
             if (categories.parentElement !== bar) bar.appendChild(categories);
