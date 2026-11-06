@@ -9,6 +9,7 @@
  * FIREBASE_API_KEY         Variable (public Firebase project API key)
  * ADMIN_UID                Variable
  * CUSTOMER_SESSION_SECRET  Secret
+ * CUSTOMER_PASSWORD_SERVICE_SECRET Secret (shared with Supabase Edge Function)
  * AUTH_RATE_SECRET         Secret
  * VISIT_RATE_SECRET        Secret
  * ALLOWED_ORIGINS          Variable (comma-separated exact origins)
@@ -91,31 +92,46 @@ function constantTimeEqual(a, b) {
   for (let i = 0; i < length; i++) diff |= (left.charCodeAt(i) || 0) ^ (right.charCodeAt(i) || 0);
   return diff === 0;
 }
-async function pbkdf2Hash(value, saltBytes = null, iterations = 310000, env = null) {
+async function passwordServiceRequest(payload, env) {
+  if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY || !env.CUSTOMER_PASSWORD_SERVICE_SECRET) {
+    throw new Error("Password service configuration is missing");
+  }
+  const base = String(env.SUPABASE_URL).replace(/\/+$/, "");
+  const response = await fetch(base + "/functions/v1/customer-password", {
+    method: "POST",
+    headers: {
+      "apikey": env.SUPABASE_SERVICE_ROLE_KEY,
+      "x-td-internal-key": env.CUSTOMER_PASSWORD_SERVICE_SECRET,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(payload)
+  });
+  let data = null;
+  try { data = await response.json(); } catch (_) {}
+  if (!response.ok || !data?.success) {
+    console.error("Password service failed:", response.status, data?.error || "No response");
+    throw new Error("Password service unavailable");
+  }
+  return data;
+}
+
+async function pbkdf2Hash(value, saltBytes = null, iterations = 310000, env) {
   if (!Number.isInteger(iterations) || iterations < 100000 || iterations > 1000000) {
     throw new Error("Invalid PBKDF2 work factor");
   }
-  const salt = saltBytes
-    ? new Uint8Array(saltBytes)
-    : crypto.getRandomValues(new Uint8Array(16));
-  if (salt.length !== 16) throw new Error("Invalid PBKDF2 salt length");
-
-  const key = await crypto.subtle.importKey(
-    "raw",
-    new TextEncoder().encode(String(value)),
-    "PBKDF2",
-    false,
-    ["deriveBits"]
-  );
-  const bits = await crypto.subtle.deriveBits(
-    { name: "PBKDF2", hash: "SHA-256", salt, iterations },
-    key,
-    256
-  );
-  return `pbkdf2$${iterations}$${bytesToHex(salt)}$${bytesToHex(new Uint8Array(bits))}`;
+  const result = await passwordServiceRequest({
+    action: "hash",
+    value: String(value),
+    salt: saltBytes ? bytesToHex(saltBytes) : null,
+    iterations
+  }, env);
+  if (typeof result.hash !== "string" || !result.hash.startsWith("pbkdf2$" + iterations + "$")) {
+    throw new Error("Invalid password hash response");
+  }
+  return result.hash;
 }
 
-async function verifyStoredSecret(stored, supplied, env = null) {
+async function verifyStoredSecret(stored, supplied, env) {
   const value = String(stored || "");
   if (value.startsWith("pbkdf2$")) {
     const parts = value.split("$");
@@ -124,24 +140,18 @@ async function verifyStoredSecret(stored, supplied, env = null) {
     if (!Number.isInteger(iterations) || iterations < 100000 || iterations > 1000000) {
       return { valid: false, needsUpgrade: false };
     }
-    let salt;
-    try {
-      salt = hexToBytes(parts[2]);
-    } catch (_) {
-      return { valid: false, needsUpgrade: false };
-    }
-    if (salt.length !== 16 || !/^[a-f0-9]{64}$/i.test(parts[3])) {
-      return { valid: false, needsUpgrade: false };
-    }
-    const candidate = await pbkdf2Hash(String(supplied), salt, iterations);
-    return { valid: constantTimeEqual(candidate.toLowerCase(), value.toLowerCase()), needsUpgrade: false };
+    const result = await passwordServiceRequest({
+      action: "verify",
+      stored: value,
+      supplied: String(supplied)
+    }, env);
+    return { valid: result.valid === true, needsUpgrade: false };
   }
 
   // Backward compatibility for accounts created before PBKDF2 was introduced.
   const legacy = await sha256(supplied);
   return { valid: constantTimeEqual(value, legacy) || constantTimeEqual(value, supplied), needsUpgrade: true };
 }
-
 async function recordAuthAttempt(action, phone, request, env) {
   if (!env.AUTH_RATE_SECRET) throw new Error("AUTH_RATE_SECRET is missing");
   const phoneKey = await hmacSha256Hex(env.AUTH_RATE_SECRET, "phone:" + normalizePhone(phone));
