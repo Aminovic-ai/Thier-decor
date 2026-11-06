@@ -2,11 +2,12 @@
 -- Generated: 2026-11-06
 --
 -- IMPORTANT:
--- 1) Run this first in Supabase SQL Editor on the LIVE project.
+-- 1) REVIEW ONLY: do NOT run this migration until the live schema and backup are confirmed.
 -- 2) This file does NOT rewrite RPC functions or change RLS/function grants.
--- 3) It preserves existing IDs and allows legacy callers to continue supplying an ID.
--- 4) If duplicate promo-use order IDs exist, the transaction stops before committing.
--- 5) Take a Supabase backup/export before running any production migration.
+-- 3) BY DEFAULT identity preserves existing IDs and callers that supply explicit IDs.
+-- 4) Adds identity to td_promo_uses.id because the audited live RPC inserts without id.
+-- 5) Duplicate promo-use order IDs stop the transaction; no duplicate rows are deleted.
+-- 6) Take a Supabase backup/export and review the preflight output before production use.
 
 BEGIN;
 
