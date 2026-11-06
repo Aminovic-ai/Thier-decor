@@ -1771,7 +1771,9 @@ function getCurrentShopProducts() {
         const selectedKey = normalizeStoreCategory(currentCategory);
         return available.filter(p => normalizeStoreCategory(p.category) === selectedKey);
     }
-    return getFeaturedProducts();
+    // Registered customers can browse the full catalog; visitors see featured products only.
+    const isCustomer = Boolean(state.session && state.session.role === 'customer');
+    return isCustomer ? available : getFeaturedProducts();
 }
 function updateShopSectionHeading() {
     const title = document.getElementById('featured-products-title');
@@ -1803,7 +1805,8 @@ function renderShop() {
     const newProductsBox = document.getElementById('new-products-box');
     if (newProductsBox) newProductsBox.style.display = 'none';
     const products = getCurrentShopProducts();
-    if (currentCategory === 'all' && getFeaturedProductIds().length === 0) {
+    const isGuest = !(state.session && state.session.role === 'customer');
+    if (isGuest && currentCategory === 'all' && getFeaturedProductIds().length === 0) {
         const container = document.getElementById('s-products');
         if (container) container.innerHTML = `<div class="featured-empty-state"><i class="fas fa-star"></i><strong>${state.currentLang === 'fr' ? 'Aucun produit vedette pour le moment' : 'لا توجد منتجات مميزة حالياً'}</strong><span>${state.currentLang === 'fr' ? 'Choisissez les produits à mettre en avant depuis les paramètres administrateur.' : 'اختر المنتجات التي تريد إبرازها من إعدادات المسؤول.'}</span></div>`;
         return;
