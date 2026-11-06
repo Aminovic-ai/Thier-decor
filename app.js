@@ -2908,9 +2908,15 @@ function effectiveProductPrice(p) {
     return promo > 0 && promo < Number(p.price) && startOk && endOk ? promo : Number(p.price) || 0;
 }
 window.effectiveProductPrice = effectiveProductPrice;
+let adminProductListView = 'all';
+let adminProductCategoryFilter = null;
+window.productEditorReturnContext = null;
+
 function setAdminProductView(view) {
     const cats = document.getElementById('a-products-categories');
     const list = document.getElementById('a-products-list');
+    adminProductListView = view === 'categories' ? 'all' : view;
+    adminProductCategoryFilter = null;
     if (view === 'categories') { cats.style.display='grid'; list.style.display='none'; renderAdminProductCategories(); }
     else { cats.style.display='none'; list.style.display='grid'; renderAdminProducts(view); }
 }
@@ -2921,7 +2927,13 @@ function renderAdminProductCategories() {
     const entries=Object.entries(groups); box.innerHTML=entries.length?entries.map(([name,count])=>`<button class="admin-category-tile" onclick="filterAdminProductsByCategory(decodeURIComponent('${encodeURIComponent(name)}'))"><strong>${esc(name)}</strong><span>${count} ${i18n[state.currentLang].category_products_count}</span></button>`).join(''):`<div class="admin-card">${i18n[state.currentLang].no_categories}</div>`;
 }
 window.renderAdminProductCategories=renderAdminProductCategories;
-function filterAdminProductsByCategory(category) { renderAdminProducts('all', category); document.getElementById('a-products-categories').style.display='none'; document.getElementById('a-products-list').style.display='grid'; }
+function filterAdminProductsByCategory(category) {
+    adminProductListView = 'all';
+    adminProductCategoryFilter = category;
+    renderAdminProducts(adminProductListView, adminProductCategoryFilter);
+    document.getElementById('a-products-categories').style.display='none';
+    document.getElementById('a-products-list').style.display='grid';
+}
 window.filterAdminProductsByCategory=filterAdminProductsByCategory;
 function openPackModal() {
     document.getElementById('pack-name').value=''; document.getElementById('pack-category').value='Packs'; document.getElementById('pack-price').value=''; document.getElementById('pack-qty').value='1'; document.getElementById('pack-desc').value='';
@@ -2996,6 +3008,13 @@ window.openPromoModalFor=openPromoModalFor;
 window.renderAdminProducts = renderAdminProducts;
 
 function openProductModal(id = null) {
+    const cats = document.getElementById('a-products-categories');
+    const list = document.getElementById('a-products-list');
+    window.productEditorReturnContext = {
+        view: adminProductListView,
+        category: adminProductCategoryFilter,
+        showingCategories: !!cats && cats.style.display !== 'none' && (!list || list.style.display === 'none')
+    };
     const p = id ? state.products.find(x => x.id === id) : null;
     document.getElementById('pf-title').textContent = p ? i18n[state.currentLang].edit_order : i18n[state.currentLang].add_product;
     document.getElementById('pf-id').value = id || ''; document.getElementById('pf-name').value = p ? p.name : ''; document.getElementById('pf-price').value = p ? p.price : '';
@@ -3145,7 +3164,19 @@ async function saveProduct() {
             }
             window.pendingRequestId = null; renderAdminRequests(); toast('🎉');
         } else toast('✅ ' + i18n[state.currentLang].saved);
-        closeModal('m-product-form'); renderCategories(); renderAdminProducts(); renderShop(); renderNewProducts();
+        const returnContext = window.productEditorReturnContext || { view: 'all', category: null, showingCategories: false };
+        closeModal('m-product-form');
+        renderCategories();
+        renderAdminProducts(returnContext.view || 'all', returnContext.category ?? null);
+        const categoryBox = document.getElementById('a-products-categories');
+        const productList = document.getElementById('a-products-list');
+        if (categoryBox && productList) {
+            categoryBox.style.display = returnContext.showingCategories ? 'grid' : 'none';
+            productList.style.display = returnContext.showingCategories ? 'none' : 'grid';
+            if (returnContext.showingCategories) renderAdminProductCategories();
+        }
+        window.productEditorReturnContext = null;
+        renderShop(); renderNewProducts();
     } catch (error) {
         console.error('saveProduct failed:', error);
         toast((state.currentLang === 'fr' ? 'Échec de sauvegarde: ' : 'فشل حفظ المنتج: ') + (error.message || String(error)), 'error');
