@@ -3720,16 +3720,23 @@ window.renderAdminRequests = renderAdminRequests;
     document.addEventListener('click', event => {
         if (event.target.closest('.mobile-nav-item')) setTimeout(updateNav, 0);
     });
+    window.toggleMobileCategories = function () {
+        const shop = document.getElementById('screen-shop');
+        const button = document.querySelector('#mobile-bottom-nav [data-mobile-page="categories"]');
+        const bar = document.getElementById('mobile-category-bar');
+        if (!shop || !bar || !button || !shop.classList.contains('customer-session-active')) return;
+        const opening = !shop.classList.contains('mobile-categories-open');
+        shop.classList.toggle('mobile-categories-open', opening);
+        button.setAttribute('aria-expanded', opening ? 'true' : 'false');
+        if (opening) {
+            bar.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            const firstCategory = bar.querySelector('.category-text-item, .category-icon-item');
+            if (firstCategory) firstCategory.focus({ preventScroll: true });
+        }
+    };
     document.addEventListener('click', event => {
         const categoryButton = event.target.closest('.mobile-nav-item[data-mobile-page="categories"]');
-        if (!categoryButton) return;
-        const shop = document.getElementById('screen-shop');
-        if (!shop) return;
-        shop.classList.toggle('mobile-categories-open');
-        const bar = document.getElementById('mobile-category-bar');
-        if (bar && shop.classList.contains('mobile-categories-open')) {
-            bar.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-        }
+        if (categoryButton) window.toggleMobileCategories();
     });
     const cartBadge = document.getElementById('cart-badge');
     const wishBadge = document.getElementById('wishlist-badge');
