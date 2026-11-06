@@ -2025,3 +2025,39 @@ a { text-underline-offset: 3px; }
   #screen-shop .mobile-contact-btn { flex-basis: 34px !important; width: 34px !important; min-width: 34px !important; }
   #screen-shop .mobile-lang-btn { flex-basis: 40px !important; width: 40px !important; min-width: 40px !important; }
 }
+
+
+/* Final mobile category-tab behavior: reveal the category strip only on tap. */
+@media (max-width: 680px) {
+  #screen-shop.customer-session-active #mobile-category-bar {
+    display: none !important;
+    visibility: hidden !important;
+    max-height: 0 !important;
+    height: 0 !important;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+    overflow: hidden !important;
+    pointer-events: none !important;
+  }
+  #screen-shop.customer-session-active.mobile-categories-open:has(#s-shop.active) #mobile-category-bar {
+    display: block !important;
+    visibility: visible !important;
+    max-height: 110px !important;
+    height: auto !important;
+    padding: 8px 12px 10px !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    pointer-events: auto !important;
+  }
+  #screen-shop.customer-session-active.mobile-categories-open:has(#s-shop.active) .shop-categories {
+    display: block !important;
+    visibility: visible !important;
+  }
+  #screen-shop.customer-session-active:not(.mobile-categories-open) .shop-categories {
+    display: none !important;
+  }
+  #screen-shop:not(.customer-session-active) #mobile-category-bar,
+  #screen-shop:not(.customer-session-active) .mobile-nav-item[data-mobile-page="categories"] {
+    display: none !important;
+  }
+}
