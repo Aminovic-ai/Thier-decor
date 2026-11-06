@@ -2228,6 +2228,8 @@ function handleAccountClick() {
     } else openCustomerAuthModal();
 }
 function openCustomerAuthModal() {
+    const authModeTabs = document.getElementById('btn-auth-login')?.parentElement;
+    if (authModeTabs) authModeTabs.style.display = 'flex';
     if (state.session) {
         const cust = state.customers.find(x => x.id === state.session.id);
         document.getElementById('auth-logged-out').style.display = 'none'; document.getElementById('auth-logged-in').style.display = 'block';
@@ -2239,6 +2241,14 @@ function openCustomerAuthModal() {
     }
     openModal('m-customer-auth');
 }
+function openCustomerRegisterModal() {
+    openCustomerAuthModal();
+    if (state.session && state.session.role === 'customer') return;
+    switchAuthMode('register');
+    const authModeTabs = document.getElementById('btn-auth-login')?.parentElement;
+    if (authModeTabs) authModeTabs.style.display = 'none';
+}
+window.openCustomerRegisterModal = openCustomerRegisterModal;
 window.handleAccountClick = handleAccountClick; window.openCustomerAuthModal = openCustomerAuthModal;
 
 function switchAuthMode(mode) {
