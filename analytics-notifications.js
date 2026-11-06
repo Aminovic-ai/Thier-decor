@@ -17,7 +17,7 @@
     const messages = (state.messages || []).filter(m => String(m.customerId) === String(customer.id) || String(m.phone || '').trim() === phone);
     const notes = [];
     orders.forEach(o => notes.push({ id: `order-${o.id}-${o.status}`, date: o.updatedAt || o.createdAt, title: tr('تحديث حالة الطلبية', 'Mise à jour de commande'), body: `${tr('الطلبية', 'Commande')} #${String(o.id).slice(-6)} — ${statusName(o.status)}`, kind: 'order', orderId: o.id }));
-    messages.filter(m => m.reply).forEach(m => notes.push({ id: `reply-${m.id}`, date: m.replyDate || m.date, title: tr('رد جديد من المتجر', 'Nouvelle réponse de la boutique'), body: String(m.reply), kind: 'message' }));
+    messages.filter(m => m.reply).forEach(m => notes.push({ id: `reply-${m.id}`, date: m.replyDate || m.date, title: tr('رد جديد من المتجر', 'Nouvelle réponse de la boutique'), body: String(m.reply), kind: 'message', messageId: m.id }));
     return notes.sort((a,b) => new Date(b.date || 0) - new Date(a.date || 0));
   }
   function statusName(status) {
@@ -30,10 +30,25 @@
     const all = customerNotifications(), reads = getReads();
     const unread = all.filter(n => !reads[n.id]).length; updateCustomerBadge(unread);
     if (!all.length) { container.innerHTML = `<div class="admin-card">${tr('لا توجد إشعارات حاليًا.','Aucune notification pour le moment.')}</div>`; return; }
-    container.innerHTML = all.map(n => `<article class="admin-card" style="display:flex;align-items:flex-start;gap:12px;margin-bottom:10px;opacity:${reads[n.id] ? '.72' : '1'};border-inline-start:4px solid ${reads[n.id] ? 'var(--border)' : 'var(--primary)'}"><i class="fas ${n.kind === 'order' ? 'fa-box' : 'fa-reply'}" style="font-size:1.2rem;color:var(--primary);margin-top:4px"></i><div style="flex:1"><strong>${esc(n.title)}</strong><p style="margin:5px 0">${esc(n.body)}</p><small>${n.date ? new Date(n.date).toLocaleString(lang()==='ar'?'ar-DZ':'fr-FR') : ''}</small>${n.orderId ? `<div><button class="btn-secondary" style="width:auto;margin-top:8px" onclick="shopGo('orders');markOneCustomerNotification('${n.id}')">${tr('عرض الطلبية','Voir la commande')}</button></div>` : ''}</div>${!reads[n.id] ? `<span class="nav-badge">${tr('جديد','Nouveau')}</span>` : ''}</article>`).join('');
+    container.innerHTML = all.map(n => `<article class="admin-card" style="display:flex;align-items:flex-start;gap:12px;margin-bottom:10px;opacity:${reads[n.id] ? '.72' : '1'};border-inline-start:4px solid ${reads[n.id] ? 'var(--border)' : 'var(--primary)'}"><i class="fas ${n.kind === 'order' ? 'fa-box' : 'fa-reply'}" style="font-size:1.2rem;color:var(--primary);margin-top:4px"></i><div style="flex:1"><strong>${esc(n.title)}</strong><p style="margin:5px 0">${esc(n.body)}</p><small>${n.date ? new Date(n.date).toLocaleString(lang()==='ar'?'ar-DZ':'fr-FR') : ''}</small>${n.orderId ? `<div><button class="btn-secondary" style="width:auto;margin-top:8px" onclick="shopGo('orders');markOneCustomerNotification('${n.id}')">${tr('عرض الطلبية','Voir la commande')}</button></div>` : n.messageId ? `<div><button class="btn-secondary" style="width:auto;margin-top:8px" onclick="openCustomerMessageNotification('${esc(n.messageId)}','${esc(n.id)}')">${tr('عرض الرسالة','Voir le message')}</button></div>` : ''}</div>${!reads[n.id] ? `<span class="nav-badge">${tr('جديد','Nouveau')}</span>` : ''}</article>`).join('');
   };
   function updateCustomerBadge(count) { const b=$('customer-notification-badge'); if(b){b.textContent=count;b.style.display=count?'inline-block':'none';} }
   window.markOneCustomerNotification = function(id) { const r=getReads(); r[id]=true; setReads(r); window.renderCustomerNotifications(); };
+  window.openCustomerMessageNotification = function(messageId, notificationId) {
+    if (typeof window.shopGo === 'function') window.shopGo('messages');
+    if (notificationId) window.markOneCustomerNotification(notificationId);
+    window.setTimeout(() => {
+      const target = $('customer-message-' + String(messageId));
+      if (!target) return;
+      target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      const oldOutline = target.style.outline;
+      const oldTransition = target.style.transition;
+      target.style.transition = 'outline-color .2s ease, background-color .2s ease';
+      target.style.outline = '2px solid var(--primary)';
+      target.style.backgroundColor = 'var(--primary-light)';
+      window.setTimeout(() => { target.style.outline = oldOutline; target.style.backgroundColor = ''; target.style.transition = oldTransition; }, 2200);
+    }, 80);
+  };
   window.markCustomerNotificationsRead = function() { const r=getReads(); customerNotifications().forEach(n=>r[n.id]=true); setReads(r); window.renderCustomerNotifications(); };
   window.openAdminNotifications = function () {
     const notes=[];
