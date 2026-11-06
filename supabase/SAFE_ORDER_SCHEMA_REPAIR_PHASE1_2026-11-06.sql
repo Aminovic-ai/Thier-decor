@@ -109,7 +109,7 @@ $$;
 -- Add an identity only when the column has neither identity nor a default.
 -- BY DEFAULT preserves compatibility with any legacy explicit-ID writer.
 -- ---------------------------------------------------------------------------
-DO $
+DO $$
 DECLARE
   v_identity text;
   v_default text;
@@ -142,7 +142,7 @@ BEGIN
     PERFORM setval(v_sequence::regclass, v_max_id, true);
   END IF;
 END
-$;
+$$;
 
 -- ---------------------------------------------------------------------------
 -- D. Standardize the default order status to the canonical RPC value "new".
