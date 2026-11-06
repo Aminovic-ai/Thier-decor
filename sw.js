@@ -1,7 +1,7 @@
-const CACHE_NAME = 'thier-decor-v57';
+const CACHE_NAME = 'thier-decor-v58';
 const ASSETS_TO_CACHE = [
     './', './index.html', './admin.html',
-    './style.css?v=41', './custom.css?v=53', './app.js?v=54', './featured-products.js?v=3',
+    './style.css?v=41', './custom.css?v=53', './app.js?v=55', './featured-products.js?v=3',
     './analytics-notifications.js', './td-config.js', './supabase-config.js',
     './firebase-config.js', './manifest.json', './icon.png', './icon-192.png?v=3', './favicon.png'
 ];
