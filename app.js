@@ -2229,7 +2229,8 @@ function handleAccountClick() {
 }
 function openCustomerAuthModal() {
     const authModeTabs = document.getElementById('btn-auth-login')?.parentElement;
-    if (authModeTabs) authModeTabs.style.display = 'flex';
+    // The regular account entry is login-only; registration is opened by the dedicated guest CTA.
+    if (authModeTabs) authModeTabs.style.display = 'none';
     if (state.session) {
         const cust = state.customers.find(x => x.id === state.session.id);
         document.getElementById('auth-logged-out').style.display = 'none'; document.getElementById('auth-logged-in').style.display = 'block';
