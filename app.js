@@ -3734,10 +3734,7 @@ window.renderAdminRequests = renderAdminRequests;
             if (firstCategory) firstCategory.focus({ preventScroll: true });
         }
     };
-    document.addEventListener('click', event => {
-        const categoryButton = event.target.closest('.mobile-nav-item[data-mobile-page="categories"]');
-        if (categoryButton) window.toggleMobileCategories();
-    });
+    // Category navigation is invoked directly by the tab's inline click handler.
     const cartBadge = document.getElementById('cart-badge');
     const wishBadge = document.getElementById('wishlist-badge');
     const syncBadges = () => {
