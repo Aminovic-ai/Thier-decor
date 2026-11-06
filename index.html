@@ -66,10 +66,7 @@
                     </div>
                     <div id="new-products-list" style="display:flex; gap:12px; overflow-x:auto; padding:15px 0;"></div>
                 </div>
-                <section class="shop-category-showcase" aria-label="أصناف المتجر">
-                    <div class="shop-category-heading"><div><h2 data-i18n="categories">الأصناف</h2><p id="shop-category-hint">اختر صنفاً لاكتشاف منتجاته</p></div></div>
-                    <div id="store-categories" class="category-list category-text-list"></div>
-                </section>
+                
                 <section id="featured-products-section" class="featured-products-section" aria-labelledby="featured-products-title">
                     <div class="featured-products-heading">
                         <div><span class="featured-products-kicker">THIER DÉCOR</span><h2 id="featured-products-title">المنتجات المميزة</h2><p id="featured-products-description">اختياراتنا المميزة لكم</p></div>
@@ -126,7 +123,6 @@
         </main>
         <nav class="mobile-bottom-nav" id="mobile-bottom-nav" aria-label="التنقل الرئيسي">
             <button type="button" class="mobile-nav-item active" data-mobile-page="shop" onclick="shopGo('shop')"><i class="fas fa-house"></i><span data-i18n="home">الرئيسية</span></button>
-            <button type="button" class="mobile-nav-item" data-mobile-page="categories" onclick="shopGo('shop'); document.getElementById('mobile-category-bar')?.scrollIntoView({behavior:'smooth',block:'nearest'})"><i class="fas fa-border-all"></i><span data-i18n="categories">المتجر</span></button>
             <button type="button" class="mobile-nav-item" data-mobile-page="wishlist" onclick="shopGo('wishlist')"><i class="fas fa-heart"></i><span data-i18n="wishlist_title">المفضلة</span><b class="mobile-nav-badge" id="mobile-wishlist-badge" style="display:none;">0</b></button>
             <button type="button" class="mobile-nav-item" data-mobile-page="cart" onclick="shopGo('cart')"><i class="fas fa-bag-shopping"></i><span data-i18n="cart">السلة</span><b class="mobile-nav-badge" id="mobile-cart-badge" style="display:none;">0</b></button>
             <button type="button" class="mobile-nav-item" data-mobile-page="profile" onclick="handleAccountClick()"><i class="fas fa-user"></i><span data-i18n="my_account">حسابي</span></button>
