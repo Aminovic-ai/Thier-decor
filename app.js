@@ -1672,8 +1672,15 @@ function updateStoreBranding() {
     const nameEl = document.getElementById('shop-name-header'); if (nameEl && state.settings.shopName) nameEl.textContent = state.settings.shopName;
     const logoEl = document.getElementById('shop-logo-img-container');
     if (logoEl) {
-        if (state.settings.logoUrl) { logoEl.innerHTML = `<img src="${esc(state.settings.logoUrl)}" style="width:100%;height:100%;object-fit:contain;border-radius:8px;">`; logoEl.style.background = 'transparent'; logoEl.style.color = 'transparent'; }
-        else { logoEl.innerHTML = 'TD'; logoEl.style.background = 'var(--primary)'; logoEl.style.color = '#fff'; }
+        if (state.settings.logoUrl) {
+            logoEl.innerHTML = `<img class="brand-logo-image" src="${esc(state.settings.logoUrl)}" alt="Thier Décor">`;
+            logoEl.style.background = 'transparent';
+            logoEl.style.color = 'transparent';
+        } else {
+            logoEl.innerHTML = '<img class="brand-logo-image" src="icon-192.png?v=3" alt="Thier Décor">';
+            logoEl.style.background = '#fff';
+            logoEl.style.color = 'transparent';
+        }
     }
 }
 window.updateStoreBranding = updateStoreBranding;
