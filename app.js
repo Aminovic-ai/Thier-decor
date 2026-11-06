@@ -1312,6 +1312,9 @@ async function loadOrdersListener(options = {}) {
                 state.settings = settings;
                 save(K.settings, settings);
                 lastSettingsFetchAt = now;
+                renderShop();
+                renderPromoBanner();
+                updateStoreBranding();
             } catch (settingsError) {
                 console.error('Public settings Worker read failed:', settingsError.message || settingsError);
             }
