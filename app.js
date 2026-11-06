@@ -1868,10 +1868,14 @@ window.renderNewProducts = renderNewProducts;
 
 function filterShopProducts(q) {
     const c = document.getElementById('s-products'); if (!c) return;
+    // Visitor storefront displays only products explicitly selected as featured by the administrator.
+    currentCategory = 'all';
     if (!q.trim()) { renderShop(); return; }
     const lq = q.toLocaleLowerCase();
-    let list = state.products.filter(p => Number(p.qty) > 0 && (String(p.name || '').toLocaleLowerCase().includes(lq) || String(p.category || '').toLocaleLowerCase().includes(lq)));
-    if (currentCategory !== 'all') list = list.filter(p => normalizeStoreCategory(p.category) === normalizeStoreCategory(currentCategory));
+    const list = getFeaturedProducts().filter(p =>
+        String(p.name || '').toLocaleLowerCase().includes(lq) ||
+        String(p.category || '').toLocaleLowerCase().includes(lq)
+    );
     renderShopHTML(list);
 }
 window.filterShopProducts = filterShopProducts;
