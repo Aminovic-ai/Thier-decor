@@ -2486,18 +2486,27 @@ function renderMyRequests() {
 }
 window.renderMyRequests = renderMyRequests;
 
-function openMessageModal() { document.getElementById('msg-text').value = ''; openModal('m-customer-message'); }
+function openMessageModal() {
+    if (!state.session || state.session.role !== 'customer' || !state.session.customerToken) {
+        toast(state.currentLang === 'fr' ? 'Connectez-vous pour envoyer un message.' : 'سجّل الدخول كزبون لإرسال رسالة.', 'error');
+        openCustomerAuthModal();
+        return;
+    }
+    const messageInput = document.getElementById('msg-text');
+    if (messageInput) messageInput.value = '';
+    openModal('m-customer-message');
+}
 async function submitCustomerMessage() {
-    const text = document.getElementById('msg-text').value.trim();
+    if (!state.session || state.session.role !== 'customer' || !state.session.customerToken) {
+        closeModal('m-customer-message');
+        toast(state.currentLang === 'fr' ? 'Connectez-vous pour envoyer un message.' : 'يجب تسجيل الدخول كزبون لإرسال رسالة.', 'error');
+        openCustomerAuthModal();
+        return;
+    }
+    const text = document.getElementById('msg-text')?.value.trim() || '';
     if (!text) return toast(i18n[state.currentLang].write_message_first, 'error');
     try {
-        let visitSessionKey = sessionStorage.getItem('td_visit_session_key_v1');
-        if (!visitSessionKey) {
-            visitSessionKey = (window.crypto?.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(16).slice(2));
-            sessionStorage.setItem('td_visit_session_key_v1', visitSessionKey.replace(/[^a-f0-9-]/gi, '').slice(0, 80));
-            visitSessionKey = sessionStorage.getItem('td_visit_session_key_v1');
-        }
-        const result = await callCustomerWorker('customerSendMessage', { text, sessionKey: visitSessionKey });
+        const result = await callCustomerWorker('customerSendMessage', { text });
         if (result.message) { state.messages.unshift(result.message); save(K.messages, state.messages); }
         closeModal('m-customer-message'); toast('✅ ' + i18n[state.currentLang].msg_sent_success);
     } catch (error) {
