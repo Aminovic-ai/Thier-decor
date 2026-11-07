@@ -1221,6 +1221,21 @@ function goScreen(id) {
 }
 window.goScreen = goScreen;
 
+// Open the admin panel directly when the existing Firebase admin session is still active.
+// Visiting the storefront must not force the administrator to authenticate again.
+function openAdminEntry() {
+    const user = Boolean(window.firebaseReady && typeof firebase !== 'undefined' && firebase.auth && firebase.auth().currentUser)
+        ? firebase.auth().currentUser
+        : null;
+    if (user && user.uid === TD_ADMIN_UID) {
+        goScreen('screen-admin');
+        adminGo('dashboard');
+        return;
+    }
+    goScreen('screen-admin-login');
+}
+window.openAdminEntry = openAdminEntry;
+
 function shopGo(id) {
     const allowedPages = new Set(['shop', 'wishlist', 'cart', 'orders', 'myrequests', 'messages', 'notifications', 'profile']);
     if (!allowedPages.has(id)) return;
@@ -1539,7 +1554,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     triggered = true;
                     clearPress();
                     if (navigator.vibrate) navigator.vibrate(100);
-                    goScreen('screen-admin-login');
+                    openAdminEntry();
                 }, 5000);
 
                 const animate = () => {
@@ -1599,7 +1614,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     suppressClick = true;
                     clearMobilePress();
                     if (navigator.vibrate) navigator.vibrate(100);
-                    goScreen('screen-admin-login');
+                    openAdminEntry();
                 }, 5000);
 
                 const animate = () => {
@@ -1657,7 +1672,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Support a direct admin entry URL (also used by the legacy admin.html redirect).
-    if (new URLSearchParams(window.location.search).get('admin') === '1') goScreen('screen-admin-login');
+    if (new URLSearchParams(window.location.search).get('admin') === '1') openAdminEntry();
 });
 
 function renderPromoBanner() { 
