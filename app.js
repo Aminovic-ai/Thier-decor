@@ -1444,9 +1444,11 @@ function setupRealtimeListeners() {
             adminLiveRefreshTimer = null;
             return;
         }
-        loadOrdersListener({ forceAdminData: true })
+        // Refresh orders regularly, but let the 2-minute admin-data cache
+        // prevent downloading customers/messages/requests/expenses on every poll.
+        loadOrdersListener()
             .catch(error => console.warn('Live admin refresh failed:', error.message || error));
-    }, 10000);
+    }, 30000);
 
     // Only the public product catalog is subscribed to from the browser.
     // Private orders/messages are refreshed through the Firebase-verified Worker poll above.
