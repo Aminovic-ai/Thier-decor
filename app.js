@@ -2134,6 +2134,8 @@ function updateDeliveryPrice() {
     const pointsNote = document.getElementById('chk-points-note');
     if (pointsNote) pointsNote.textContent = usePoints ? i18n[state.currentLang].points_redeemed : '';
     document.getElementById('chk-discount').textContent = fmtMoney(discountAmount);
+    const discountLabel = document.querySelector('#chk-discount')?.previousElementSibling;
+    if (discountLabel) discountLabel.textContent = crownDiscount && discountAmount > 0 ? (state.currentLang === 'fr' ? 'Remise Couronne 👑 (4 %):' : 'تخفيض التاج 👑 (4%):') : (state.currentLang === 'fr' ? 'Remise :' : 'الخصم:');
     document.getElementById('chk-del-price').textContent = fmtMoney(delPrice); 
     document.getElementById('chk-items-total').textContent = fmtMoney(itemsTotal + discountAmount); 
     document.getElementById('chk-total-price').textContent = fmtMoney(total);
