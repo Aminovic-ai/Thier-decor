@@ -427,7 +427,7 @@ async function createCustomerOrder(request, body, env) {
 
   const customerRows = await dbRequest(
     env,
-    "customers?select=id,name,phone,points,isBlocked&id=eq." +
+    "customers?select=id,name,phone,points,isBlocked,isTop&id=eq." +
       encodeURIComponent(session.sub) + "&limit=1"
   );
   const customer = customerRows?.[0];
@@ -514,10 +514,23 @@ async function createCustomerOrder(request, body, env) {
   }
   subtotal = money(subtotal);
 
-  const promoCode = String(order.promoCode || order.couponCode || "").trim().toUpperCase().slice(0, 80);
+  // Crown discount is decided only from the customer row in Supabase.
+  // It cannot be enabled by browser-supplied flags or combined with a coupon.
+  const isTopCustomer = customer.isTop === true;
+  const promoCode = isTopCustomer
+    ? ""
+    : String(order.promoCode || order.couponCode || "").trim().toUpperCase().slice(0, 80);
   let discountPercent = 0;
   let discountAmount = 0;
-  if (promoCode) {
+  let crownDiscountPercent = 0;
+  let crownDiscountAmount = 0;
+
+  if (isTopCustomer) {
+    crownDiscountPercent = 4;
+    crownDiscountAmount = money(subtotal * crownDiscountPercent / 100);
+    discountPercent = crownDiscountPercent;
+    discountAmount = crownDiscountAmount;
+  } else if (promoCode) {
     const validation = await dbRequest(env, "rpc/td_check_promo", {
       method: "POST",
       body: JSON.stringify({ p_code: promoCode, p_phone: customer.phone })
@@ -578,8 +591,10 @@ async function createCustomerOrder(request, body, env) {
     discount: discountAmount,
     couponCode: promoCode || null,
     promoCode: promoCode || null,
-    promoDiscountPercent: discountPercent,
-    promoDiscountAmount: discountAmount,
+    promoDiscountPercent: isTopCustomer ? 0 : discountPercent,
+    promoDiscountAmount: isTopCustomer ? 0 : discountAmount,
+    crownDiscountPercent,
+    crownDiscountAmount,
     deliveryPrice,
     total: finalTotal,
     courier,
