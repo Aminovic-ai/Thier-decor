@@ -2573,7 +2573,22 @@ function adminGo(sec, btnElement) {
     document.querySelectorAll('.admin-section').forEach(s => s.style.display = 'none'); document.getElementById('sec-' + sec).style.display = 'block';
     document.querySelectorAll('.admin-nav a').forEach(a => a.classList.remove('active')); if (btnElement) btnElement.classList.add('active');
     const titleKey = sec === 'dashboard' ? 'admin_home' : 'admin_' + sec; document.getElementById('admin-page-title').textContent = i18n[state.currentLang][titleKey] || sec;
-    if (sec === 'dashboard') renderAdminHome(); if (sec === 'orders') renderAdminOrdersList(); if (sec === 'products') renderAdminProducts(); if (sec === 'customers') renderAdminCustomers(); if (sec === 'messages') renderAdminMessages(); if (sec === 'expenses') renderAdminExpenses(); if (sec === 'reports') renderAdminReports(); if (sec === 'requests') renderAdminRequests(); if (sec === 'debts') renderAdminDebts(); if (sec === 'settings') { renderAdminSettings(); }
+    if (sec === 'dashboard') renderAdminHome();
+    if (sec === 'orders') renderAdminOrdersList();
+    if (sec === 'products') renderAdminProducts();
+    if (sec === 'customers') {
+        renderAdminCustomers(document.getElementById('admin-customer-search')?.value || '');
+        // Always fetch the latest customer list when the admin opens this section.
+        // This bypasses the two-minute admin-data cache and updates installed PWAs too.
+        loadOrdersListener({ forceAdminData: true, forceWait: true })
+            .catch(error => console.warn('Customer list refresh failed:', error.message || error));
+    }
+    if (sec === 'messages') renderAdminMessages();
+    if (sec === 'expenses') renderAdminExpenses();
+    if (sec === 'reports') renderAdminReports();
+    if (sec === 'requests') renderAdminRequests();
+    if (sec === 'debts') renderAdminDebts();
+    if (sec === 'settings') renderAdminSettings();
 }
 window.adminGo = adminGo;
 
