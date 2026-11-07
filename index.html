@@ -531,20 +531,26 @@
     <script src="featured-products.js?v=3"></script>
     <script src="analytics-notifications.js"></script>
     <script>
-        // Register the storefront service worker and check for fresh assets on each visit.
+        // Keep installed PWA assets current: check on launch, return to app, and focus.
         if ('serviceWorker' in navigator) {
-            const hadActiveController = !!navigator.serviceWorker.controller;
-            let refreshedAfterUpdate = false;
+            let reloadingForWorkerUpdate = false;
             navigator.serviceWorker.addEventListener('controllerchange', () => {
-                if (hadActiveController && !refreshedAfterUpdate) {
-                    refreshedAfterUpdate = true;
-                    window.location.reload();
-                }
+                if (reloadingForWorkerUpdate) return;
+                reloadingForWorkerUpdate = true;
+                window.location.reload();
             });
-            window.addEventListener('load', () => {
+
+            const checkStoreUpdate = () => {
                 navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' })
                     .then(registration => registration.update())
                     .catch(error => console.warn('Store update check unavailable:', error));
+            };
+
+            window.addEventListener('load', checkStoreUpdate, { once: true });
+            window.addEventListener('pageshow', checkStoreUpdate);
+            window.addEventListener('focus', checkStoreUpdate);
+            document.addEventListener('visibilitychange', () => {
+                if (document.visibilityState === 'visible') checkStoreUpdate();
             });
         }
     </script>
