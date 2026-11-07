@@ -1309,6 +1309,8 @@ const ADMIN_DATA_CACHE_TTL_MS = 2 * 60 * 1000;
 let lastAdminDataFetchAt = 0;
 let lastProductsFetchAt = 0;
 let lastSettingsFetchAt = 0;
+let catalogLoading = true;
+let catalogLoadFailed = false;
 let loadRefreshInProgress = false;
 
 async function loadOrdersListener(options = {}) {
@@ -1324,7 +1326,21 @@ async function loadOrdersListener(options = {}) {
         // Avoid re-reading public catalog on every order event; use the locally cached catalog for up to 3 minutes.
         if (options.forceProducts || !state.products.length || (now - lastProductsFetchAt) >= PRODUCT_CACHE_TTL_MS) {
             const { data: products, error: productsError } = await window.supabaseClient.from('products').select('*');
-            if (!productsError && products) { state.products = products; save(K.products, products); lastProductsFetchAt = now; } else if (productsError) console.error('Supabase products read failed:', productsError.message);
+            if (!productsError && products) {
+                state.products = products;
+                save(K.products, products);
+                lastProductsFetchAt = now;
+                catalogLoading = false;
+                catalogLoadFailed = false;
+            } else if (productsError) {
+                console.error('Supabase products read failed:', productsError.message);
+                if (catalogLoading) {
+                    // Use the saved catalog only as an offline fallback, never before the live request.
+                    state.products = load(K.products, []);
+                    catalogLoadFailed = state.products.length > 0;
+                    catalogLoading = false;
+                }
+            }
         }
         if (options.forceSettings || !state.settings || (now - lastSettingsFetchAt) >= SETTINGS_CACHE_TTL_MS) {
             try {
@@ -1407,7 +1423,18 @@ async function loadOrdersListener(options = {}) {
 
         renderShop(); renderCategories(); renderMyOrders(); renderAdminOrdersList(); renderAdminHome(); updateAdminBadges();
         renderPromoBanner(); updateStoreBranding(); renderSliderAd();
-    } catch (error) { console.error('Supabase refresh failed:', error); return false; }
+    } catch (error) {
+        console.error('Supabase refresh failed:', error);
+        if (catalogLoading) {
+            // If the live catalog request itself failed, fall back only after that failure is known.
+            state.products = load(K.products, []);
+            catalogLoadFailed = state.products.length > 0;
+            catalogLoading = false;
+            renderCategories();
+            renderShop();
+        }
+        return false;
+    }
     finally { loadRefreshInProgress = false; }
     return true;
 }
@@ -1537,7 +1564,8 @@ function startCatalogFallbackRefresh() {
 })();
 
 document.addEventListener('DOMContentLoaded', () => {
-    state.products = load(K.products, []); state.orders = load(K.orders, []); state.expenses = load(K.expenses, []); state.settings = load(K.settings, state.settings);
+    // Do not paint an old product catalog on first load; wait for the current Supabase catalog.
+    state.products = []; state.orders = load(K.orders, []); state.expenses = load(K.expenses, []); state.settings = load(K.settings, state.settings);
     state.customers = load(K.customers, []); save(K.customers, state.customers); state.messages = load(K.messages, []); state.requests = load(K.requests, []); state.session = load(K.session, null);
     state.cart = load(K.cart, []); state.currentLang = load(K.lang, 'ar'); state.wishlist = load(K.wishlist, []);
 
@@ -1840,6 +1868,11 @@ function sortShopProducts(val) {
 window.sortShopProducts = sortShopProducts;
 
 function renderShop() {
+    const productsContainer = document.getElementById('s-products');
+    if (catalogLoading) {
+        if (productsContainer) productsContainer.innerHTML = `<div role="status" aria-live="polite" style="grid-column:1/-1;display:flex;align-items:center;justify-content:center;gap:10px;padding:42px 16px;color:var(--text-muted,#64748b);font-weight:700;"><i class="fas fa-spinner fa-spin" aria-hidden="true"></i><span>${state.currentLang === 'fr' ? 'Chargement des produits actuels...' : 'جاري تحميل المنتجات الحالية...'}</span></div>`;
+        return;
+    }
     updateShopSectionHeading();
     const newProductsBox = document.getElementById('new-products-box');
     if (newProductsBox) newProductsBox.style.display = 'none';
