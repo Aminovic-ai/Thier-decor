@@ -1322,35 +1322,59 @@ async function loadOrdersListener(options = {}) {
     loadRefreshInProgress = true;
     try {
         const now = Date.now();
-        // Avoid re-reading public catalog on every order event; use the locally cached catalog for up to 3 minutes.
-        if (options.forceProducts || !state.products.length || (now - lastProductsFetchAt) >= PRODUCT_CACHE_TTL_MS) {
-            const { data: products, error: productsError } = await window.supabaseClient.from('products').select('*');
-            if (!productsError && products) {
-                state.products = products;
-                save(K.products, products);
-                lastProductsFetchAt = now;
-                catalogLoading = false;
-            } else if (productsError) {
-                console.error('Supabase products read failed:', productsError.message);
+        // Fetch the public catalog and public storefront settings concurrently.
+        // The guest featured-product selection depends on fresh settings, so render
+        // only after both requests have settled; do not paint the stale full catalog.
+        const shouldFetchProducts = options.forceProducts || !state.products.length || (now - lastProductsFetchAt) >= PRODUCT_CACHE_TTL_MS;
+        const shouldFetchSettings = options.forceSettings || !state.settings || (now - lastSettingsFetchAt) >= SETTINGS_CACHE_TTL_MS;
+
+        const productsTask = (async () => {
+            if (!shouldFetchProducts) return;
+            try {
+                const { data: products, error: productsError } = await window.supabaseClient.from('products').select('*');
+                if (!productsError && Array.isArray(products)) {
+                    state.products = products;
+                    save(K.products, products);
+                    lastProductsFetchAt = Date.now();
+                    catalogLoading = false;
+                } else if (productsError) {
+                    console.error('Supabase products read failed:', productsError.message);
+                    if (catalogLoading) {
+                        // Use the saved catalog only as an offline fallback, never before the live request.
+                        state.products = load(K.products, []);
+                        catalogLoading = false;
+                    }
+                }
+            } catch (productsFetchError) {
+                console.error('Supabase products request failed:', productsFetchError.message || productsFetchError);
                 if (catalogLoading) {
-                    // Use the saved catalog only as an offline fallback, never before the live request.
                     state.products = load(K.products, []);
                     catalogLoading = false;
                 }
             }
-        }
-        if (options.forceSettings || !state.settings || (now - lastSettingsFetchAt) >= SETTINGS_CACHE_TTL_MS) {
+        })();
+
+        const settingsTask = (async () => {
+            if (!shouldFetchSettings) return;
             try {
                 const settings = await fetchPublicSettingsViaWorker();
                 state.settings = settings;
                 save(K.settings, settings);
-                lastSettingsFetchAt = now;
-                renderShop();
+                lastSettingsFetchAt = Date.now();
                 renderPromoBanner();
                 updateStoreBranding();
             } catch (settingsError) {
                 console.error('Public settings Worker read failed:', settingsError.message || settingsError);
             }
+        })();
+
+        await Promise.all([productsTask, settingsTask]);
+
+        // Paint the correct audience-specific catalog as soon as public data is ready.
+        // Customer-private orders/profile data must never delay storefront rendering.
+        if (!catalogLoading) {
+            renderCategories();
+            renderShop();
         }
         
         const currentFirebaseUser = Boolean(window.firebaseReady && typeof firebase !== 'undefined' && firebase.auth && firebase.auth().currentUser);
