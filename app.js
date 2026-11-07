@@ -1310,7 +1310,6 @@ let lastAdminDataFetchAt = 0;
 let lastProductsFetchAt = 0;
 let lastSettingsFetchAt = 0;
 let catalogLoading = true;
-let catalogLoadFailed = false;
 let loadRefreshInProgress = false;
 
 async function loadOrdersListener(options = {}) {
@@ -1331,13 +1330,11 @@ async function loadOrdersListener(options = {}) {
                 save(K.products, products);
                 lastProductsFetchAt = now;
                 catalogLoading = false;
-                catalogLoadFailed = false;
             } else if (productsError) {
                 console.error('Supabase products read failed:', productsError.message);
                 if (catalogLoading) {
                     // Use the saved catalog only as an offline fallback, never before the live request.
                     state.products = load(K.products, []);
-                    catalogLoadFailed = state.products.length > 0;
                     catalogLoading = false;
                 }
             }
@@ -1428,7 +1425,6 @@ async function loadOrdersListener(options = {}) {
         if (catalogLoading) {
             // If the live catalog request itself failed, fall back only after that failure is known.
             state.products = load(K.products, []);
-            catalogLoadFailed = state.products.length > 0;
             catalogLoading = false;
             renderCategories();
             renderShop();
@@ -1697,6 +1693,12 @@ document.addEventListener('DOMContentLoaded', () => {
     if (window.supabaseClient) {
         loadOrdersListener();
         startCatalogFallbackRefresh();
+    } else {
+        // If Supabase is unavailable, use the saved catalog only as a last-resort fallback.
+        state.products = load(K.products, []);
+        catalogLoading = false;
+        renderCategories();
+        renderShop();
     }
 
     const adminForm = document.getElementById('admin-login-form');
