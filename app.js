@@ -1394,6 +1394,7 @@ async function loadOrdersListener(options = {}) {
                     if (adminData.settings && typeof adminData.settings === 'object') { state.settings = adminData.settings; save(K.settings, adminData.settings); }
                     if (Array.isArray(adminData.customers)) { state.customers = adminData.customers; save(K.customers, adminData.customers); renderAdminCustomers(document.getElementById('admin-customer-search')?.value || ''); }
                     if (Array.isArray(adminData.messages)) { state.messages = adminData.messages; save(K.messages, adminData.messages); }
+                    if (typeof renderAdminMessages === 'function') renderAdminMessages();
                     if (Array.isArray(adminData.requests)) { state.requests = adminData.requests; save(K.requests, adminData.requests); }
                     if (Array.isArray(adminData.expenses)) { state.expenses = adminData.expenses; save(K.expenses, adminData.expenses); }
                     lastAdminDataFetchAt = now;
@@ -1412,8 +1413,13 @@ async function loadOrdersListener(options = {}) {
 }
 window.loadOrdersListener = loadOrdersListener;
 let realtimeChannel = null;
+let adminLiveRefreshTimer = null;
 
 function setupRealtimeListeners() {
+    if (adminLiveRefreshTimer) {
+        clearInterval(adminLiveRefreshTimer);
+        adminLiveRefreshTimer = null;
+    }
     if (!window.supabaseClient) return;
     if (realtimeChannel) {
         window.supabaseClient.removeChannel(realtimeChannel);
@@ -1426,8 +1432,24 @@ function setupRealtimeListeners() {
     
     if (!isAdmin) return; 
     
+    // Orders and messages are private: refresh them through the Firebase-verified Worker.
+    // Poll only while the admin app is visible; this avoids exposing private tables to browser realtime.
+    adminLiveRefreshTimer = setInterval(() => {
+        if (document.visibilityState !== 'visible' || loadRefreshInProgress) return;
+        const stillAdmin = (window.firebaseReady && typeof firebase !== 'undefined' && firebase.auth &&
+            firebase.auth().currentUser && firebase.auth().currentUser.uid === TD_ADMIN_UID) ||
+            (state.session && state.session.role === 'admin');
+        if (!stillAdmin) {
+            clearInterval(adminLiveRefreshTimer);
+            adminLiveRefreshTimer = null;
+            return;
+        }
+        loadOrdersListener({ forceAdminData: true })
+            .catch(error => console.warn('Live admin refresh failed:', error.message || error));
+    }, 10000);
+
     // Only the public product catalog is subscribed to from the browser.
-    // Private orders/messages are refreshed through the Firebase-verified Worker poll below.
+    // Private orders/messages are refreshed through the Firebase-verified Worker poll above.
     realtimeChannel = window.supabaseClient.channel('public-products-channel')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, () => { lastProductsFetchAt = 0; loadOrdersListener({ forceProducts: true }); })
       .subscribe();
