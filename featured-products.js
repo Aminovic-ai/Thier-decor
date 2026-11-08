@@ -259,6 +259,12 @@
     }
   }
   window.saveCategoryOrder = saveCategoryOrder;
+
+  // Called by app.js after an explicit catalog render; no DOM observer is needed.
+  window.refreshFeaturedProductsAdminUI = function () {
+    renderAdminSelector();
+    renderCategoryOrderSelector();
+  };
   document.addEventListener('click', event => {
     const button = event.target.closest?.('[data-category-move]');
     if (!button) return;
@@ -274,14 +280,6 @@
     renderAdminSelector();
     renderCategoryOrderSelector();
     renderFeaturedStorefront();
-    const shopProducts = document.getElementById('s-products');
-    if (shopProducts && 'MutationObserver' in window) {
-      new MutationObserver(() => {
-        renderFeaturedStorefront();
-        renderAdminSelector();
-        renderCategoryOrderSelector();
-      }).observe(shopProducts, { childList: true, subtree: true });
-    }
     const languageButtons = ['lang-btn', 'mobile-lang-btn'];
     languageButtons.forEach(id => {
       const button = document.getElementById(id);
