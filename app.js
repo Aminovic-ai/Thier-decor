@@ -1900,6 +1900,8 @@ function renderShop() {
         return;
     }
     updateShopSectionHeading();
+    // Keep featured-product admin selectors in sync with the catalog without observing every DOM mutation.
+    if (typeof window.refreshFeaturedProductsAdminUI === 'function') window.refreshFeaturedProductsAdminUI();
     const newProductsBox = document.getElementById('new-products-box');
     if (newProductsBox) newProductsBox.style.display = 'none';
     const products = getCurrentShopProducts();
