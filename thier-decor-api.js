@@ -514,8 +514,8 @@ async function createCustomerOrder(request, body, env) {
   }
   subtotal = money(subtotal);
 
-  // Crown discount is decided only from the customer row in Supabase.
-  // It cannot be enabled by browser-supplied flags or combined with a coupon.
+  // Crown discount is granted from the customer's trusted database flag only.
+  // It replaces coupon discounts and is calculated on merchandise subtotal only.
   const isTopCustomer = customer.isTop === true;
   const promoCode = isTopCustomer
     ? ""
@@ -1012,8 +1012,7 @@ async function customerConfirmReceipt(request, body, env) {
   const order = rows?.[0];
   if (!order || String(order.customerId) !== String(session.sub)) return fail("الطلبية غير موجودة في حسابك.", 404);
   // A customer may confirm receipt only after the order has actually left for delivery.
-  if (!["on_the_way","out_for_delivery"].includes(order.status)) return fail("لا يمكن تأكيد استلام هذه الطلبية قبل خروجها للتوصيل.", 409);
-  return await updateOrderStatus({ id, status: "delivered" }, env);
+  if (!["on_the_way","out_for_delivery"].includes(order.status)) return fail("لا يمكن تأكيد استلام هذه الطلبية قبل خروجها للتوصيل.", 409);  return await updateOrderStatus({ id, status: "delivered" }, env);
 }
 
 /* ---------------- ALLOW-LISTED ADMIN MUTATIONS ---------------- */
