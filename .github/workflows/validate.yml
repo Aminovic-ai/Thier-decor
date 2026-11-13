@@ -26,6 +26,7 @@ jobs:
         run: |
           node --check td-config.js
           node --check app.js
+          node --check featured-products.js
           node --check analytics-notifications.js
           node --check sw.js
           node --check firebase-config.js
@@ -61,6 +62,7 @@ jobs:
               Path("THIER_DECOR_CUSTOMER_PHONE_UNIQUE_REVIEW.sql"),
               Path("THIER_DECOR_FINAL_SECURITY_AND_ORDER_MUTATIONS_REVIEW.sql"),
               Path("SCHEMA_AUDIT_READONLY.sql"),
+              Path("supabase/migrations/20261113_add_product_image_urls.sql"),
           ]
           for path in files:
               parse_sql(path.read_text(encoding="utf-8"))

@@ -19,8 +19,10 @@
   const getStoredIds = () => Array.isArray(getCustomPrices()[META_KEY])
     ? getCustomPrices()[META_KEY].map(id => String(id)) : [];
   const money = amount => (Number(amount) || 0).toLocaleString('fr-FR') + (isFrench() ? ' DA' : ' دج');
-  const productImage = product => Array.isArray(product.images) && typeof product.images[0] === 'string' && product.images[0].length > 10
-    ? product.images[0] : '';
+  const productImage = product => {
+    const images = Array.isArray(product?.image_urls) ? product.image_urls : (Array.isArray(product?.images) ? product.images : []);
+    return typeof images[0] === 'string' && images[0].length > 10 ? images[0] : '';
+  };
 
   function renderFeaturedStorefront() {
     const section = document.getElementById('featured-products-section');

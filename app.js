@@ -1937,6 +1937,38 @@ function addProductFromCard(productId) {
 }
 window.addProductFromCard = addProductFromCard;
 
+function getProductImages(product) {
+    if (Array.isArray(product?.image_urls)) return product.image_urls.filter(image => typeof image === 'string' && image.length > 0);
+    return Array.isArray(product?.images) ? product.images.filter(image => typeof image === 'string' && image.length > 0) : [];
+}
+window.getProductImages = getProductImages;
+
+async function uploadProductImageToR2(dataUrl) {
+    ensureApiConfigured();
+    const match = /^data:image\/jpeg;base64,([A-Za-z0-9+/=]+)$/i.exec(String(dataUrl || ''));
+    if (!match) throw new Error(state.currentLang === 'fr' ? 'Format d’image invalide.' : 'صيغة الصورة غير صالحة.');
+    if (!window.firebaseReady || typeof firebase === 'undefined' || !firebase.auth) {
+        throw new Error(state.currentLang === 'fr' ? 'Session administrateur indisponible.' : 'جلسة المسؤول غير متاحة.');
+    }
+    const user = firebase.auth().currentUser;
+    if (!user || user.uid !== TD_ADMIN_UID) throw new Error(state.currentLang === 'fr' ? 'Accès administrateur refusé.' : 'تم رفض صلاحية المسؤول.');
+    const idToken = await user.getIdToken();
+    const binary = atob(match[1]);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    const response = await fetch(TD_ADMIN_API_URL.replace(/\/+$/, '') + '/images/upload', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + idToken, 'Content-Type': 'image/jpeg' },
+        body: bytes,
+        cache: 'no-store'
+    });
+    const result = await response.json().catch(() => null);
+    if (!response.ok || result?.success !== true || typeof result.url !== 'string') {
+        throw new Error(result?.error || (state.currentLang === 'fr' ? 'Échec du téléversement de l’image.' : 'فشل رفع الصورة إلى التخزين.'));
+    }
+    return result.url;
+}
+
 function renderShopHTML(list) {
     const c = document.getElementById('s-products'); if (!c) return;
     if (list.length === 0) { c.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:40px;">${i18n[state.currentLang].no_products}</div>`; return; }
@@ -1953,7 +1985,8 @@ function renderShopHTML(list) {
     });
 
     c.innerHTML = cards.map(({ product: p, variants }) => {
-        const imageSrc = (p.images && p.images[0] && p.images[0].length > 10) ? esc(p.images[0]) : null;
+        const productImages = getProductImages(p);
+        const imageSrc = productImages[0] && productImages[0].length > 10 ? esc(productImages[0]) : null;
         const promoPrice = effectiveProductPrice(p);
         const isPromo = promoPrice < Number(p.price);
         const isWish = state.wishlist.includes(p.id);
@@ -2030,7 +2063,7 @@ function renderWishlist() {
     const c = document.getElementById('s-wishlist-items'); if (!c) return;
     const items = state.products.filter(p => state.wishlist.includes(p.id));
     if (items.length === 0) { c.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:40px;">${i18n[state.currentLang].empty_wishlist}</div>`; return; }
-    c.innerHTML = items.map(p => `<div class="product-card" onclick="showProductView(${p.id})"><div class="product-img">${p.images && p.images[0] ? `<img src="${esc(p.images[0])}">` : '📦'}</div><div class="product-info"><h3>${esc(p.name)}</h3><div style="font-weight:900;margin:10px 0;">${fmtMoney(p.price)}</div><button class="btn-primary" style="width:100%;padding:8px;" onclick="event.stopPropagation();addToCart(${p.id})">${i18n[state.currentLang].add_to_cart}</button></div></div>`).join('');
+    c.innerHTML = items.map(p => { const image = getProductImages(p)[0]; return `<div class="product-card" onclick="showProductView(${p.id})"><div class="product-img">${image ? `<img src="${esc(image)}">` : '📦'}</div><div class="product-info"><h3>${esc(p.name)}</h3><div style="font-weight:900;margin:10px 0;">${fmtMoney(p.price)}</div><button class="btn-primary" style="width:100%;padding:8px;" onclick="event.stopPropagation();addToCart(${p.id})">${i18n[state.currentLang].add_to_cart}</button></div></div>`; }).join('');
 }
 window.updateWishlistBadge = updateWishlistBadge; window.renderWishlist = renderWishlist;
 
@@ -2042,7 +2075,8 @@ function showProductView(id) {
             <div class="product-variants-heading">${state.currentLang === 'fr' ? 'Choisissez la couleur ou la forme' : 'اختر اللون أو الشكل'} <small>${state.currentLang === 'fr' ? variants.length + ' modèles disponibles' : variants.length + ' أشكال متوفرة'}</small></div>
             <div class="product-variants-list">
                 ${variants.map((variant, index) => {
-                    const thumb = Array.isArray(variant.images) && variant.images[0] ? esc(variant.images[0]) : '';
+                    const thumbImage = getProductImages(variant)[0];
+                    const thumb = thumbImage ? esc(thumbImage) : '';
                     const selected = String(variant.id) === String(p.id);
                     const label = state.currentLang === 'fr' ? 'Modèle ' + (index + 1) : 'الشكل ' + (index + 1);
                     return `<button type="button" class="product-variant-option ${selected ? 'active' : ''}" onclick="showProductView(${Number(variant.id)})" aria-label="${label}" title="${label}">
@@ -2059,7 +2093,8 @@ function showProductView(id) {
     const variantsBox = document.getElementById('pv-variants');
     if (variantsBox) variantsBox.innerHTML = variantPicker;
     const imgBox = document.getElementById('pv-image-box');
-    if (p.images && p.images.length > 0) { imgBox.innerHTML = `<div class="product-gallery">${p.images.map(img => `<img src="${esc(img)}" alt="${esc(p.name)}">`).join('')}</div>`; }
+    const productImages = getProductImages(p);
+    if (productImages.length > 0) { imgBox.innerHTML = `<div class="product-gallery">${productImages.map(img => `<img src="${esc(img)}" alt="${esc(p.name)}">`).join('')}</div>`; }
     else { imgBox.innerHTML = '<div style="height:200px;background:#f1f5f9;text-align:center;font-size:3rem;">📦</div>'; }
     const revList = document.getElementById('pv-reviews-list');
     if (p.reviews && p.reviews.length > 0) { revList.innerHTML = p.reviews.map(r => `<div style="border-bottom:1px dashed #eee; padding:5px 0;"><strong>${esc(r.name)}</strong> <span style="color:#f59e0b;">${'⭐'.repeat(r.stars)}</span><br><small>${esc(r.text)}</small></div>`).join(''); }
@@ -2131,7 +2166,8 @@ function renderCart() {
     if (state.cart.length === 0) { c.innerHTML = `<div style="text-align:center;padding:40px;">${i18n[state.currentLang].cart_empty}</div>`; sum.innerHTML = ''; return; }
     c.innerHTML = state.cart.map(i => {
         const product = state.products.find(p => String(p.id) === String(i.id));
-        const image = product && Array.isArray(product.images) && product.images[0] ? esc(product.images[0]) : '';
+        const productImage = getProductImages(product)[0];
+        const image = productImage ? esc(productImage) : '';
         return `<div class="admin-card cart-variant-row">${image ? `<img class="cart-variant-thumb" src="${image}" alt="">` : ''}<div class="cart-variant-info"><strong>${esc(i.name)}</strong><br><small>${fmtMoney(i.price)} x ${i.qty}</small></div><div class="cart-qty-control"><button type="button" class="cart-qty-step" onclick="updateCartQty(${i.id},-1)" aria-label="${state.currentLang === 'ar' ? 'إنقاص الكمية' : 'Diminuer la quantité'}" title="${state.currentLang === 'ar' ? 'إنقاص الكمية' : 'Diminuer la quantité'}"><i class="fas fa-minus"></i></button><input class="cart-qty-input" type="number" inputmode="numeric" pattern="[0-9]*" min="1" max="${product ? Math.max(0, Number(product.qty) || 0) : ''}" step="1" value="${Math.max(1, Number(i.qty) || 1)}" aria-label="${state.currentLang === 'ar' ? 'الكمية' : 'Quantité'}" onchange="updateCartQtyDirect(${i.id},this.value)" onkeydown="if(event.key==='Enter'){this.blur();}"><button type="button" class="cart-qty-step" onclick="updateCartQty(${i.id},1)" aria-label="${state.currentLang === 'ar' ? 'زيادة الكمية' : 'Augmenter la quantité'}" title="${state.currentLang === 'ar' ? 'زيادة الكمية' : 'Augmenter la quantité'}"><i class="fas fa-plus"></i></button><button type="button" class="cart-qty-remove" onclick="removeFromCart(${i.id})" aria-label="${state.currentLang === 'ar' ? 'حذف المنتج' : 'Supprimer le produit'}" title="${state.currentLang === 'ar' ? 'حذف المنتج' : 'Supprimer le produit'}"><i class="fas fa-trash-alt"></i></button></div></div>`;
     }).join('');
     sum.innerHTML = `<div class="delivery-cost-box">${i18n[state.currentLang].total_price} ${fmtMoney(state.cart.reduce((s, i) => s + i.price * i.qty, 0))}</div>`;
@@ -2881,7 +2917,8 @@ function viewOrderDetails(orderId) {
     const order = state.orders.find(o => o.id === orderId); if (!order) return; const customer = state.customers.find(c => c.phone === order.customerPhone); const isVip = customer && customer.isVip;
     const itemsHtml = order.items.map(i => {
         const variantProduct = state.products.find(product => String(product.id) === String(i.id));
-        const variantImage = variantProduct && Array.isArray(variantProduct.images) && variantProduct.images[0] ? esc(variantProduct.images[0]) : '';
+        const productImage = getProductImages(variantProduct)[0];
+        const variantImage = productImage ? esc(productImage) : '';
         const imageHtml = variantImage ? `<img class="order-variant-thumb" src="${variantImage}" alt="" loading="lazy">` : '<span class="order-variant-thumb order-variant-placeholder"><i class="fas fa-image"></i></span>';
         const components = i.isPack && Array.isArray(i.packItems) && i.packItems.length ? `<div style="font-size:0.8rem;color:var(--text-mid);margin-top:4px;">${i.packItems.map(comp => `${esc(state.products.find(p => String(p.id) === String(comp.id))?.name || comp.name || 'Produit')} × ${Number(comp.qty)||0}`).join(' · ')}</div>` : '';
         return `<div class="order-variant-row">${imageHtml}<div class="order-variant-info"><strong>${esc(i.name)}</strong><br><small style="color:var(--text-mid);">${i.qty} × ${fmtMoney(i.price)}</small>${components}</div><div style="font-weight:900;">${fmtMoney(i.price * i.qty)}</div></div>`;
@@ -3136,8 +3173,15 @@ async function savePack() {
         const component = state.products.find(cp => String(cp.id) === String(pi.id));
         return sum + (Number(component?.cost) || 0) * pi.qty;
     }, 0);
-    const newP = { id: Date.now(), name, price, cost: packCost, qty, category, desc: description, images: (state.products.find(p => String(p.id) === String(packItems[0].id))?.images || []).slice(0,1), isPack: true, packItems, createdAt: new Date().toISOString() };
+    const firstComponent = state.products.find(p => String(p.id) === String(packItems[0].id));
+    const firstComponentImages = getProductImages(firstComponent).slice(0, 1);
     try {
+        const packImageUrls = [];
+        for (const image of firstComponentImages) {
+            if (/^https:\/\/images\.thierdecor\.com\/[a-f0-9]{64}\.jpg$/i.test(String(image))) packImageUrls.push(image);
+            else packImageUrls.push(await uploadProductImageToR2(image));
+        }
+        const newP = { id: Date.now(), name, price, cost: packCost, qty, category, desc: description, image_urls: packImageUrls, isPack: true, packItems, createdAt: new Date().toISOString() };
         await callAdminWorker('adminUpsertProduct', { product: newP });
         state.products.push(newP); save(K.products, state.products);
         closeModal('m-pack-form'); renderAdminProducts(); renderCategories(); renderShop();
@@ -3184,7 +3228,7 @@ window.removePromo=removePromo;
 function renderAdminProducts(view = 'all', categoryFilter = null) {
     const c = document.getElementById('a-products-list'); if (!c) return;
     let products = state.products.slice(); if (view === 'packs') products = products.filter(p => p.isPack); if (categoryFilter !== null) products = products.filter(p => (p.category || i18n[state.currentLang].all) === categoryFilter);
-    c.innerHTML = products.map(p => { const activePrice=effectiveProductPrice(p); const promo=activePrice < Number(p.price); return `<div class="admin-card"><div style="display:flex;align-items:center;gap:15px;"><div style="width:58px;height:58px;background:#eff8ff;border-radius:10px;overflow:hidden;flex-shrink:0;">${p.images && p.images[0] ? `<img src="${esc(p.images[0])}" style="width:100%;height:100%;object-fit:cover;">` : '📦'}</div><div><strong>${esc(p.name)} ${p.isPack ? `(${i18n[state.currentLang].pack_badge})` : ''} ${p.isSpecial ? `(${i18n[state.currentLang].special_badge})` : ''} ${promo ? `<span class="promo-pill">${i18n[state.currentLang].promo_badge}</span>` : ''}</strong><br><small>${promo ? `<del>${fmtMoney(p.price)}</del> <b>${fmtMoney(activePrice)}</b>` : fmtMoney(p.price)} · ${i18n[state.currentLang].quantity}: ${p.qty}</small>${p.isPack && Array.isArray(p.packItems) ? `<br><small>${i18n[state.currentLang].pack_items}: ${p.packItems.map(i=>esc(state.products.find(x=>x.id===i.id)?.name||'')).filter(Boolean).join('، ')}</small>` : ''}</div></div><div class="admin-card-actions"><button class="btn-icon" title="${i18n[state.currentLang].create_promo}" onclick="openPromoModalFor(${p.id})"><i class="fas fa-tags"></i></button><button class="btn-icon" title="${i18n[state.currentLang].edit_order}" onclick="openProductModal(${p.id})"><i class="fas fa-edit"></i></button><button class="btn-danger" onclick="deleteProduct(${p.id})"><i class="fas fa-trash"></i></button></div></div>`; }).join('') || `<div class="admin-card">${i18n[state.currentLang].no_products}</div>`;
+    c.innerHTML = products.map(p => { const activePrice=effectiveProductPrice(p); const promo=activePrice < Number(p.price); return `<div class="admin-card"><div style="display:flex;align-items:center;gap:15px;"><div style="width:58px;height:58px;background:#eff8ff;border-radius:10px;overflow:hidden;flex-shrink:0;">${getProductImages(p)[0] ? `<img src="${esc(getProductImages(p)[0])}" style="width:100%;height:100%;object-fit:cover;">` : '📦'}</div><div><strong>${esc(p.name)} ${p.isPack ? `(${i18n[state.currentLang].pack_badge})` : ''} ${p.isSpecial ? `(${i18n[state.currentLang].special_badge})` : ''} ${promo ? `<span class="promo-pill">${i18n[state.currentLang].promo_badge}</span>` : ''}</strong><br><small>${promo ? `<del>${fmtMoney(p.price)}</del> <b>${fmtMoney(activePrice)}</b>` : fmtMoney(p.price)} · ${i18n[state.currentLang].quantity}: ${p.qty}</small>${p.isPack && Array.isArray(p.packItems) ? `<br><small>${i18n[state.currentLang].pack_items}: ${p.packItems.map(i=>esc(state.products.find(x=>x.id===i.id)?.name||'')).filter(Boolean).join('، ')}</small>` : ''}</div></div><div class="admin-card-actions"><button class="btn-icon" title="${i18n[state.currentLang].create_promo}" onclick="openPromoModalFor(${p.id})"><i class="fas fa-tags"></i></button><button class="btn-icon" title="${i18n[state.currentLang].edit_order}" onclick="openProductModal(${p.id})"><i class="fas fa-edit"></i></button><button class="btn-danger" onclick="deleteProduct(${p.id})"><i class="fas fa-trash"></i></button></div></div>`; }).join('') || `<div class="admin-card">${i18n[state.currentLang].no_products}</div>`;
 }
 function openPromoModalFor(id){openPromoModal();const s=document.getElementById('promo-product');s.value=String(id);updatePromoOriginalPrice();const p=state.products.find(x=>x.id===id);document.getElementById('promo-price').value=p?.promoPrice||'';document.getElementById('promo-start').value=p?.promoStart||'';document.getElementById('promo-end').value=p?.promoEnd||'';}
 window.openPromoModalFor=openPromoModalFor;
@@ -3202,7 +3246,7 @@ function openProductModal(id = null) {
     document.getElementById('pf-title').textContent = p ? i18n[state.currentLang].edit_order : i18n[state.currentLang].add_product;
     document.getElementById('pf-id').value = id || ''; document.getElementById('pf-name').value = p ? p.name : ''; document.getElementById('pf-price').value = p ? p.price : '';
     document.getElementById('pf-cost').value = p ? p.cost : ''; document.getElementById('pf-qty').value = p ? p.qty : ''; document.getElementById('pf-category').value = p ? p.category : '';
-    document.getElementById('pf-desc').value = p ? p.desc : ''; tempUploadedImages = (p && p.images) ? [...p.images] : []; if (!p) window.pendingRequestId = null;
+    document.getElementById('pf-desc').value = p ? p.desc : ''; tempUploadedImages = p ? [...getProductImages(p)] : []; if (!p) window.pendingRequestId = null;
     renderImagePreviews(); openModal('m-product-form');
 }
 window.openProductModal = openProductModal;
@@ -3322,16 +3366,22 @@ async function saveProduct() {
     const desc = document.getElementById('pf-desc').value.trim();
     if (!n || !(price > 0) || qty < 0) return toast(i18n[state.currentLang].save_failed, 'error');
     const existingProduct = id ? state.products.find(x => String(x.id) === String(id)) : null;
-    const newP = {
-        ...(existingProduct || {}),
-        name: n, price, cost, qty, category: cat, desc, images: tempUploadedImages,
-        isPack: existingProduct?.isPack || false, packItems: existingProduct?.packItems || [],
-        isSpecial: existingProduct?.isSpecial || false, promoPrice: existingProduct?.promoPrice || null,
-        promoStart: existingProduct?.promoStart || null, promoEnd: existingProduct?.promoEnd || null
-    };
+    try {
+        const imageUrls = [];
+        for (const image of tempUploadedImages) {
+            if (/^https:\/\/images\.thierdecor\.com\/[a-f0-9]{64}\.jpg$/i.test(String(image))) imageUrls.push(image);
+            else imageUrls.push(await uploadProductImageToR2(image));
+        }
+        const newP = {
+            ...(existingProduct || {}),
+            name: n, price, cost, qty, category: cat, desc, image_urls: imageUrls,
+            isPack: existingProduct?.isPack || false, packItems: existingProduct?.packItems || [],
+            isSpecial: existingProduct?.isSpecial || false, promoPrice: existingProduct?.promoPrice || null,
+            promoStart: existingProduct?.promoStart || null, promoEnd: existingProduct?.promoEnd || null
+        };
+        delete newP.images;
     if (id) newP.id = Number(id);
     else { newP.id = Date.now(); newP.createdAt = new Date().toISOString(); }
-    try {
         await callAdminWorker('adminUpsertProduct', { ...(id ? { id: Number(id) } : {}), product: newP });
         if (id) {
             const idx = state.products.findIndex(x => String(x.id) === String(id));
