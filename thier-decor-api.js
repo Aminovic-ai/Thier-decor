@@ -1303,31 +1303,48 @@ async function recordVisit(request, body, env) {
 
 /* ---------------- PRODUCT IMAGE STORAGE (R2) ---------------- */
 async function handleProductImageUpload(request, env) {
-  if (request.method !== "POST") return fail("Method not allowed.", 405);
-  if (!env.IMAGES_BUCKET) return fail("R2 image storage is not configured.", 503);
+  try {
+    if (request.method !== "POST") return fail("Method not allowed.", 405);
+    if (!env.IMAGES_BUCKET) return fail("R2 image storage is not configured.", 503);
 
-  const isAdmin = await verifyFirebaseAdmin(request, env);
-  if (!isAdmin) return fail("غير مصرح لك بتنفيذ هذا الإجراء.", 401);
+    const isAdmin = await verifyFirebaseAdmin(request, env);
+    if (!isAdmin) return fail("غير مصرح لك بتنفيذ هذا الإجراء.", 401);
 
-  const contentType = String(request.headers.get("Content-Type") || "").split(";")[0].trim().toLowerCase();
-  if (contentType !== "image/jpeg") return fail("صيغة الصورة غير مدعومة؛ أرسل صورة JPG فقط.", 415);
+    const contentType = String(request.headers.get("Content-Type") || "").split(";")[0].trim().toLowerCase();
+    if (contentType !== "image/jpeg") return fail("صيغة الصورة غير مدعومة؛ أرسل صورة JPG فقط.", 415);
 
-  const bytes = await request.arrayBuffer();
-  if (!bytes.byteLength || bytes.byteLength > 512 * 1024) return fail("حجم الصورة غير صالح أو يتجاوز 512 كيلوبايت.", 413);
+    const maxBytes = 512 * 1024;
+    const declaredLength = Number(request.headers.get("Content-Length") || 0);
+    if (declaredLength > maxBytes) return fail("حجم الصورة يتجاوز 512 كيلوبايت.", 413);
 
-  const digest = await crypto.subtle.digest("SHA-256", bytes);
-  const key = bytesToHex(new Uint8Array(digest)) + ".jpg";
-  await env.IMAGES_BUCKET.put(key, bytes, {
-    httpMetadata: {
-      contentType: "image/jpeg",
-      cacheControl: "public, max-age=31536000, immutable"
+    const bytes = await request.arrayBuffer();
+    if (!bytes.byteLength || bytes.byteLength > maxBytes) {
+      return fail("حجم الصورة غير صالح أو يتجاوز 512 كيلوبايت.", 413);
     }
-  });
 
-  return json({
-    success: true,
-    url: "https://images.thierdecor.com/" + key
-  });
+    // Validate the actual JPEG signature; Content-Type alone can be spoofed.
+    const header = new Uint8Array(bytes, 0, Math.min(3, bytes.byteLength));
+    if (header.length !== 3 || header[0] !== 0xff || header[1] !== 0xd8 || header[2] !== 0xff) {
+      return fail("محتوى الملف ليس صورة JPEG صالحة.", 415);
+    }
+
+    const digest = await crypto.subtle.digest("SHA-256", bytes);
+    const key = bytesToHex(new Uint8Array(digest)) + ".jpg";
+    await env.IMAGES_BUCKET.put(key, bytes, {
+      httpMetadata: {
+        contentType: "image/jpeg",
+        cacheControl: "public, max-age=31536000, immutable"
+      }
+    });
+
+    return json({
+      success: true,
+      url: "https://images.thierdecor.com/" + key
+    });
+  } catch (error) {
+    console.error("R2 product image upload failed:", error);
+    return fail("تعذر رفع الصورة إلى التخزين حالياً. حاول مجدداً.", 500);
+  }
 }
 
 /* ---------------- MAIN ROUTER ---------------- */
