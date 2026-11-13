@@ -1073,7 +1073,7 @@ async function adminMutation(action, body, env) {
       product.qty = Number(product.qty);
       if (!product.name || !Number.isFinite(product.price) || product.price <= 0 || !Number.isFinite(product.cost) || product.cost < 0 || !Number.isFinite(product.qty) || product.qty < 0) return fail("تحقق من اسم المنتج والسعر والتكلفة والكمية.");
       if (product.images !== undefined && (!Array.isArray(product.images) || product.images.length > 12 || product.images.some(x => typeof x !== "string" || x.length > 900000))) return fail("صور المنتج غير صالحة.");
-      if (product.image_urls !== undefined && (!Array.isArray(product.image_urls) || product.image_urls.length > 12 || product.image_urls.some(x => typeof x !== "string" || !/^https:\/\/images\\.thierdecor\\.com\/[a-f0-9]{64}\\.jpg$/i.test(x)))) return fail("روابط صور المنتج غير صالحة.");
+      if (product.image_urls !== undefined && (!Array.isArray(product.image_urls) || product.image_urls.length > 12 || product.image_urls.some(x => typeof x !== "string" || !/^https:\/\/images\.thierdecor\.com\/[a-f0-9]{64}\.jpg$/i.test(x)))) return fail("روابط صور المنتج غير صالحة.");
       if (product.packItems !== undefined && (!Array.isArray(product.packItems) || product.packItems.length > 60)) return fail("مكونات الباقة غير صالحة.");
       if (product.isPack === true) {
         if (!Array.isArray(product.packItems) || !product.packItems.length) return fail("يجب تحديد مكونات الباقة.");
