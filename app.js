@@ -1945,7 +1945,7 @@ window.getProductImages = getProductImages;
 
 async function uploadProductImageToR2(dataUrl) {
     ensureApiConfigured();
-    const match = /^data:image\\/jpeg;base64,([A-Za-z0-9+/=]+)$/i.exec(String(dataUrl || ''));
+    const match = /^data:image\/jpeg;base64,([A-Za-z0-9+/=]+)$/i.exec(String(dataUrl || ''));
     if (!match) throw new Error(state.currentLang === 'fr' ? 'Format d’image invalide.' : 'صيغة الصورة غير صالحة.');
     if (!window.firebaseReady || typeof firebase === 'undefined' || !firebase.auth) {
         throw new Error(state.currentLang === 'fr' ? 'Session administrateur indisponible.' : 'جلسة المسؤول غير متاحة.');
@@ -1956,7 +1956,7 @@ async function uploadProductImageToR2(dataUrl) {
     const binary = atob(match[1]);
     const bytes = new Uint8Array(binary.length);
     for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-    const response = await fetch(TD_ADMIN_API_URL.replace(/\\/+$/, '') + '/images/upload', {
+    const response = await fetch(TD_ADMIN_API_URL.replace(/\/+$/, '') + '/images/upload', {
         method: 'POST',
         headers: { 'Authorization': 'Bearer ' + idToken, 'Content-Type': 'image/jpeg' },
         body: bytes,
@@ -1985,7 +1985,8 @@ function renderShopHTML(list) {
     });
 
     c.innerHTML = cards.map(({ product: p, variants }) => {
-        const productImages = getProductImages(p);\n        const imageSrc = productImages[0] && productImages[0].length > 10 ? esc(productImages[0]) : null;
+        const productImages = getProductImages(p);
+        const imageSrc = productImages[0] && productImages[0].length > 10 ? esc(productImages[0]) : null;
         const promoPrice = effectiveProductPrice(p);
         const isPromo = promoPrice < Number(p.price);
         const isWish = state.wishlist.includes(p.id);
@@ -2074,7 +2075,8 @@ function showProductView(id) {
             <div class="product-variants-heading">${state.currentLang === 'fr' ? 'Choisissez la couleur ou la forme' : 'اختر اللون أو الشكل'} <small>${state.currentLang === 'fr' ? variants.length + ' modèles disponibles' : variants.length + ' أشكال متوفرة'}</small></div>
             <div class="product-variants-list">
                 ${variants.map((variant, index) => {
-                    const thumbImage = getProductImages(variant)[0];\n                    const thumb = thumbImage ? esc(thumbImage) : '';
+                    const thumbImage = getProductImages(variant)[0];
+                    const thumb = thumbImage ? esc(thumbImage) : '';
                     const selected = String(variant.id) === String(p.id);
                     const label = state.currentLang === 'fr' ? 'Modèle ' + (index + 1) : 'الشكل ' + (index + 1);
                     return `<button type="button" class="product-variant-option ${selected ? 'active' : ''}" onclick="showProductView(${Number(variant.id)})" aria-label="${label}" title="${label}">
@@ -2091,7 +2093,8 @@ function showProductView(id) {
     const variantsBox = document.getElementById('pv-variants');
     if (variantsBox) variantsBox.innerHTML = variantPicker;
     const imgBox = document.getElementById('pv-image-box');
-    const productImages = getProductImages(p);\n    if (productImages.length > 0) { imgBox.innerHTML = `<div class="product-gallery">${productImages.map(img => `<img src="${esc(img)}" alt="${esc(p.name)}">`).join('')}</div>`; }
+    const productImages = getProductImages(p);
+    if (productImages.length > 0) { imgBox.innerHTML = `<div class="product-gallery">${productImages.map(img => `<img src="${esc(img)}" alt="${esc(p.name)}">`).join('')}</div>`; }
     else { imgBox.innerHTML = '<div style="height:200px;background:#f1f5f9;text-align:center;font-size:3rem;">📦</div>'; }
     const revList = document.getElementById('pv-reviews-list');
     if (p.reviews && p.reviews.length > 0) { revList.innerHTML = p.reviews.map(r => `<div style="border-bottom:1px dashed #eee; padding:5px 0;"><strong>${esc(r.name)}</strong> <span style="color:#f59e0b;">${'⭐'.repeat(r.stars)}</span><br><small>${esc(r.text)}</small></div>`).join(''); }
@@ -2163,7 +2166,8 @@ function renderCart() {
     if (state.cart.length === 0) { c.innerHTML = `<div style="text-align:center;padding:40px;">${i18n[state.currentLang].cart_empty}</div>`; sum.innerHTML = ''; return; }
     c.innerHTML = state.cart.map(i => {
         const product = state.products.find(p => String(p.id) === String(i.id));
-        const productImage = getProductImages(product)[0];\n        const image = productImage ? esc(productImage) : '';
+        const productImage = getProductImages(product)[0];
+        const image = productImage ? esc(productImage) : '';
         return `<div class="admin-card cart-variant-row">${image ? `<img class="cart-variant-thumb" src="${image}" alt="">` : ''}<div class="cart-variant-info"><strong>${esc(i.name)}</strong><br><small>${fmtMoney(i.price)} x ${i.qty}</small></div><div class="cart-qty-control"><button type="button" class="cart-qty-step" onclick="updateCartQty(${i.id},-1)" aria-label="${state.currentLang === 'ar' ? 'إنقاص الكمية' : 'Diminuer la quantité'}" title="${state.currentLang === 'ar' ? 'إنقاص الكمية' : 'Diminuer la quantité'}"><i class="fas fa-minus"></i></button><input class="cart-qty-input" type="number" inputmode="numeric" pattern="[0-9]*" min="1" max="${product ? Math.max(0, Number(product.qty) || 0) : ''}" step="1" value="${Math.max(1, Number(i.qty) || 1)}" aria-label="${state.currentLang === 'ar' ? 'الكمية' : 'Quantité'}" onchange="updateCartQtyDirect(${i.id},this.value)" onkeydown="if(event.key==='Enter'){this.blur();}"><button type="button" class="cart-qty-step" onclick="updateCartQty(${i.id},1)" aria-label="${state.currentLang === 'ar' ? 'زيادة الكمية' : 'Augmenter la quantité'}" title="${state.currentLang === 'ar' ? 'زيادة الكمية' : 'Augmenter la quantité'}"><i class="fas fa-plus"></i></button><button type="button" class="cart-qty-remove" onclick="removeFromCart(${i.id})" aria-label="${state.currentLang === 'ar' ? 'حذف المنتج' : 'Supprimer le produit'}" title="${state.currentLang === 'ar' ? 'حذف المنتج' : 'Supprimer le produit'}"><i class="fas fa-trash-alt"></i></button></div></div>`;
     }).join('');
     sum.innerHTML = `<div class="delivery-cost-box">${i18n[state.currentLang].total_price} ${fmtMoney(state.cart.reduce((s, i) => s + i.price * i.qty, 0))}</div>`;
@@ -2913,7 +2917,8 @@ function viewOrderDetails(orderId) {
     const order = state.orders.find(o => o.id === orderId); if (!order) return; const customer = state.customers.find(c => c.phone === order.customerPhone); const isVip = customer && customer.isVip;
     const itemsHtml = order.items.map(i => {
         const variantProduct = state.products.find(product => String(product.id) === String(i.id));
-        const productImage = getProductImages(variantProduct)[0];\n        const variantImage = productImage ? esc(productImage) : '';
+        const productImage = getProductImages(variantProduct)[0];
+        const variantImage = productImage ? esc(productImage) : '';
         const imageHtml = variantImage ? `<img class="order-variant-thumb" src="${variantImage}" alt="" loading="lazy">` : '<span class="order-variant-thumb order-variant-placeholder"><i class="fas fa-image"></i></span>';
         const components = i.isPack && Array.isArray(i.packItems) && i.packItems.length ? `<div style="font-size:0.8rem;color:var(--text-mid);margin-top:4px;">${i.packItems.map(comp => `${esc(state.products.find(p => String(p.id) === String(comp.id))?.name || comp.name || 'Produit')} × ${Number(comp.qty)||0}`).join(' · ')}</div>` : '';
         return `<div class="order-variant-row">${imageHtml}<div class="order-variant-info"><strong>${esc(i.name)}</strong><br><small style="color:var(--text-mid);">${i.qty} × ${fmtMoney(i.price)}</small>${components}</div><div style="font-weight:900;">${fmtMoney(i.price * i.qty)}</div></div>`;
