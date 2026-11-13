@@ -3173,7 +3173,14 @@ async function savePack() {
         const component = state.products.find(cp => String(cp.id) === String(pi.id));
         return sum + (Number(component?.cost) || 0) * pi.qty;
     }, 0);
-    const newP = { id: Date.now(), name, price, cost: packCost, qty, category, desc: description, images: (state.products.find(p => String(p.id) === String(packItems[0].id))?.images || []).slice(0,1), isPack: true, packItems, createdAt: new Date().toISOString() };
+    const firstComponent = state.products.find(p => String(p.id) === String(packItems[0].id));
+    const firstComponentImages = getProductImages(firstComponent).slice(0, 1);
+    const packImageUrls = [];
+    for (const image of firstComponentImages) {
+        if (/^https:\/\/images\.thierdecor\.com\/[a-f0-9]{64}\.jpg$/i.test(String(image))) packImageUrls.push(image);
+        else packImageUrls.push(await uploadProductImageToR2(image));
+    }
+    const newP = { id: Date.now(), name, price, cost: packCost, qty, category, desc: description, image_urls: packImageUrls, isPack: true, packItems, createdAt: new Date().toISOString() };
     try {
         await callAdminWorker('adminUpsertProduct', { product: newP });
         state.products.push(newP); save(K.products, state.products);
