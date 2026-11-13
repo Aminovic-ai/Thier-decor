@@ -1064,7 +1064,7 @@ async function adminMutation(action, body, env) {
       const source = body.product;
       const id = body.id == null ? positiveId(source?.id || Date.now(), "معرّف المنتج") : positiveId(body.id, "معرّف المنتج");
       if (!source || typeof source !== "object" || Array.isArray(source)) return fail("بيانات المنتج غير صالحة.");
-      const allowed = ["name","price","cost","qty","category","desc","images","isPack","packItems","isSpecial","promoPrice","promoStart","promoEnd","reviews","createdAt"];
+      const allowed = ["name","price","cost","qty","category","desc","images","image_urls","isPack","packItems","isSpecial","promoPrice","promoStart","promoEnd","reviews","createdAt"];
       const product = {};
       for (const key of allowed) if (Object.prototype.hasOwnProperty.call(source, key)) product[key] = source[key];
       product.name = cleanText(product.name, 180, "اسم المنتج");
@@ -1073,6 +1073,7 @@ async function adminMutation(action, body, env) {
       product.qty = Number(product.qty);
       if (!product.name || !Number.isFinite(product.price) || product.price <= 0 || !Number.isFinite(product.cost) || product.cost < 0 || !Number.isFinite(product.qty) || product.qty < 0) return fail("تحقق من اسم المنتج والسعر والتكلفة والكمية.");
       if (product.images !== undefined && (!Array.isArray(product.images) || product.images.length > 12 || product.images.some(x => typeof x !== "string" || x.length > 900000))) return fail("صور المنتج غير صالحة.");
+      if (product.image_urls !== undefined && (!Array.isArray(product.image_urls) || product.image_urls.length > 12 || product.image_urls.some(x => typeof x !== "string" || !/^https:\/\/images\\.thierdecor\\.com\/[a-f0-9]{64}\\.jpg$/i.test(x)))) return fail("روابط صور المنتج غير صالحة.");
       if (product.packItems !== undefined && (!Array.isArray(product.packItems) || product.packItems.length > 60)) return fail("مكونات الباقة غير صالحة.");
       if (product.isPack === true) {
         if (!Array.isArray(product.packItems) || !product.packItems.length) return fail("يجب تحديد مكونات الباقة.");
@@ -1299,11 +1300,46 @@ async function recordVisit(request, body, env) {
   });
   return json({ success: true, recorded: result?.recorded === true });
 }
+
+/* ---------------- PRODUCT IMAGE STORAGE (R2) ---------------- */
+async function handleProductImageUpload(request, env) {
+  if (request.method !== "POST") return fail("Method not allowed.", 405);
+  if (!env.IMAGES_BUCKET) return fail("R2 image storage is not configured.", 503);
+
+  const isAdmin = await verifyFirebaseAdmin(request, env);
+  if (!isAdmin) return fail("غير مصرح لك بتنفيذ هذا الإجراء.", 401);
+
+  const contentType = String(request.headers.get("Content-Type") || "").split(";")[0].trim().toLowerCase();
+  if (contentType !== "image/jpeg") return fail("صيغة الصورة غير مدعومة؛ أرسل صورة JPG فقط.", 415);
+
+  const bytes = await request.arrayBuffer();
+  if (!bytes.byteLength || bytes.byteLength > 512 * 1024) return fail("حجم الصورة غير صالح أو يتجاوز 512 كيلوبايت.", 413);
+
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  const key = bytesToHex(new Uint8Array(digest)) + ".jpg";
+  await env.IMAGES_BUCKET.put(key, bytes, {
+    httpMetadata: {
+      contentType: "image/jpeg",
+      cacheControl: "public, max-age=31536000, immutable"
+    }
+  });
+
+  return json({
+    success: true,
+    url: "https://images.thierdecor.com/" + key
+  });
+}
+
 /* ---------------- MAIN ROUTER ---------------- */
 
 async function handleRequest(request, env) {
     if (!isAllowedOrigin(request, env)) return fail("Origin not allowed.", 403);
     if (request.method === "OPTIONS") return new Response(null, { status: 204 });
+
+    const requestUrl = new URL(request.url);
+    if (requestUrl.pathname === "/images/upload") {
+      return await handleProductImageUpload(request, env);
+    }
 
     if (request.method !== "POST") {
       return fail("Method not allowed.", 405);
