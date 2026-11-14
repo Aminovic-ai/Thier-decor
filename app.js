@@ -143,11 +143,32 @@ function playNotificationSound() {
 const save = (key, val) => {
     try {
         // Never persist customer password hashes or recovery PINs in browser storage.
-        const safeVal = key === K.customers && Array.isArray(val)
-            ? val.map(customer => { const copy = { ...customer }; delete copy.password; delete copy.recoveryPin; return copy; })
-            : val;
+        // Product images are fetched live from Supabase/R2; do not duplicate large
+        // legacy Base64 payloads in localStorage (the browser quota is very small).
+        let safeVal = val;
+        if (key === K.customers && Array.isArray(val)) {
+            safeVal = val.map(customer => {
+                const copy = { ...customer };
+                delete copy.password;
+                delete copy.recoveryPin;
+                return copy;
+            });
+        } else if (key === K.products && Array.isArray(val)) {
+            safeVal = val.map(product => {
+                const copy = { ...product };
+                if (Array.isArray(copy.images)) {
+                    copy.images = copy.images.filter(image =>
+                        typeof image === 'string' && !/^data:image\\//i.test(image)
+                    );
+                }
+                return copy;
+            });
+        }
         localStorage.setItem(key, JSON.stringify(safeVal));
-    } catch (e) { console.warn('Local cache save failed:', e); }
+    } catch (e) {
+        // Cache failures must never affect live data already loaded into application state.
+        console.warn('Local cache save failed:', e);
+    }
 };
 const load = (key, def) => { try { const d = localStorage.getItem(key); return d ? JSON.parse(d) : def; } catch (e) { return def; } };
 const esc = (s) => s ? String(s).replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[m]) : '';
@@ -1375,6 +1396,14 @@ async function loadOrdersListener(options = {}) {
         if (!catalogLoading) {
             renderCategories();
             renderShop();
+            // The admin product screen may have rendered before the asynchronous
+            // catalog request completed. Refresh both admin views after live data arrives.
+            if (typeof renderAdminProducts === 'function') {
+                renderAdminProducts(adminProductListView || 'all', adminProductCategoryFilter ?? null);
+            }
+            if (typeof renderAdminProductCategories === 'function') {
+                renderAdminProductCategories();
+            }
         }
         
         const currentFirebaseUser = Boolean(window.firebaseReady && typeof firebase !== 'undefined' && firebase.auth && firebase.auth().currentUser);
