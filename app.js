@@ -158,7 +158,7 @@ const save = (key, val) => {
                 const copy = { ...product };
                 if (Array.isArray(copy.images)) {
                     copy.images = copy.images.filter(image =>
-                        typeof image === 'string' && !/^data:image\\//i.test(image)
+                        typeof image === 'string' && !/^data:image\//i.test(image)
                     );
                 }
                 return copy;
