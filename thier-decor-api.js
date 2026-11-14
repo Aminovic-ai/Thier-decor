@@ -894,15 +894,11 @@ async function listOrders(env) {
 /* ---------------- ADMIN DATA ---------------- */
 
 async function listAdminData(env) {
-  const [
-    products,
-    customers,
-    messages,
-    requests,
-    expenses,
-    settings
-  ] = await Promise.all([
-    dbRequestPaged(env, "products?select=*&order=createdAt.desc,id.desc"),
+  // Products are loaded directly by the public catalog query in app.js.
+  // Do not fetch them again here: legacy rows contain large Base64 images,
+  // which needlessly inflate this private admin response and can prevent
+  // customers/messages/requests/expenses from reaching the dashboard.
+  const [customers, messages, requests, expenses, settings] = await Promise.all([
     dbRequestPaged(env, "customers?select=*&order=createdAt.desc,id.desc"),
     dbRequestPaged(env, "messages?select=*&order=date.desc,id.desc"),
     dbRequestPaged(env, "requests?select=*&order=date.desc,id.desc"),
@@ -913,7 +909,6 @@ async function listAdminData(env) {
   return json({
     success: true,
     data: {
-      products: products || [],
       customers: (customers || []).map(safeCustomer),
       messages: messages || [],
       requests: requests || [],
