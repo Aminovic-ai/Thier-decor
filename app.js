@@ -3213,7 +3213,7 @@ async function savePack() {
     try {
         const packImageUrls = [];
         for (const image of firstComponentImages) {
-            if (/^https:\/\/images\.thierdecor\.com\/[a-f0-9]{64}\.jpg$/i.test(String(image))) packImageUrls.push(image);
+            if (/^https:\/\/images\.thierdecor\.com\/(?:products\/images\/)?[a-f0-9]{64}\.jpg$/i.test(String(image))) packImageUrls.push(image);
             else packImageUrls.push(await uploadProductImageToR2(image));
         }
         const newP = { id: Date.now(), name, price, cost: packCost, qty, category, desc: description, image_urls: packImageUrls, isPack: true, packItems, createdAt: new Date().toISOString() };
@@ -3404,7 +3404,7 @@ async function saveProduct() {
     try {
         const imageUrls = [];
         for (const image of tempUploadedImages) {
-            if (/^https:\/\/images\.thierdecor\.com\/[a-f0-9]{64}\.jpg$/i.test(String(image))) imageUrls.push(image);
+            if (/^https:\/\/images\.thierdecor\.com\/(?:products\/images\/)?[a-f0-9]{64}\.jpg$/i.test(String(image))) imageUrls.push(image);
             else imageUrls.push(await uploadProductImageToR2(image));
         }
         const newP = {
