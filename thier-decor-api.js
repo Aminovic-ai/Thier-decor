@@ -1353,6 +1353,83 @@ async function handleProductImageUpload(request, env) {
   }
 }
 
+
+/* ---------------- LEGACY PRODUCT IMAGE MIGRATION (NON-DESTRUCTIVE) ---------------- */
+async function adminMigrateLegacyImages(body, env) {
+  if (!env.IMAGES_BUCKET) return fail("R2 image storage is not configured.", 503);
+
+  const requestedLimit = Number(body.limit ?? 1);
+  const limit = Number.isInteger(requestedLimit) ? Math.max(1, Math.min(2, requestedLimit)) : 0;
+  if (!limit) return fail("حجم الدفعة غير صالح؛ الحد الأقصى صورتان لمنتجين في كل تشغيل.");
+
+  const cursor = body.cursor == null || body.cursor === "" ? null : String(body.cursor);
+  if (cursor !== null && !/^\d{1,20}$/.test(cursor)) return fail("مؤشر المتابعة غير صالح.");
+
+  const path = "products?select=id,images,image_urls&order=id.asc&limit=" + limit +
+    (cursor === null ? "" : "&id=gt." + encodeURIComponent(cursor));
+  const rows = await dbRequest(env, path);
+  const products = Array.isArray(rows) ? rows : [];
+  const result = {
+    success: true, scanned: products.length, migrated: 0, skipped: 0, failed: 0,
+    nextCursor: products.length ? String(products[products.length - 1].id) : cursor,
+    hasMore: products.length === limit, errors: []
+  };
+
+  for (const product of products) {
+    const id = String(product.id);
+    const existingUrls = Array.isArray(product.image_urls) ? product.image_urls : [];
+    if (existingUrls.length) { result.skipped++; continue; }
+    const legacyImages = Array.isArray(product.images) ? product.images : [];
+    if (!legacyImages.length) { result.skipped++; continue; }
+
+    try {
+      if (legacyImages.length > 12) throw new Error("عدد الصور يتجاوز الحد المسموح.");
+      const migratedUrls = [];
+      for (const source of legacyImages) {
+        if (typeof source !== "string") throw new Error("بيانات صورة قديمة غير صالحة.");
+        const match = source.match(/^data:image\/jpeg;base64,([a-z0-9+/]+={0,2})$/i);
+        if (!match) throw new Error("الصورة ليست JPEG بصيغة Base64 مدعومة.");
+        let binary;
+        try { binary = atob(match[1]); }
+        catch (_) { throw new Error("ترميز Base64 للصورة غير صالح."); }
+        if (!binary.length || binary.length > 1024 * 1024) throw new Error("حجم الصورة يتجاوز 1 ميغابايت أو فارغ.");
+
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+        if (bytes.length < 3 || bytes[0] !== 0xff || bytes[1] !== 0xd8 || bytes[2] !== 0xff) {
+          throw new Error("محتوى الصورة لا يطابق توقيع JPEG.");
+        }
+
+        const digest = await crypto.subtle.digest("SHA-256", bytes);
+        const key = bytesToHex(new Uint8Array(digest)) + ".jpg";
+        await env.IMAGES_BUCKET.put(key, bytes, {
+          httpMetadata: { contentType: "image/jpeg", cacheControl: "public, max-age=31536000, immutable" }
+        });
+        migratedUrls.push("https://images.thierdecor.com/" + key);
+      }
+
+      // Use a database-side conditional update because PostgreSQL json has no
+      // equality operator. The RPC casts the current value to jsonb and updates
+      // only when image_urls is SQL NULL or an empty JSON array.
+      const updated = await dbRequest(env, "rpc/td_set_product_image_urls_if_empty", {
+        method: "POST",
+        body: JSON.stringify({ p_product_id: id, p_image_urls: migratedUrls })
+      });
+      if (!Array.isArray(updated) || !updated.length) {
+        result.skipped++;
+        continue;
+      }
+      result.migrated++;
+    } catch (error) {
+      result.failed++;
+      if (result.errors.length < 10) result.errors.push({
+        productId: id, reason: String(error?.message || "تعذر نقل الصور.")
+      });
+    }
+  }
+  return json(result);
+}
+
 /* ---------------- MAIN ROUTER ---------------- */
 
 async function handleRequest(request, env) {
@@ -1443,6 +1520,7 @@ async function handleRequest(request, env) {
         case "adminSetRequestStatus":
         case "adminDeleteRequest":
         case "adminCouponUsage":
+        case "adminMigrateLegacyImages":
         case "adminNotifyCustomerProductAvailable":
         case "adminDeleteOrder":
         case "adminEditOrder":
@@ -1456,6 +1534,7 @@ async function handleRequest(request, env) {
           if (action === "adminDeleteOrder") return await adminDeleteOrder(body, env);
           if (action === "adminEditOrder") return await adminEditOrder(body, env);
           if (action === "adminVisitStats") return await adminVisitStats(env);
+          if (action === "adminMigrateLegacyImages") return await adminMigrateLegacyImages(body, env);
           return await adminMutation(action, body, env);
         }
 
