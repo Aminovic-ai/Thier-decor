@@ -1415,8 +1415,11 @@ async function adminMigrateLegacyImages(body, env) {
       if (!latest) throw new Error("المنتج لم يعد موجوداً.");
       if (Array.isArray(latest.image_urls) && latest.image_urls.length) { result.skipped++; continue; }
 
+      // image_urls is a PostgreSQL json column (not jsonb), so PostgREST cannot
+      // safely compare it with [] using eq. Re-read immediately above, then
+      // update this product by id. Original Base64 images are never modified.
       const updated = await dbRequest(env,
-        "products?id=eq." + encodeURIComponent(id) + "&or=(image_urls.is.null,image_urls.eq.%5B%5D)&select=id,image_urls", {
+        "products?id=eq." + encodeURIComponent(id) + "&select=id,image_urls", {
           method: "PATCH", headers: { "Prefer": "return=representation" },
           body: JSON.stringify({ image_urls: migratedUrls })
         });
