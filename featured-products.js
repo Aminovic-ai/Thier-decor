@@ -20,14 +20,11 @@
     ? getCustomPrices()[META_KEY].map(id => String(id)) : [];
   const money = amount => (Number(amount) || 0).toLocaleString('fr-FR') + (isFrench() ? ' DA' : ' دج');
   const productImage = product => {
-    // Match app.js: an empty/invalid R2 URL list must not hide retained legacy images.
-    const r2Images = Array.isArray(product?.image_urls)
-      ? product.image_urls.filter(image => typeof image === 'string' && image.length > 10)
-      : [];
-    const legacyImages = Array.isArray(product?.images)
-      ? product.images.filter(image => typeof image === 'string' && image.length > 10)
-      : [];
-    return r2Images[0] || legacyImages[0] || '';
+    // NULL/absent image_urls means not migrated; [] means images were intentionally removed.
+    const images = Array.isArray(product?.image_urls)
+      ? product.image_urls
+      : (Array.isArray(product?.images) ? product.images : []);
+    return typeof images[0] === 'string' && images[0].length > 10 ? images[0] : '';
   };
 
   function renderFeaturedStorefront() {
