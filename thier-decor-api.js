@@ -1357,9 +1357,6 @@ async function handleProductImageUpload(request, env) {
 /* ---------------- LEGACY PRODUCT IMAGE MIGRATION (NON-DESTRUCTIVE) ---------------- */
 async function adminMigrateLegacyImages(body, env) {
   if (!env.IMAGES_BUCKET) return fail("R2 image storage is not configured.", 503);
-  // Fail closed: image_urls is currently PostgreSQL json, not jsonb. Do not
-  // run a migration until an atomic, type-compatible empty-array update is available.
-  return fail("ترحيل الصور متوقف مؤقتاً: يجب تجهيز تحديث آمن متوافق مع نوع العمود json.", 409);
 
   const requestedLimit = Number(body.limit ?? 1);
   const limit = Number.isInteger(requestedLimit) ? Math.max(1, Math.min(2, requestedLimit)) : 0;
@@ -1411,21 +1408,21 @@ async function adminMigrateLegacyImages(body, env) {
         migratedUrls.push("https://images.thierdecor.com/" + key);
       }
 
-      // Re-read before writing so an already-populated image_urls field is not overwritten.
-      const latestRows = await dbRequest(env,
-        "products?select=id,image_urls&id=eq." + encodeURIComponent(id) + "&limit=1");
-      const latest = latestRows?.[0];
-      if (!latest) throw new Error("المنتج لم يعد موجوداً.");
-      if (Array.isArray(latest.image_urls) && latest.image_urls.length) { result.skipped++; continue; }
-
-      // image_urls is a PostgreSQL json column (not jsonb), so PostgREST cannot
-      // safely compare it with [] using eq. Re-read immediately above, then
-      // update this product by id. Original Base64 images are never modified.
-      const updated = await dbRequest(env,
-        "products?id=eq." + encodeURIComponent(id) + "&select=id,image_urls", {
+      // Conditional PATCHes keep this safe against concurrent edits. The column
+      // is PostgreSQL json: compare the JSON empty array as [] (not {}), then
+      // separately handle SQL NULL. Never PATCH by id alone.
+      let updated = await dbRequest(env,
+        "products?id=eq." + encodeURIComponent(id) + "&image_urls=eq.%5B%5D&select=id,image_urls", {
           method: "PATCH", headers: { "Prefer": "return=representation" },
           body: JSON.stringify({ image_urls: migratedUrls })
         });
+      if (!Array.isArray(updated) || !updated.length) {
+        updated = await dbRequest(env,
+          "products?id=eq." + encodeURIComponent(id) + "&image_urls=is.null&select=id,image_urls", {
+            method: "PATCH", headers: { "Prefer": "return=representation" },
+            body: JSON.stringify({ image_urls: migratedUrls })
+          });
+      }
       if (!Array.isArray(updated) || !updated.length) {
         const afterRace = await dbRequest(env,
           "products?select=id,image_urls&id=eq." + encodeURIComponent(id) + "&limit=1");
