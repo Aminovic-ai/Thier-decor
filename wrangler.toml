@@ -1,9 +1,9 @@
-name = "thier-decor-api-v2"
+name = "thier-decor-api"
 main = "thier-decor-api.js"
 compatibility_date = "2026-11-02"
 compatibility_flags = ["nodejs_compat"]
 workers_dev = true
 
-# Project-specific public variables are injected by the deployment workflow.
-# SUPABASE_URL and ALLOWED_ORIGINS must be configured in the GitHub Environment.
-# Never place service keys or shared secrets in this file.
+# Keep secrets and environment-specific values in the Cloudflare dashboard.
+# Required production binding: IMAGES_BUCKET -> R2 bucket "thier-decor-images".
+# Required variables/secrets are configured on the existing production Worker.

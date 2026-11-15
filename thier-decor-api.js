@@ -23,7 +23,13 @@ const CORS_HEADERS = {
 function isAllowedOrigin(request, env) {
   const origin = request.headers.get("Origin");
   if (!origin) return true;
-  const allowed = String(env.ALLOWED_ORIGINS || "").split(",").map(value => value.trim()).filter(Boolean);
+
+  // Match the production CORS policy: only exact origins configured in
+  // ALLOWED_ORIGINS are accepted. Keep the migration preview out of production.
+  const allowed = String(env.ALLOWED_ORIGINS || "")
+    .split(",")
+    .map(value => value.trim())
+    .filter(Boolean);
   return allowed.includes(origin);
 }
 
@@ -894,15 +900,11 @@ async function listOrders(env) {
 /* ---------------- ADMIN DATA ---------------- */
 
 async function listAdminData(env) {
-  const [
-    products,
-    customers,
-    messages,
-    requests,
-    expenses,
-    settings
-  ] = await Promise.all([
-    dbRequestPaged(env, "products?select=*&order=createdAt.desc,id.desc"),
+  // Products are loaded directly by the public catalog query in app.js.
+  // Do not fetch them again here: legacy rows contain large Base64 images,
+  // which needlessly inflate this private admin response and can prevent
+  // customers/messages/requests/expenses from reaching the dashboard.
+  const [customers, messages, requests, expenses, settings] = await Promise.all([
     dbRequestPaged(env, "customers?select=*&order=createdAt.desc,id.desc"),
     dbRequestPaged(env, "messages?select=*&order=date.desc,id.desc"),
     dbRequestPaged(env, "requests?select=*&order=date.desc,id.desc"),
@@ -913,7 +915,6 @@ async function listAdminData(env) {
   return json({
     success: true,
     data: {
-      products: products || [],
       customers: (customers || []).map(safeCustomer),
       messages: messages || [],
       requests: requests || [],
@@ -1064,7 +1065,7 @@ async function adminMutation(action, body, env) {
       const source = body.product;
       const id = body.id == null ? positiveId(source?.id || Date.now(), "معرّف المنتج") : positiveId(body.id, "معرّف المنتج");
       if (!source || typeof source !== "object" || Array.isArray(source)) return fail("بيانات المنتج غير صالحة.");
-      const allowed = ["name","price","cost","qty","category","desc","images","isPack","packItems","isSpecial","promoPrice","promoStart","promoEnd","reviews","createdAt"];
+      const allowed = ["name","price","cost","qty","category","desc","images","image_urls","isPack","packItems","isSpecial","promoPrice","promoStart","promoEnd","reviews","createdAt"];
       const product = {};
       for (const key of allowed) if (Object.prototype.hasOwnProperty.call(source, key)) product[key] = source[key];
       product.name = cleanText(product.name, 180, "اسم المنتج");
@@ -1073,6 +1074,7 @@ async function adminMutation(action, body, env) {
       product.qty = Number(product.qty);
       if (!product.name || !Number.isFinite(product.price) || product.price <= 0 || !Number.isFinite(product.cost) || product.cost < 0 || !Number.isFinite(product.qty) || product.qty < 0) return fail("تحقق من اسم المنتج والسعر والتكلفة والكمية.");
       if (product.images !== undefined && (!Array.isArray(product.images) || product.images.length > 12 || product.images.some(x => typeof x !== "string" || x.length > 900000))) return fail("صور المنتج غير صالحة.");
+      if (product.image_urls !== undefined && (!Array.isArray(product.image_urls) || product.image_urls.length > 12 || product.image_urls.some(x => typeof x !== "string" || !/^https:\/\/images\.thierdecor\.com\/(?:products\/images\/)?[a-f0-9]{64}\.jpg$/i.test(x)))) return fail("روابط صور المنتج غير صالحة.");
       if (product.packItems !== undefined && (!Array.isArray(product.packItems) || product.packItems.length > 60)) return fail("مكونات الباقة غير صالحة.");
       if (product.isPack === true) {
         if (!Array.isArray(product.packItems) || !product.packItems.length) return fail("يجب تحديد مكونات الباقة.");
@@ -1088,8 +1090,13 @@ async function adminMutation(action, body, env) {
         if (existingComponents.some(component => component.isPack === true)) return fail("لا يمكن وضع باقة داخل باقة؛ اختر منتجات عادية كمكونات.");
       }
       if (product.promoPrice != null && (!(Number(product.promoPrice) > 0) || Number(product.promoPrice) >= product.price)) return fail("سعر العرض غير صالح.");
-      const existingRows = body.id == null ? [] : await dbRequest(env, "products?select=id,isPack,packItems&id=eq." + id + "&limit=1");
+      const existingRows = body.id == null ? [] : await dbRequest(env, "products?select=id,isPack,packItems,images&id=eq." + id + "&limit=1");
       const existingProduct = existingRows?.[0];
+      // Preserve legacy Base64 images in Supabase when an edited product only
+      // supplies new R2 URLs. This is deliberately non-destructive.
+      if (existingProduct && product.images === undefined) {
+        product.images = Array.isArray(existingProduct.images) ? existingProduct.images : [];
+      }
       if (existingProduct && (
         Boolean(existingProduct.isPack) !== Boolean(product.isPack) ||
         canonicalPackDefinition(existingProduct.packItems) !== canonicalPackDefinition(product.packItems)
@@ -1299,11 +1306,63 @@ async function recordVisit(request, body, env) {
   });
   return json({ success: true, recorded: result?.recorded === true });
 }
+
+/* ---------------- PRODUCT IMAGE STORAGE (R2) ---------------- */
+async function handleProductImageUpload(request, env) {
+  try {
+    if (request.method !== "POST") return fail("Method not allowed.", 405);
+    if (!env.IMAGES_BUCKET) return fail("R2 image storage is not configured.", 503);
+
+    const isAdmin = await verifyFirebaseAdmin(request, env);
+    if (!isAdmin) return fail("غير مصرح لك بتنفيذ هذا الإجراء.", 401);
+
+    const contentType = String(request.headers.get("Content-Type") || "").split(";")[0].trim().toLowerCase();
+    if (contentType !== "image/jpeg") return fail("صيغة الصورة غير مدعومة؛ أرسل صورة JPG فقط.", 415);
+
+    const maxBytes = 512 * 1024;
+    const declaredLength = Number(request.headers.get("Content-Length") || 0);
+    if (declaredLength > maxBytes) return fail("حجم الصورة يتجاوز 512 كيلوبايت.", 413);
+
+    const bytes = await request.arrayBuffer();
+    if (!bytes.byteLength || bytes.byteLength > maxBytes) {
+      return fail("حجم الصورة غير صالح أو يتجاوز 512 كيلوبايت.", 413);
+    }
+
+    // Validate the actual JPEG signature; Content-Type alone can be spoofed.
+    const header = new Uint8Array(bytes, 0, Math.min(3, bytes.byteLength));
+    if (header.length !== 3 || header[0] !== 0xff || header[1] !== 0xd8 || header[2] !== 0xff) {
+      return fail("محتوى الملف ليس صورة JPEG صالحة.", 415);
+    }
+
+    const digest = await crypto.subtle.digest("SHA-256", bytes);
+    const key = bytesToHex(new Uint8Array(digest)) + ".jpg";
+    await env.IMAGES_BUCKET.put(key, bytes, {
+      httpMetadata: {
+        contentType: "image/jpeg",
+        cacheControl: "public, max-age=31536000, immutable"
+      }
+    });
+
+    return json({
+      success: true,
+      url: "https://images.thierdecor.com/" + key
+    });
+  } catch (error) {
+    console.error("R2 product image upload failed:", error);
+    return fail("تعذر رفع الصورة إلى التخزين حالياً. حاول مجدداً.", 500);
+  }
+}
+
 /* ---------------- MAIN ROUTER ---------------- */
 
 async function handleRequest(request, env) {
     if (!isAllowedOrigin(request, env)) return fail("Origin not allowed.", 403);
     if (request.method === "OPTIONS") return new Response(null, { status: 204 });
+
+    const requestUrl = new URL(request.url);
+    if (requestUrl.pathname === "/images/upload") {
+      return await handleProductImageUpload(request, env);
+    }
 
     if (request.method !== "POST") {
       return fail("Method not allowed.", 405);
