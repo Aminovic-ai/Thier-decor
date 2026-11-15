@@ -1392,7 +1392,7 @@ async function adminMigrateLegacyImages(body, env) {
         let binary;
         try { binary = atob(match[1]); }
         catch (_) { throw new Error("ترميز Base64 للصورة غير صالح."); }
-        if (!binary.length || binary.length > 512 * 1024) throw new Error("حجم الصورة يتجاوز 512 كيلوبايت أو فارغ.");
+        if (!binary.length || binary.length > 1024 * 1024) throw new Error("حجم الصورة يتجاوز 1 ميغابايت أو فارغ.");
 
         const bytes = new Uint8Array(binary.length);
         for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
