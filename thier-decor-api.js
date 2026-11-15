@@ -1090,8 +1090,13 @@ async function adminMutation(action, body, env) {
         if (existingComponents.some(component => component.isPack === true)) return fail("لا يمكن وضع باقة داخل باقة؛ اختر منتجات عادية كمكونات.");
       }
       if (product.promoPrice != null && (!(Number(product.promoPrice) > 0) || Number(product.promoPrice) >= product.price)) return fail("سعر العرض غير صالح.");
-      const existingRows = body.id == null ? [] : await dbRequest(env, "products?select=id,isPack,packItems&id=eq." + id + "&limit=1");
+      const existingRows = body.id == null ? [] : await dbRequest(env, "products?select=id,isPack,packItems,images&id=eq." + id + "&limit=1");
       const existingProduct = existingRows?.[0];
+      // Preserve legacy Base64 images in Supabase when an edited product only
+      // supplies new R2 URLs. This is deliberately non-destructive.
+      if (existingProduct && product.images === undefined) {
+        product.images = Array.isArray(existingProduct.images) ? existingProduct.images : [];
+      }
       if (existingProduct && (
         Boolean(existingProduct.isPack) !== Boolean(product.isPack) ||
         canonicalPackDefinition(existingProduct.packItems) !== canonicalPackDefinition(product.packItems)
