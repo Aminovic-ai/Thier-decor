@@ -1416,11 +1416,19 @@ async function adminMigrateLegacyImages(body, env) {
       if (Array.isArray(latest.image_urls) && latest.image_urls.length) { result.skipped++; continue; }
 
       const updated = await dbRequest(env,
-        "products?id=eq." + encodeURIComponent(id) + "&select=id,image_urls", {
+        "products?id=eq." + encodeURIComponent(id) + "&or=(image_urls.is.null,image_urls.eq.%7B%7D)&select=id,image_urls", {
           method: "PATCH", headers: { "Prefer": "return=representation" },
           body: JSON.stringify({ image_urls: migratedUrls })
         });
-      if (!Array.isArray(updated) || !updated.length) throw new Error("لم يؤكد Supabase حفظ روابط الصور.");
+      if (!Array.isArray(updated) || !updated.length) {
+        const afterRace = await dbRequest(env,
+          "products?select=id,image_urls&id=eq." + encodeURIComponent(id) + "&limit=1");
+        if (Array.isArray(afterRace?.[0]?.image_urls) && afterRace[0].image_urls.length) {
+          result.skipped++;
+          continue;
+        }
+        throw new Error("لم يؤكد Supabase حفظ روابط الصور.");
+      }
       result.migrated++;
     } catch (error) {
       result.failed++;
