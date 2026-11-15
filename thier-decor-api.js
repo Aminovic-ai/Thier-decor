@@ -24,21 +24,13 @@ function isAllowedOrigin(request, env) {
   const origin = request.headers.get("Origin");
   if (!origin) return true;
 
-  // Keep the production and migration-preview sites working even if a
-  // Cloudflare deployment version has not yet received the ALLOWED_ORIGINS var.
-  // The environment variable can add further exact origins without widening access.
-  const builtInAllowedOrigins = [
-    "https://thier-decor-v3.pages.dev",
-    "https://thierdecor.com",
-    "https://www.thierdecor.com",
-    "https://r2-images-migration-review.thier-decor-v3.pages.dev"
-  ];
-  const configuredOrigins = String(env.ALLOWED_ORIGINS || "")
+  // Match the production CORS policy: only exact origins configured in
+  // ALLOWED_ORIGINS are accepted. Keep the migration preview out of production.
+  const allowed = String(env.ALLOWED_ORIGINS || "")
     .split(",")
     .map(value => value.trim())
     .filter(Boolean);
-
-  return builtInAllowedOrigins.includes(origin) || configuredOrigins.includes(origin);
+  return allowed.includes(origin);
 }
 
 function withCors(response, request, env) {
