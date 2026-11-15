@@ -1357,6 +1357,9 @@ async function handleProductImageUpload(request, env) {
 /* ---------------- LEGACY PRODUCT IMAGE MIGRATION (NON-DESTRUCTIVE) ---------------- */
 async function adminMigrateLegacyImages(body, env) {
   if (!env.IMAGES_BUCKET) return fail("R2 image storage is not configured.", 503);
+  // Fail closed: image_urls is currently PostgreSQL json, not jsonb. Do not
+  // run a migration until an atomic, type-compatible empty-array update is available.
+  return fail("ترحيل الصور متوقف مؤقتاً: يجب تجهيز تحديث آمن متوافق مع نوع العمود json.", 409);
 
   const requestedLimit = Number(body.limit ?? 1);
   const limit = Number.isInteger(requestedLimit) ? Math.max(1, Math.min(2, requestedLimit)) : 0;
