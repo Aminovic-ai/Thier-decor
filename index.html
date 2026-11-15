@@ -252,9 +252,11 @@
                         <button class="btn-primary" onclick="openPackModal()"><i class="fas fa-gift"></i> <span data-i18n="create_pack">إنشاء Pack</span></button>
                         <button class="btn-primary promo-admin-button" onclick="openPromoModal()"><i class="fas fa-tags"></i> <span data-i18n="create_promo">برومو</span></button>
                         <button class="btn-primary" onclick="openProductModal()"><i class="fas fa-plus"></i> <span data-i18n="add_product">إضافة منتج</span></button>
+                        <button class="btn-primary" id="btn-migrate-r2-images" type="button" onclick="migrateLegacyImagesBatch()" style="background:#0f766e;"><i class="fas fa-cloud-upload-alt"></i> نقل الصور القديمة إلى R2</button>
                     </div>
                     <div id="a-products-categories" class="admin-category-grid" style="display:none;"></div>
                     <div id="a-products-list" class="admin-grid-list"></div>
+                    <div id="r2-migration-status" role="status" style="margin-top:10px;font-size:.9rem;white-space:pre-wrap;"></div>
                 </section>
                 <section class="admin-section" id="sec-debts" style="display:none;"><div id="a-debts-list" class="admin-grid-list"></div></section>
                 <section class="admin-section" id="sec-requests" style="display:none;"><div id="a-requests-list" class="admin-grid-list"></div></section>
