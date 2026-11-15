@@ -3265,6 +3265,42 @@ function renderAdminProducts(view = 'all', categoryFilter = null) {
     let products = state.products.slice(); if (view === 'packs') products = products.filter(p => p.isPack); if (categoryFilter !== null) products = products.filter(p => (p.category || i18n[state.currentLang].all) === categoryFilter);
     c.innerHTML = products.map(p => { const activePrice=effectiveProductPrice(p); const promo=activePrice < Number(p.price); return `<div class="admin-card"><div style="display:flex;align-items:center;gap:15px;"><div style="width:58px;height:58px;background:#eff8ff;border-radius:10px;overflow:hidden;flex-shrink:0;">${getProductImages(p)[0] ? `<img src="${esc(getProductImages(p)[0])}" style="width:100%;height:100%;object-fit:cover;">` : '📦'}</div><div><strong>${esc(p.name)} ${p.isPack ? `(${i18n[state.currentLang].pack_badge})` : ''} ${p.isSpecial ? `(${i18n[state.currentLang].special_badge})` : ''} ${promo ? `<span class="promo-pill">${i18n[state.currentLang].promo_badge}</span>` : ''}</strong><br><small>${promo ? `<del>${fmtMoney(p.price)}</del> <b>${fmtMoney(activePrice)}</b>` : fmtMoney(p.price)} · ${i18n[state.currentLang].quantity}: ${p.qty}</small>${p.isPack && Array.isArray(p.packItems) ? `<br><small>${i18n[state.currentLang].pack_items}: ${p.packItems.map(i=>esc(state.products.find(x=>x.id===i.id)?.name||'')).filter(Boolean).join('، ')}</small>` : ''}</div></div><div class="admin-card-actions"><button class="btn-icon" title="${i18n[state.currentLang].create_promo}" onclick="openPromoModalFor(${p.id})"><i class="fas fa-tags"></i></button><button class="btn-icon" title="${i18n[state.currentLang].edit_order}" onclick="openProductModal(${p.id})"><i class="fas fa-edit"></i></button><button class="btn-danger" onclick="deleteProduct(${p.id})"><i class="fas fa-trash"></i></button></div></div>`; }).join('') || `<div class="admin-card">${i18n[state.currentLang].no_products}</div>`;
 }
+async function migrateLegacyImagesBatch() {
+    const button = document.getElementById('btn-migrate-r2-images');
+    const status = document.getElementById('r2-migration-status');
+    if (window.__tdR2MigrationRunning) return;
+    if (!confirm(state.currentLang === 'fr'
+        ? 'Lancer le transfert d’un lot de 2 produits vers R2 ? Les anciennes images Supabase seront conservées.'
+        : 'هل تريد نقل دفعة من منتجين إلى R2؟ ستبقى الصور القديمة في Supabase دون حذف.')) return;
+    window.__tdR2MigrationRunning = true;
+    if (button) button.disabled = true;
+    try {
+        const key = 'td_r2_migration_cursor';
+        const cursor = sessionStorage.getItem(key) || null;
+        const result = await callAdminWorker('adminMigrateLegacyImages', { limit: 2, cursor });
+        if (result.nextCursor != null) sessionStorage.setItem(key, String(result.nextCursor));
+        if (!result.hasMore) sessionStorage.removeItem(key);
+        const summary = state.currentLang === 'fr'
+            ? `Lot terminé — analysés: ${result.scanned}, transférés: ${result.migrated}, ignorés: ${result.skipped}, échecs: ${result.failed}.`
+            : `انتهت الدفعة — تم فحص: ${result.scanned}، نُقل: ${result.migrated}، تم تجاوز: ${result.skipped}، فشل: ${result.failed}.`;
+        const continuation = result.hasMore
+            ? (state.currentLang === 'fr' ? ' Cliquez à nouveau pour continuer.' : ' اضغط مرة أخرى لنقل الدفعة التالية.')
+            : (state.currentLang === 'fr' ? ' Transfert terminé.' : ' اكتمل فحص المنتجات.');
+        const errors = Array.isArray(result.errors) && result.errors.length
+            ? '\\n' + result.errors.map(e => `#${e.productId}: ${e.reason}`).join(' | ')
+            : '';
+        if (status) status.textContent = summary + continuation + errors;
+        toast(summary, result.failed ? 'error' : 'success');
+    } catch (error) {
+        if (status) status.textContent = error.message || String(error);
+        toast(error.message || String(error), 'error');
+    } finally {
+        window.__tdR2MigrationRunning = false;
+        if (button) button.disabled = false;
+    }
+}
+window.migrateLegacyImagesBatch = migrateLegacyImagesBatch;
+
 function openPromoModalFor(id){openPromoModal();const s=document.getElementById('promo-product');s.value=String(id);updatePromoOriginalPrice();const p=state.products.find(x=>x.id===id);document.getElementById('promo-price').value=p?.promoPrice||'';document.getElementById('promo-start').value=p?.promoStart||'';document.getElementById('promo-end').value=p?.promoEnd||'';}
 window.openPromoModalFor=openPromoModalFor;
 window.renderAdminProducts = renderAdminProducts;
