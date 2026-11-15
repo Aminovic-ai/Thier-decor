@@ -1967,13 +1967,11 @@ function addProductFromCard(productId) {
 window.addProductFromCard = addProductFromCard;
 
 function getProductImages(product) {
-    // Prefer R2 URLs, but never hide retained legacy images when the URL list
-    // is empty. This also lets the editor migrate those originals to R2 on save.
-    const r2Images = Array.isArray(product?.image_urls)
-        ? product.image_urls.filter(image => typeof image === 'string' && image.length > 0)
-        : [];
-    if (r2Images.length) return r2Images;
-
+    // NULL/absent image_urls means not migrated: use legacy images.
+    // An empty array is an intentional no-image state and must not resurrect deleted images.
+    if (Array.isArray(product?.image_urls)) {
+        return product.image_urls.filter(image => typeof image === 'string' && image.length > 0);
+    }
     return Array.isArray(product?.images)
         ? product.images.filter(image => typeof image === 'string' && image.length > 0)
         : [];
