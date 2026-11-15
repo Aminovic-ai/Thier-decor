@@ -1408,29 +1408,16 @@ async function adminMigrateLegacyImages(body, env) {
         migratedUrls.push("https://images.thierdecor.com/" + key);
       }
 
-      // Conditional PATCHes keep this safe against concurrent edits. The column
-      // is PostgreSQL json: compare the JSON empty array as [] (not {}), then
-      // separately handle SQL NULL. Never PATCH by id alone.
-      let updated = await dbRequest(env,
-        "products?id=eq." + encodeURIComponent(id) + "&image_urls=eq.%5B%5D&select=id,image_urls", {
-          method: "PATCH", headers: { "Prefer": "return=representation" },
-          body: JSON.stringify({ image_urls: migratedUrls })
-        });
+      // Use a database-side conditional update because PostgreSQL json has no
+      // equality operator. The RPC casts the current value to jsonb and updates
+      // only when image_urls is SQL NULL or an empty JSON array.
+      const updated = await dbRequest(env, "rpc/td_set_product_image_urls_if_empty", {
+        method: "POST",
+        body: JSON.stringify({ p_product_id: id, p_image_urls: migratedUrls })
+      });
       if (!Array.isArray(updated) || !updated.length) {
-        updated = await dbRequest(env,
-          "products?id=eq." + encodeURIComponent(id) + "&image_urls=is.null&select=id,image_urls", {
-            method: "PATCH", headers: { "Prefer": "return=representation" },
-            body: JSON.stringify({ image_urls: migratedUrls })
-          });
-      }
-      if (!Array.isArray(updated) || !updated.length) {
-        const afterRace = await dbRequest(env,
-          "products?select=id,image_urls&id=eq." + encodeURIComponent(id) + "&limit=1");
-        if (Array.isArray(afterRace?.[0]?.image_urls) && afterRace[0].image_urls.length) {
-          result.skipped++;
-          continue;
-        }
-        throw new Error("لم يؤكد Supabase حفظ روابط الصور.");
+        result.skipped++;
+        continue;
       }
       result.migrated++;
     } catch (error) {
