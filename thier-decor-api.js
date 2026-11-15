@@ -1416,7 +1416,7 @@ async function adminMigrateLegacyImages(body, env) {
       if (Array.isArray(latest.image_urls) && latest.image_urls.length) { result.skipped++; continue; }
 
       const updated = await dbRequest(env,
-        "products?id=eq." + encodeURIComponent(id) + "&or=(image_urls.is.null,image_urls.eq.%7B%7D)&select=id,image_urls", {
+        "products?id=eq." + encodeURIComponent(id) + "&or=(image_urls.is.null,image_urls.eq.%5B%5D)&select=id,image_urls", {
           method: "PATCH", headers: { "Prefer": "return=representation" },
           body: JSON.stringify({ image_urls: migratedUrls })
         });
