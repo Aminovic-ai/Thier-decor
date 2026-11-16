@@ -94,6 +94,15 @@ begin
     );
   end if;
 
+  -- One stock operation may be linked to only one invoice, even if a caller
+  -- accidentally retries it with a different request_key.
+  perform 1 from public.pos_sales
+  where stock_operation_id = v_stock_operation_id
+  for update;
+  if found then
+    raise exception 'Stock operation is already linked to another POS invoice';
+  end if;
+
   v_subtotal := round(coalesce((p_sale->>'subtotal')::numeric,0),2);
   v_discount := round(coalesce((p_sale->>'discount')::numeric,0),2);
   v_total := round(coalesce((p_sale->>'total')::numeric,0),2);
@@ -140,7 +149,91 @@ begin
        or coalesce(v_item->>'quantity','') !~ '^[0-9]{1,6}$'
        or (v_item->>'quantity')::numeric <= 0
        or coalesce(v_item->>'unit_price','') !~ '^[0-9]+(\.[0-9]+)?$'
-       or coalesce(v_item->>'unit_cost','') !~ '^[0-9]+(\.[0-9]+)?$' then
+       or coalesce(v_item->>'unit_cost','') !~ '^[0-9]+(\.[0-9]+)?
+      raise exception 'Invalid POS invoice line';
+    end if;
+    insert into public.pos_sale_items (
+      sale_id, product_id, product_name, quantity, unit_price,
+      unit_cost, line_total, is_pack, pack_snapshot
+    ) values (
+      v_sale_id,
+      v_item->>'product_id',
+      left(coalesce(v_item->>'product_name',''),180),
+      (v_item->>'quantity')::numeric,
+      (v_item->>'unit_price')::numeric,
+      (v_item->>'unit_cost')::numeric,
+      round((v_item->>'line_total')::numeric,2),
+      coalesce((v_item->>'is_pack')::boolean,false),
+      coalesce(v_item->'pack_snapshot','[]'::jsonb)
+    );
+  end loop;
+
+  return jsonb_build_object(
+    'ok', true, 'sale_id', v_sale_id, 'invoice_no', v_invoice_no,
+    'subtotal', v_subtotal, 'discount', v_discount, 'total', v_total,
+    'payment_method', v_payment, 'paid_amount', v_paid,
+    'customer_name', coalesce(p_sale->>'customer_name',''),
+    'customer_phone', coalesce(p_sale->>'customer_phone',''),
+    'customer_address', coalesce(p_sale->>'customer_address',''),
+    'store_name', coalesce(p_sale->>'store_name','Thier Décor'),
+    'store_phone', coalesce(p_sale->>'store_phone',''),
+    'store_address', coalesce(p_sale->>'store_address',''),
+    'created_at', v_created_at,
+    'items', coalesce((select jsonb_agg(jsonb_build_object('name', i.product_name, 'qty', i.quantity, 'price', i.unit_price) order by i.id) from public.pos_sale_items i where i.sale_id = v_sale_id), '[]'::jsonb),
+    'already_created', false
+  );
+end;
+$$;
+
+revoke all on function public.td_pos_record_sale(jsonb) from public, anon, authenticated;
+grant execute on function public.td_pos_record_sale(jsonb) to service_role;
+
+commit;
+
+       or coalesce(v_item->>'line_total','') !~ '^[0-9]+(\.[0-9]+)?
+      raise exception 'Invalid POS invoice line';
+    end if;
+    insert into public.pos_sale_items (
+      sale_id, product_id, product_name, quantity, unit_price,
+      unit_cost, line_total, is_pack, pack_snapshot
+    ) values (
+      v_sale_id,
+      v_item->>'product_id',
+      left(coalesce(v_item->>'product_name',''),180),
+      (v_item->>'quantity')::numeric,
+      (v_item->>'unit_price')::numeric,
+      (v_item->>'unit_cost')::numeric,
+      round((v_item->>'line_total')::numeric,2),
+      coalesce((v_item->>'is_pack')::boolean,false),
+      coalesce(v_item->'pack_snapshot','[]'::jsonb)
+    );
+  end loop;
+
+  return jsonb_build_object(
+    'ok', true, 'sale_id', v_sale_id, 'invoice_no', v_invoice_no,
+    'subtotal', v_subtotal, 'discount', v_discount, 'total', v_total,
+    'payment_method', v_payment, 'paid_amount', v_paid,
+    'customer_name', coalesce(p_sale->>'customer_name',''),
+    'customer_phone', coalesce(p_sale->>'customer_phone',''),
+    'customer_address', coalesce(p_sale->>'customer_address',''),
+    'store_name', coalesce(p_sale->>'store_name','Thier Décor'),
+    'store_phone', coalesce(p_sale->>'store_phone',''),
+    'store_address', coalesce(p_sale->>'store_address',''),
+    'created_at', v_created_at,
+    'items', coalesce((select jsonb_agg(jsonb_build_object('name', i.product_name, 'qty', i.quantity, 'price', i.unit_price) order by i.id) from public.pos_sale_items i where i.sale_id = v_sale_id), '[]'::jsonb),
+    'already_created', false
+  );
+end;
+$$;
+
+revoke all on function public.td_pos_record_sale(jsonb) from public, anon, authenticated;
+grant execute on function public.td_pos_record_sale(jsonb) to service_role;
+
+commit;
+
+       or (v_item->>'unit_cost')::numeric < 0
+       or round((v_item->>'quantity')::numeric * (v_item->>'unit_price')::numeric,2)
+          <> round((v_item->>'line_total')::numeric,2) then
       raise exception 'Invalid POS invoice line';
     end if;
     insert into public.pos_sale_items (
