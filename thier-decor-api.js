@@ -314,6 +314,29 @@ async function dbRequest(env, path, options = {}) {
 }
 
 
+async function posDbRequest(env, path, options = {}) {
+  if (!env.POS_SUPABASE_URL || !env.POS_SUPABASE_SERVICE_ROLE_KEY) {
+    throw new Error("POS database configuration is missing");
+  }
+  const url = new URL("/rest/v1/" + path, env.POS_SUPABASE_URL).toString();
+  const response = await fetch(url, {
+    ...options,
+    headers: {
+      "apikey": env.POS_SUPABASE_SERVICE_ROLE_KEY,
+      "Content-Type": "application/json",
+      ...(options.headers || {})
+    }
+  });
+  const text = await response.text();
+  let data = null;
+  try { data = text ? JSON.parse(text) : null; } catch (_) { data = text; }
+  if (!response.ok) {
+    console.error("POS Supabase error:", response.status, data);
+    throw new Error(typeof data === "object" && data?.message ? data.message : "POS database request failed");
+  }
+  return data;
+}
+
 async function dbRequestPaged(env, path, pageSize = 1000, maxRows = 50000) {
   const all = [];
   for (let offset = 0; offset < maxRows; offset += pageSize) {
@@ -1268,6 +1291,289 @@ async function adminNotifyCustomerProductAvailable(body, env) {
   if (!Array.isArray(inserted) || !inserted.length) return fail("لم يؤكد الخادم إرسال الإشعار.", 409);
   return json({ success: true, message });
 }
+async function adminCreateStoreSale(body, env, request) {
+  const items = body.items;
+  if (!Array.isArray(items) || items.length < 1 || items.length > 100) {
+    return fail("أضف منتجاً واحداً على الأقل إلى سلة البيع.");
+  }
+
+  const cleanItems = [];
+  for (const item of items) {
+    const id = Number(item?.id);
+    const qty = Number(item?.qty);
+    if (!Number.isSafeInteger(id) || id <= 0 ||
+        !Number.isSafeInteger(qty) || qty <= 0 || qty > 1000) {
+      return fail("أحد المنتجات أو الكميات غير صالح.");
+    }
+    cleanItems.push({ id, qty });
+  }
+
+  const discount = Number(body.discount || 0);
+  if (!Number.isFinite(discount) || discount < 0 || discount > 100000000) {
+    return fail("قيمة التخفيض غير صالحة.");
+  }
+
+  const paymentMethod = String(body.paymentMethod || "cash").trim().toLowerCase();
+  if (!["cash", "transfer", "card", "other"].includes(paymentMethod)) {
+    return fail("طريقة الدفع غير صالحة.");
+  }
+
+  const requestKey = String(body.requestKey || "");
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(requestKey)) {
+    return fail("مفتاح عملية البيع غير صالح.");
+  }
+
+  const cleanText = (value, max) => String(value || "").trim().slice(0, max);
+  const saleInput = {
+    request_key: requestKey.toLowerCase(),
+    items: cleanItems,
+    discount,
+    payment_method: paymentMethod,
+    customer_name: cleanText(body.customerName, 120),
+    customer_phone: cleanText(body.customerPhone, 40),
+    customer_address: cleanText(body.customerAddress, 300),
+    store_name: cleanText(body.storeName, 120) || "Thier Décor",
+    store_phone: cleanText(body.storePhone, 40),
+    store_address: cleanText(body.storeAddress, 300)
+  };
+
+  if (!env.POS_SUPABASE_URL || !env.POS_SUPABASE_SERVICE_ROLE_KEY) {
+    return fail("قاعدة POS غير مهيأة. لم يتم خصم المخزون.", 503);
+  }
+
+  // Step 1: commit inventory only in the store database. This RPC must be
+  // idempotent by request_key and must persist its operation in the same
+  // transaction as the stock decrement.
+  let stockResult;
+  let stockError;
+  // A deadlock or network timeout may happen after the database committed.
+  // Retrying the identical request_key/payload is safe because the store ledger
+  // returns the original operation instead of deducting stock a second time.
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      stockResult = await dbRequest(env, "rpc/td_pos_commit_stock", {
+        method: "POST",
+        body: JSON.stringify({ p_sale: saleInput })
+      });
+      stockError = null;
+      break;
+    } catch (error) {
+      stockError = error;
+      console.error("POS stock commit attempt failed:", attempt + 1, error);
+      const retryable = error instanceof TypeError ||
+        /deadlock|timeout|temporar|connection|network|could not serialize|configuration changed during sale/i.test(String(error?.message || ""));
+      if (!retryable || attempt >= 2) break;
+      await new Promise(resolve => setTimeout(resolve, 180 * (attempt + 1)));
+    }
+  }
+  if (stockError) {
+    return fail("تعذر تأكيد خصم المخزون بعد محاولات آمنة. أعد المحاولة بنفس عملية البيع.", 409);
+  }
+
+  if (!stockResult?.ok || !stockResult.operation_id ||
+      !Array.isArray(stockResult.items) || !stockResult.items.length) {
+    return fail("لم يؤكد نظام المخزون عملية البيع.", 409);
+  }
+
+  // Step 2: persist the immutable invoice snapshot in the independent POS DB.
+  // Retrying the same request_key must return the same invoice without
+  // touching inventory again. Never fall back to the store database.
+  const posPayload = {
+    request_key: requestKey.toLowerCase(),
+    stock_operation_id: stockResult.operation_id,
+    invoice_no: null,
+    items: stockResult.items,
+    subtotal: stockResult.subtotal,
+    discount: stockResult.discount,
+    total: stockResult.total,
+    payment_method: paymentMethod,
+    paid_amount: stockResult.total,
+    customer_name: saleInput.customer_name,
+    customer_phone: saleInput.customer_phone,
+    customer_address: saleInput.customer_address,
+    store_name: saleInput.store_name,
+    store_phone: saleInput.store_phone,
+    store_address: saleInput.store_address,
+    created_at: stockResult.created_at || new Date().toISOString()
+  };
+
+  try {
+    const saleResult = await posDbRequest(env, "rpc/td_pos_record_sale", {
+      method: "POST",
+      body: JSON.stringify({ p_sale: posPayload })
+    });
+    if (!saleResult?.ok || !saleResult.invoice_no) {
+      return json({
+        success: false,
+        pending: true,
+        requestKey,
+        error: "تم حجز/خصم المخزون، لكن لم يكتمل حفظ الفاتورة. أعد المحاولة بنفس العملية."
+      }, 202);
+    }
+    return json({ success: true, sale: saleResult });
+  } catch (error) {
+    console.error("POS invoice persistence pending:", error);
+    return json({
+      success: false,
+      pending: true,
+      requestKey,
+      error: "تم تأكيد المخزون، لكن قاعدة POS غير متاحة مؤقتاً. أعد المحاولة دون إنشاء عملية بيع جديدة."
+    }, 202);
+  }
+}
+
+async function adminListPOSSales(body, env) {
+  if (!env.POS_SUPABASE_URL || !env.POS_SUPABASE_SERVICE_ROLE_KEY) {
+    return fail("قاعدة POS غير مهيأة.", 503);
+  }
+  const requestedLimit = Number(body?.limit || 50);
+  const limit = Number.isInteger(requestedLimit) ? Math.min(100, Math.max(1, requestedLimit)) : 50;
+  // Reports use Algeria local calendar days/months, not the Worker UTC date.
+  const dateParts = Object.fromEntries(new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Africa/Algiers", year: "numeric", month: "2-digit", day: "2-digit"
+  }).formatToParts(new Date()).filter(part => part.type !== "literal").map(part => [part.type, part.value]));
+  const dayStart = new Date(dateParts.year + "-" + dateParts.month + "-" + dateParts.day + "T00:00:00+01:00");
+  const monthStart = new Date(dateParts.year + "-" + dateParts.month + "-01T00:00:00+01:00");
+  const weekStart = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+  const queryStart = new Date(Math.min(monthStart.getTime(), weekStart.getTime()));
+  const rows = await posDbRequest(
+    env,
+    "pos_sales?select=id,invoice_no,customer_name,customer_phone,customer_address,subtotal,discount,total,payment_method,paid_amount,created_at,store_name,store_phone,store_address,pos_sale_items(id,product_id,product_name,quantity,unit_price,unit_cost,line_total,is_pack,pack_snapshot)&created_at=gte." + encodeURIComponent(queryStart.toISOString()) + "&order=created_at.desc&limit=1000"
+  );
+  const allSales = Array.isArray(rows) ? rows : [];
+  const sales = allSales.slice(0, limit);
+  const now = Date.now();
+  const dayMs = dayStart.getTime();
+  const weekMs = now - 7 * 24 * 60 * 60 * 1000;
+  const monthMs = monthStart.getTime();
+  const summary = {
+    today: { count: 0, sales: 0, profit: 0 },
+    week: { count: 0, sales: 0, profit: 0 },
+    month: { count: 0, sales: 0, profit: 0 }
+  };
+  for (const sale of allSales) {
+    const stamp = Date.parse(sale.created_at || "");
+    if (!Number.isFinite(stamp)) continue;
+    const saleTotal = Number(sale.total) || 0;
+    const discount = Number(sale.discount) || 0;
+    const itemMargin = (Array.isArray(sale.pos_sale_items) ? sale.pos_sale_items : []).reduce((sum, item) =>
+      sum + ((Number(item.unit_price) || 0) - (Number(item.unit_cost) || 0)) * (Number(item.quantity) || 0), 0);
+    const profit = itemMargin - discount;
+    for (const [key, since] of [["today", dayMs], ["week", weekMs], ["month", monthMs]]) {
+      if (stamp >= since) {
+        summary[key].count++;
+        summary[key].sales += saleTotal;
+        summary[key].profit += profit;
+      }
+    }
+  }
+  return json({ success: true, sales, summary, limit });
+}
+
+async function adminRecoverPendingStoreSales(body, env) {
+  if (!env.POS_SUPABASE_URL || !env.POS_SUPABASE_SERVICE_ROLE_KEY) {
+    return fail("قاعدة POS غير مهيأة.", 503);
+  }
+
+  // Keyset pagination prevents older orphaned invoices from being hidden by
+  // a fixed latest-500 window. The caller persists this cursor between runs.
+  const cursor = body?.cursor || null;
+  if (cursor && (
+    typeof cursor !== "object" ||
+    !Number.isFinite(Date.parse(cursor.created_at || "")) ||
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(cursor.operation_id || ""))
+  )) return fail("مؤشر استعادة الفواتير غير صالح.", 400);
+
+  let cursorFilter = "";
+  if (cursor) {
+    const stamp = encodeURIComponent(cursor.created_at);
+    cursorFilter = "&or=(created_at.gt." + stamp +
+      ",and(created_at.eq." + stamp + ",operation_id.gt." + cursor.operation_id + "))";
+  }
+  const operations = await dbRequest(
+    env,
+    "td_pos_stock_operations?select=operation_id,request_key,request_payload,canonical_items,subtotal,discount,total,created_at&order=created_at.asc,operation_id.asc&limit=500" + cursorFilter
+  );
+  const rows = Array.isArray(operations) ? operations : [];
+  if (!rows.length) return json({ success: true, recovered: [], pending: 0, done: true, nextCursor: null, scanned: 0 });
+
+  const operationIds = rows.map(row => row.operation_id).filter(Boolean);
+  const recorded = new Set();
+  for (let offset = 0; offset < operationIds.length; offset += 100) {
+    const batch = operationIds.slice(offset, offset + 100);
+    const existing = await posDbRequest(
+      env,
+      "pos_sales?select=stock_operation_id&stock_operation_id=in.(" + batch.join(",") + ")"
+    );
+    for (const row of (Array.isArray(existing) ? existing : [])) {
+      recorded.add(String(row.stock_operation_id));
+    }
+  }
+
+  const recovered = [];
+  let lastScanned = cursor;
+  let blocked = false;
+  let processedOrphans = 0;
+
+  for (const operation of rows) {
+    if (!operation.operation_id || !operation.request_key) {
+      blocked = true;
+      break;
+    }
+
+    if (!recorded.has(String(operation.operation_id))) {
+      const original = operation.request_payload || {};
+      const payload = {
+        request_key: operation.request_key,
+        stock_operation_id: operation.operation_id,
+        invoice_no: null,
+        items: operation.canonical_items,
+        subtotal: operation.subtotal,
+        discount: operation.discount,
+        total: operation.total,
+        payment_method: original.payment_method || "cash",
+        paid_amount: operation.total,
+        customer_name: original.customer_name || "",
+        customer_phone: original.customer_phone || "",
+        customer_address: original.customer_address || "",
+        store_name: original.store_name || "Thier Décor",
+        store_phone: original.store_phone || "",
+        store_address: original.store_address || "",
+        created_at: operation.created_at
+      };
+      try {
+        const result = await posDbRequest(env, "rpc/td_pos_record_sale", {
+          method: "POST",
+          body: JSON.stringify({ p_sale: payload })
+        });
+        if (!result?.ok || !result.invoice_no) {
+          blocked = true;
+          break;
+        }
+        recovered.push({ invoice_no: result.invoice_no, operation_id: operation.operation_id });
+        processedOrphans++;
+      } catch (error) {
+        console.error("POS pending invoice recovery failed:", operation.operation_id, error);
+        blocked = true;
+        break;
+      }
+    }
+
+    lastScanned = { created_at: operation.created_at, operation_id: operation.operation_id };
+    if (processedOrphans >= 50) break;
+  }
+
+  const done = !blocked && processedOrphans < 50 && rows.length < 500;
+  return json({
+    success: true,
+    recovered,
+    pending: blocked ? 1 : 0,
+    blocked,
+    done,
+    nextCursor: done ? null : lastScanned,
+    scanned: rows.length
+  });
+}
 async function adminDeleteOrder(body, env) {
   const id = positiveId(body.id, "معرّف الطلبية");
   const result = await dbRequest(env, "rpc/td_admin_delete_order", { method: "POST", body: JSON.stringify({ p_order_id: id }) });
@@ -1522,6 +1828,9 @@ async function handleRequest(request, env) {
         case "adminCouponUsage":
         case "adminMigrateLegacyImages":
         case "adminNotifyCustomerProductAvailable":
+        case "adminCreateStoreSale":
+        case "adminListPOSSales":
+        case "adminRecoverPendingStoreSales":
         case "adminDeleteOrder":
         case "adminEditOrder":
         case "adminVisitStats": {
@@ -1531,6 +1840,9 @@ async function handleRequest(request, env) {
           if (action === "listAdminData") return await listAdminData(env);
           if (action === "updateOrderStatus") return await updateOrderStatus(body, env);
           if (action === "adminNotifyCustomerProductAvailable") return await adminNotifyCustomerProductAvailable(body, env);
+          if (action === "adminCreateStoreSale") return await adminCreateStoreSale(body, env, request);
+          if (action === "adminListPOSSales") return await adminListPOSSales(body, env);
+          if (action === "adminRecoverPendingStoreSales") return await adminRecoverPendingStoreSales(body, env);
           if (action === "adminDeleteOrder") return await adminDeleteOrder(body, env);
           if (action === "adminEditOrder") return await adminEditOrder(body, env);
           if (action === "adminVisitStats") return await adminVisitStats(env);

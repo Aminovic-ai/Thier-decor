@@ -2061,3 +2061,191 @@ a { text-underline-offset: 3px; }
     display: none !important;
   }
 }
+
+/* POS — professional responsive point-of-sale layout */
+#screen-admin #sec-pos.pos-admin-section { max-width: 1500px; margin-inline: auto; }
+#screen-admin .pos-page-heading { display:flex; align-items:center; gap:15px; margin:0 0 20px; padding:19px 21px; border:1px solid #dbeafe; border-radius:17px; background:linear-gradient(115deg,#fff 0%,#f0f9ff 100%); }
+#screen-admin .pos-heading-icon { width:52px; height:52px; flex:0 0 52px; display:grid; place-items:center; border-radius:15px; background:#dbeafe; color:#0369a1; font-size:1.35rem; }
+#screen-admin .pos-eyebrow { display:block; margin-bottom:4px; color:#0284c7; font-size:.68rem; font-weight:900; letter-spacing:1.1px; }
+#screen-admin .pos-page-heading h2 { margin:0; color:#0f172a; font-size:1.22rem; font-weight:900; }
+#screen-admin .pos-page-heading p { margin:5px 0 0; color:#64748b; font-size:.82rem; }
+#screen-admin .pos-layout { display:grid; grid-template-columns:minmax(0,1.65fr) minmax(310px,.9fr); grid-template-areas:"products cart"; gap:18px; align-items:start; direction:rtl; }
+#screen-admin .pos-products-panel { grid-area:products; min-width:0; padding:20px; }
+#screen-admin .pos-cart-panel { grid-area:cart; min-width:0; padding:20px; position:sticky; top:92px; }
+#screen-admin .pos-panel-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:15px; padding-bottom:13px; border-bottom:1px solid #eaf2f8; }
+#screen-admin .pos-panel-heading h3 { margin:0; color:#0f172a; font-size:1.02rem; font-weight:900; }
+#screen-admin .pos-panel-heading p { margin:4px 0 0; color:#64748b; font-size:.77rem; }
+#screen-admin .pos-panel-icon { width:39px; height:39px; flex:0 0 39px; display:grid; place-items:center; border-radius:12px; background:#eff8ff; color:#0284c7; }
+#screen-admin .pos-search-wrap { display:flex; align-items:center; gap:10px; min-height:46px; margin-bottom:14px; padding:0 13px; border:1px solid #dbeafe; border-radius:11px; background:#f8fcff; color:#64748b; }
+#screen-admin .pos-search-wrap:focus-within { border-color:#38bdf8; box-shadow:0 0 0 3px rgba(56,189,248,.12); }
+#screen-admin .pos-search-wrap input { width:100%; min-width:0; min-height:42px; padding:8px 0; border:0; outline:0; box-shadow:none; background:transparent; }
+#screen-admin .pos-search-wrap input:focus { border:0; outline:0; box-shadow:none; }
+#screen-admin .pos-products-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(145px,1fr)); gap:12px; }
+#screen-admin .pos-cart-content { min-height:75px; }
+#screen-admin .pos-checkout-fields { display:grid; grid-template-columns:1fr; gap:7px; margin-top:15px; padding-top:14px; border-top:1px solid #eaf2f8; }
+#screen-admin .pos-checkout-fields label { color:#475569; font-size:.82rem; font-weight:800; }
+#screen-admin .pos-checkout-fields input, #screen-admin .pos-checkout-fields select { width:100%; min-height:43px; padding:9px 11px; border:1px solid #dbeafe; border-radius:10px; background:#fff; }
+#screen-admin .pos-total { margin:16px 0 13px; padding:14px; border:1px solid #bfdbfe; border-radius:12px; background:#eff8ff; color:#075985; font-size:1.12rem; font-weight:900; text-align:center; }
+#screen-admin .pos-submit-button { width:100%; min-height:48px; display:flex; align-items:center; justify-content:center; gap:9px; border-radius:11px; font-weight:900; }
+#screen-admin .pos-stock-note { display:flex; align-items:center; justify-content:center; gap:7px; margin:11px 0 0; color:#64748b; font-size:.75rem; text-align:center; }
+@media(max-width:900px) {
+  #screen-admin .pos-layout { grid-template-columns:minmax(0,1.35fr) minmax(275px,.9fr); gap:12px; }
+  #screen-admin .pos-products-panel, #screen-admin .pos-cart-panel { padding:15px; }
+}
+@media(max-width:700px) {
+  #screen-admin .pos-page-heading { padding:15px; margin-bottom:13px; }
+  #screen-admin .pos-layout { grid-template-columns:minmax(0,1fr); grid-template-areas:"products" "cart"; gap:13px; }
+  #screen-admin .pos-products-panel, #screen-admin .pos-cart-panel { position:static; padding:14px; }
+  #screen-admin .pos-products-grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:9px; }
+  #screen-admin .pos-panel-heading { margin-bottom:12px; }
+  #screen-admin .pos-page-heading p { line-height:1.5; }
+}
+@media(max-width:360px) {
+  #screen-admin .pos-products-grid { grid-template-columns:minmax(0,1fr); }
+}
+
+
+/* POS customer details on invoice */
+#screen-admin .pos-customer-fields { display:grid; grid-template-columns:1fr; gap:7px; margin:12px 0 16px; padding:13px; border:1px solid #dbeafe; border-radius:12px; background:#f8fcff; }
+#screen-admin .pos-customer-fields-heading { display:grid; grid-template-columns:auto 1fr; align-items:center; column-gap:8px; margin-bottom:4px; color:#075985; }
+#screen-admin .pos-customer-fields-heading i { grid-row:span 2; font-size:1.15rem; }
+#screen-admin .pos-customer-fields-heading strong { font-size:.86rem; }
+#screen-admin .pos-customer-fields-heading small { color:#64748b; font-size:.7rem; }
+#screen-admin .pos-customer-fields label { margin-top:3px; color:#475569; font-size:.78rem; font-weight:800; }
+#screen-admin .pos-customer-fields input, #screen-admin .pos-customer-fields textarea { width:100%; min-width:0; padding:10px 11px; border:1px solid #dbeafe; border-radius:9px; background:#fff; font:inherit; font-size:.84rem; }
+#screen-admin .pos-customer-fields textarea { resize:vertical; min-height:58px; }
+#screen-admin .pos-customer-fields input:focus, #screen-admin .pos-customer-fields textarea:focus { border-color:#38bdf8; outline:0; box-shadow:0 0 0 3px rgba(56,189,248,.12); }
+
+
+/* POS — customer details are kept near the top, before the product list. */
+#screen-admin .pos-customer-panel { margin:0 0 16px; padding:15px 18px; border:1px solid #dbeafe; border-radius:15px; background:linear-gradient(120deg,#fff 0%,#f5fbff 100%); }
+#screen-admin .pos-customer-fields { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px 13px; align-items:end; margin:0; padding:0; border:0; background:transparent; }
+#screen-admin .pos-customer-fields-heading { grid-column:1/-1; display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin:0 0 2px; }
+#screen-admin .pos-customer-fields-heading small { margin-inline-start:auto; font-size:.73rem; }
+#screen-admin .pos-customer-field { display:flex; flex-direction:column; gap:6px; min-width:0; }
+#screen-admin .pos-customer-field label { margin:0; color:#334155; font-size:.8rem; font-weight:800; }
+#screen-admin .pos-customer-field input,
+#screen-admin .pos-customer-field textarea { width:100%; min-width:0; min-height:43px; padding:9px 12px; border:1px solid #d7e5f2; border-radius:10px; background:#fff; color:#0f172a; font:inherit; font-size:.86rem; box-sizing:border-box; }
+#screen-admin .pos-customer-field textarea { min-height:43px; height:43px; resize:vertical; }
+#screen-admin .pos-customer-field input:focus,
+#screen-admin .pos-customer-field textarea:focus { border-color:#38bdf8; outline:0; box-shadow:0 0 0 3px rgba(56,189,248,.12); }
+@media(max-width:700px) {
+  #screen-admin .pos-customer-panel { margin-bottom:13px; padding:13px; }
+  #screen-admin .pos-customer-fields { grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+  #screen-admin .pos-customer-fields-heading { align-items:flex-start; }
+  #screen-admin .pos-customer-fields-heading small { flex-basis:100%; margin:0; }
+  #screen-admin .pos-customer-address-field { grid-column:1/-1; }
+}
+@media(max-width:380px) {
+  #screen-admin .pos-customer-fields { grid-template-columns:minmax(0,1fr); }
+  #screen-admin .pos-customer-address-field { grid-column:auto; }
+}
+
+
+/* POS usability: cart first on mobile, category filters, cleaner cart rows. */
+#screen-admin .pos-cart-panel { border:1px solid #cfe5f7; box-shadow:0 8px 24px rgba(15,80,130,.06); }
+#screen-admin .pos-cart-panel .pos-panel-heading { margin-bottom:10px; }
+#screen-admin .pos-cart-count { display:inline-flex; align-items:center; justify-content:center; min-width:25px; height:25px; padding:0 7px; border-radius:20px; background:#dbeafe; color:#075985; font-size:.75rem; font-weight:900; }
+#screen-admin .pos-category-filters { display:flex; gap:8px; overflow-x:auto; padding:2px 1px 12px; margin-bottom:4px; scrollbar-width:thin; }
+#screen-admin .pos-category-chip { flex:0 0 auto; display:inline-flex; align-items:center; gap:7px; min-height:37px; padding:7px 13px; border:1px solid #dbe5ef; border-radius:22px; background:#fff; color:#334155; font:inherit; font-size:.78rem; font-weight:800; cursor:pointer; }
+#screen-admin .pos-category-chip span { display:inline-grid; place-items:center; min-width:19px; height:19px; padding:0 4px; border-radius:12px; background:#f1f5f9; color:#64748b; font-size:.68rem; }
+#screen-admin .pos-category-chip.active { border-color:#0284c7; background:#eaf6ff; color:#075985; }
+#screen-admin .pos-category-chip.active span { background:#cfeaff; color:#075985; }
+#screen-admin .pos-product-card { display:flex !important; flex-direction:column; gap:6px; width:100%; min-width:0; text-align:start; padding:10px !important; border:1px solid #e2edf6; border-radius:13px; background:#fff; cursor:pointer; }
+#screen-admin .pos-product-image { display:grid; place-items:center; width:100%; height:104px; overflow:hidden; border-radius:9px; background:#f1f8fd; color:#94a3b8; }
+#screen-admin .pos-product-image img { width:100%; height:100%; object-fit:cover; }
+#screen-admin .pos-product-card strong { font-size:.82rem; line-height:1.4; }
+#screen-admin .pos-product-card small { color:#64748b; font-size:.72rem; }
+#screen-admin .pos-cart-line { display:grid; grid-template-columns:minmax(0,1fr) auto auto; align-items:center; gap:9px; padding:11px 0; border-bottom:1px solid #edf2f7; }
+#screen-admin .pos-cart-line-info { display:flex; flex-direction:column; gap:4px; min-width:0; }
+#screen-admin .pos-cart-line-info strong { font-size:.82rem; overflow-wrap:anywhere; }
+#screen-admin .pos-cart-line-info small { color:#64748b; font-size:.7rem; }
+#screen-admin .pos-cart-line-actions { display:flex; align-items:center; gap:7px; white-space:nowrap; }
+#screen-admin .pos-qty-button { display:inline-grid; place-items:center; width:29px; height:29px; border:1px solid #dbeafe; border-radius:8px; background:#f5faff; color:#0369a1; font-size:1.05rem; font-weight:900; }
+#screen-admin .pos-cart-line-total { color:#075985; font-size:.77rem; white-space:nowrap; }
+#screen-admin .pos-empty-cart, #screen-admin .pos-empty-products { padding:17px 10px; color:#64748b; text-align:center; font-size:.8rem; }
+@media(max-width:700px) {
+ #screen-admin .pos-layout { grid-template-areas:"cart" "products"; }
+ #screen-admin .pos-cart-panel { order:-1; }
+ #screen-admin .pos-cart-line { grid-template-columns:minmax(0,1fr) auto; }
+ #screen-admin .pos-cart-line-total { grid-column:1/-1; text-align:end; }
+ #screen-admin .pos-product-image { height:90px; }
+}
+
+
+/* POS mobile: compact product cards matching the live storefront. */
+#screen-admin .pos-category-filters {
+  display:flex !important;
+  flex-wrap:nowrap !important;
+  gap:8px !important;
+  overflow-x:auto !important;
+  padding:4px 1px 10px !important;
+  margin:0 0 8px !important;
+  -webkit-overflow-scrolling:touch;
+}
+#screen-admin .pos-category-chip {
+  flex:0 0 auto !important;
+  min-height:34px !important;
+  padding:6px 11px !important;
+  border-radius:20px !important;
+  font-size:.76rem !important;
+}
+#screen-admin .pos-products-grid {
+  display:grid !important;
+  grid-template-columns:repeat(2,minmax(0,1fr)) !important;
+  align-items:start !important;
+  gap:10px !important;
+}
+#screen-admin .pos-product-card {
+  display:flex !important;
+  flex-direction:column !important;
+  min-width:0 !important;
+  min-height:0 !important;
+  height:auto !important;
+  gap:6px !important;
+  padding:8px !important;
+  overflow:hidden !important;
+  border-radius:12px !important;
+}
+#screen-admin .pos-product-image {
+  display:flex !important;
+  align-items:center !important;
+  justify-content:center !important;
+  width:100% !important;
+  height:112px !important;
+  min-height:112px !important;
+  max-height:112px !important;
+  padding:5px !important;
+  background:#f1f5f8 !important;
+  border-radius:9px !important;
+  overflow:hidden !important;
+}
+#screen-admin .pos-product-image img {
+  display:block !important;
+  width:100% !important;
+  height:100% !important;
+  max-width:100% !important;
+  max-height:100% !important;
+  object-fit:contain !important;
+  object-position:center !important;
+}
+#screen-admin .pos-product-card strong {
+  display:-webkit-box !important;
+  -webkit-box-orient:vertical !important;
+  -webkit-line-clamp:2 !important;
+  min-height:2.6em !important;
+  overflow:hidden !important;
+  font-size:.82rem !important;
+  line-height:1.3 !important;
+}
+#screen-admin .pos-product-card small {
+  font-size:.72rem !important;
+  line-height:1.35 !important;
+}
+@media(max-width:380px) {
+  #screen-admin .pos-product-image {
+    height:96px !important;
+    min-height:96px !important;
+    max-height:96px !important;
+  }
+}
