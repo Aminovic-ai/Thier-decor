@@ -1290,7 +1290,8 @@ async function adminCreateStoreSale(body, env, request) {
   if (!["cash", "transfer", "card", "other"].includes(paymentMethod)) {
     return fail("طريقة الدفع غير صالحة.");
   }
-  const requestKey = crypto.randomUUID();
+  const requestKey = String(body.requestKey || "");
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(requestKey)) return fail("مفتاح عملية البيع غير صالح.");
   const result = await dbRequest(env, "rpc/td_admin_create_store_sale", {
     method: "POST",
     body: JSON.stringify({
