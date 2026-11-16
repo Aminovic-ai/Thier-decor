@@ -1292,6 +1292,13 @@ async function adminCreateStoreSale(body, env, request) {
   }
   const requestKey = String(body.requestKey || "");
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(requestKey)) return fail("مفتاح عملية البيع غير صالح.");
+  const cleanText = (value, max) => String(value || "").trim().slice(0, max);
+  const customerName = cleanText(body.customerName, 120);
+  const customerPhone = cleanText(body.customerPhone, 40);
+  const customerAddress = cleanText(body.customerAddress, 300);
+  const storeName = cleanText(body.storeName, 120) || "Thier Décor";
+  const storePhone = cleanText(body.storePhone, 40);
+  const storeAddress = cleanText(body.storeAddress, 300);
   const result = await dbRequest(env, "rpc/td_admin_create_store_sale", {
     method: "POST",
     body: JSON.stringify({
@@ -1300,6 +1307,12 @@ async function adminCreateStoreSale(body, env, request) {
         items: cleanItems,
         discount,
         payment_method: paymentMethod,
+        customer_name: customerName,
+        customer_phone: customerPhone,
+        customer_address: customerAddress,
+        store_name: storeName,
+        store_phone: storePhone,
+        store_address: storeAddress,
         cashier_uid: ""
       }
     })
