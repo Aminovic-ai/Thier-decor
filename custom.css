@@ -2540,3 +2540,19 @@ a { text-underline-offset: 3px; }
   color:#fff!important;
   background:linear-gradient(135deg,#10b981,#047857)!important;
 }
+
+
+/* A4 invoice download action in POS history */
+#screen-admin .pos-invoice-download-btn{
+ display:inline-flex;align-items:center;justify-content:center;gap:7px;
+ min-height:36px;padding:7px 11px;border:1px solid #bfdbfe;border-radius:10px;
+ background:linear-gradient(135deg,#eff6ff,#dbeafe);color:#1d4ed8;
+ font-size:.78rem;font-weight:900;white-space:nowrap;cursor:pointer;
+ transition:transform .15s ease,box-shadow .15s ease;
+}
+#screen-admin .pos-invoice-download-btn:hover{
+ transform:translateY(-1px);box-shadow:0 5px 12px rgba(37,99,235,.15);
+ background:linear-gradient(135deg,#dbeafe,#bfdbfe);
+}
+#screen-admin .pos-invoice-download-btn i{color:#dc2626}
+#screen-admin .pos-invoice-table td{vertical-align:middle}
