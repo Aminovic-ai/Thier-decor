@@ -1389,10 +1389,10 @@ async function loadOrdersListener(options = {}) {
             }
         })();
 
-        await Promise.all([productsTask, settingsTask]);
+        // Render the catalog immediately when products arrive. Do not make the
+        // storefront wait for the independent public-settings Worker request.
+        await productsTask;
 
-        // Paint the correct audience-specific catalog as soon as public data is ready.
-        // Customer-private orders/profile data must never delay storefront rendering.
         if (!catalogLoading) {
             renderCategories();
             renderShop();
@@ -1405,6 +1405,9 @@ async function loadOrdersListener(options = {}) {
                 renderAdminProductCategories();
             }
         }
+
+        // Settings can finish afterwards; their own task updates the banner and branding.
+        await settingsTask;
         
         const currentFirebaseUser = Boolean(window.firebaseReady && typeof firebase !== 'undefined' && firebase.auth && firebase.auth().currentUser);
         const isFirebaseAdmin = currentFirebaseUser && firebase.auth().currentUser.uid === TD_ADMIN_UID;
@@ -2019,7 +2022,7 @@ function renderShopHTML(list) {
         cards.push({ product, variants: variants.length ? variants : [product] });
     });
 
-    c.innerHTML = cards.map(({ product: p, variants }) => {
+    c.innerHTML = cards.map(({ product: p, variants }, cardIndex) => {
         const productImages = getProductImages(p);
         const imageSrc = productImages[0] && productImages[0].length > 10 ? esc(productImages[0]) : null;
         const promoPrice = effectiveProductPrice(p);
@@ -2031,7 +2034,7 @@ function renderShopHTML(list) {
 
         return `<div class="product-card" onclick="showProductView(${p.id})">
             <div class="product-img">
-                ${imageSrc ? `<img src="${imageSrc}" loading="lazy" alt="${esc(p.name)}" onerror="this.onerror=null; this.parentElement.innerHTML='<i class=\\'fas fa-image\\' style=\\'color:#cbd5e1;font-size:2rem;\\'></i>';">` : '<i class="fas fa-image" style="color:#cbd5e1;font-size:2rem;"></i>'}
+                ${imageSrc ? `<img src="${imageSrc}" loading="${cardIndex < 4 ? 'eager' : 'lazy'}" fetchpriority="${cardIndex < 2 ? 'high' : 'auto'}" decoding="async" alt="${esc(p.name)}" onerror="this.onerror=null; this.parentElement.innerHTML='<i class=\\'fas fa-image\\' style=\\'color:#cbd5e1;font-size:2rem;\\'></i>';">` : '<i class="fas fa-image" style="color:#cbd5e1;font-size:2rem;"></i>'}
                 ${variantBadge}
             </div>
             <div class="product-actions-under-image">
