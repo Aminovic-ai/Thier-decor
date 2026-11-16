@@ -1430,7 +1430,7 @@ async function adminRecoverPendingStoreSales(env) {
 
   const operations = await dbRequest(
     env,
-    "td_pos_stock_operations?select=operation_id,request_key,request_payload,canonical_items,subtotal,discount,total,created_at&order=created_at.asc&limit=100"
+    "td_pos_stock_operations?select=operation_id,request_key,request_payload,canonical_items,subtotal,discount,total,created_at&order=created_at.desc&limit=1000"
   );
   const rows = Array.isArray(operations) ? operations : [];
   if (!rows.length) return json({ success: true, recovered: [], pending: 0 });
