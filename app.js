@@ -2746,7 +2746,7 @@ let posSelectedCategory = 'all';
 
 const posTranslations = {
  ar: {
-  heading:'البيع من المحل', intro:'اختر المنتجات، راجع السلة، ثم أكّد عملية البيع',
+  heading:'البيع من المحل', intro:'اختر المنتجات، راجع السلة، ثم أكّد عملية البيع', backToWebsite:'إدارة الموقع', language:'FR',
   customerPanel:'معلومات العميل للفاتورة', optional:'اختياري — اترك الحقول فارغة إذا كان البيع دون بيانات عميل',
   customerName:'اسم العميل', customerPhone:'رقم الهاتف', address:'العنوان', customerAddress:'عنوان العميل',
   products:'المنتجات', searchProducts:'ابحث واختر المنتجات لإضافتها إلى البيع', searchPlaceholder:'ابحث باسم المنتج...',
@@ -2774,7 +2774,7 @@ const posTranslations = {
   recoverError:'تعذرت استعادة الفواتير:', noData:'لا توجد بيانات'
  },
  fr: {
-  heading:'Vente', intro:'Choisissez les produits, vérifiez le panier, puis confirmez la vente.',
+  heading:'Vente', intro:'Choisissez les produits, vérifiez le panier, puis confirmez la vente.', backToWebsite:'Administration du site', language:'AR',
   customerPanel:'Informations client pour la facture', optional:'Facultatif — laissez les champs vides pour une vente sans coordonnées client.',
   customerName:'Nom du client', customerPhone:'Téléphone', address:'Adresse', customerAddress:'Adresse du client',
   products:'Produits', searchProducts:'Recherchez et choisissez les produits à ajouter à la vente.',
