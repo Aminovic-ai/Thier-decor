@@ -24,7 +24,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&family=Tajawal:wght@400;700;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="style.css?v=41">
-    <link rel="stylesheet" href="custom.css?v=59">
+    <link rel="stylesheet" href="custom.css?v=60">
     <style>
         #guest-register-cta{margin:18px auto 22px;padding:clamp(18px,3vw,28px);max-width:1180px;border:1px solid #bfdbfe;border-radius:18px;background:linear-gradient(120deg,#eff6ff 0%,#f8fbff 55%,#e0f2fe 100%);box-shadow:0 8px 24px rgba(37,99,235,.09);display:flex;align-items:center;justify-content:space-between;gap:18px}
         #guest-register-cta .guest-cta-copy{min-width:0}
@@ -183,6 +183,15 @@
     </div>
 
     <div class="screen" id="screen-admin">
+        <section id="admin-area-hub" class="admin-area-hub" aria-label="Thier Décor administration">
+            <div class="admin-hub-brand"><img src="icon.png" alt="Thier Décor"><div><strong>THIER DÉCOR</strong><span>ESPACE DE GESTION</span></div></div>
+            <div class="admin-hub-heading"><span class="admin-hub-eyebrow">THIER DÉCOR</span><h1 id="admin-hub-title">مرحباً بك في لوحة التحكم</h1><p id="admin-hub-subtitle">اختر المساحة التي تريد إدارتها</p></div>
+            <div class="admin-hub-cards">
+                <button type="button" class="admin-hub-card admin-hub-site" onclick="openAdminArea('dashboard')"><span class="admin-hub-card-icon"><i class="fas fa-globe"></i></span><span class="admin-hub-card-copy"><strong id="admin-hub-site-title">إدارة الموقع</strong><small id="admin-hub-site-desc">المنتجات والطلبات والزبائن وإعدادات المتجر</small></span><span class="admin-hub-arrow"><i class="fas fa-arrow-left"></i></span></button>
+                <button type="button" class="admin-hub-card admin-hub-pos" onclick="openAdminArea('pos')"><span class="admin-hub-card-icon"><i class="fas fa-cash-register"></i></span><span class="admin-hub-card-copy"><strong id="admin-hub-pos-title">إدارة المحل</strong><small id="admin-hub-pos-desc">البيع المباشر وسجل الفواتير وتقارير الأرباح</small></span><span class="admin-hub-arrow"><i class="fas fa-arrow-left"></i></span></button>
+            </div>
+            <div class="admin-hub-footer"><button type="button" onclick="switchLanguage(state.currentLang === 'ar' ? 'fr' : 'ar')"><i class="fas fa-language"></i><span id="admin-hub-language">Français</span></button><button type="button" onclick="adminLogout()"><i class="fas fa-sign-out-alt"></i><span id="admin-hub-logout">خروج</span></button></div>
+        </section>
         <div class="admin-layout">
             <aside class="admin-sidebar">
                 <div class="admin-brand"><div class="logo-icon has-brand-image"><img class="brand-logo-image" src="icon.png" alt="Thier Décor"></div> <span>Admin</span></div>
@@ -208,11 +217,11 @@
             <main class="admin-content">
                 <header class="admin-header">
                     <h2 id="admin-page-title">الملخص</h2>
-                    <div class="admin-header-actions"><button type="button" class="btn-primary admin-manual-refresh" onclick="adminRefreshAll()" style="width:auto;padding:9px 12px;" title="تحديث البيانات"><i class="fas fa-sync-alt" id="admin-refresh-icon"></i> <span data-i18n="refresh">تحديث</span></button><button type="button" class="admin-store-quick" onclick="goScreen('screen-shop'); updateUIBasedOnSession();"><i class="fas fa-store"></i><span data-i18n="show_store">المتجر</span></button><button type="button" class="btn-icon notification-bell" onclick="openAdminNotifications()" title="Notifications" aria-label="Notifications"><i class="fas fa-bell"></i><span id="admin-notification-badge" class="nav-badge" style="display:none;">0</span></button><button type="button" onclick="switchLanguage(state.currentLang === 'ar' ? 'fr' : 'ar')" class="btn-icon admin-language-button" aria-label="Language"><i class="fas fa-globe"></i></button></div>
+                    <div class="admin-header-actions"><button type="button" class="btn-icon admin-hub-return" onclick="showAdminHub()" title="العودة لاختيار الإدارة"><i class="fas fa-th-large"></i><span id="admin-hub-return-label">اختيار الإدارة</span></button><button type="button" class="btn-primary admin-manual-refresh" onclick="adminRefreshAll()" style="width:auto;padding:9px 12px;" title="تحديث البيانات"><i class="fas fa-sync-alt" id="admin-refresh-icon"></i> <span data-i18n="refresh">تحديث</span></button><button type="button" class="admin-store-quick" onclick="goScreen('screen-shop'); updateUIBasedOnSession();"><i class="fas fa-store"></i><span data-i18n="show_store">المتجر</span></button><button type="button" class="btn-icon notification-bell" onclick="openAdminNotifications()" title="Notifications" aria-label="Notifications"><i class="fas fa-bell"></i><span id="admin-notification-badge" class="nav-badge" style="display:none;">0</span></button><button type="button" onclick="switchLanguage(state.currentLang === 'ar' ? 'fr' : 'ar')" class="btn-icon admin-language-button" aria-label="Language"><i class="fas fa-globe"></i></button></div>
                 </header>
 
                 <section class="admin-section pos-admin-section" id="sec-pos" style="display:none;">
-                    <div class="pos-workspace-topbar"><div class="pos-workspace-brand"><span class="pos-workspace-brand-icon"><i class="fas fa-cash-register"></i></span><div><strong>THIER DÉCOR</strong><small>POINT OF SALE</small></div></div><div class="pos-workspace-actions"><button type="button" class="pos-view-tab active" data-pos-view="sale" aria-pressed="true" onclick="setPOSView('sale')"><i class="fas fa-cash-register"></i><span data-pos-i18n="saleTab">البيع</span></button><button type="button" class="pos-view-tab" data-pos-view="reports" aria-pressed="false" onclick="setPOSView('reports')"><i class="fas fa-chart-line"></i><span data-pos-i18n="reportsTab">سجل الفواتير والتقارير</span></button><button type="button" class="pos-workspace-site-btn" onclick="adminGo('dashboard')"><i class="fas fa-globe"></i><span data-pos-i18n="backToWebsite">إدارة الموقع</span></button><button type="button" class="pos-workspace-language-btn" onclick="switchLanguage(state.currentLang === 'ar' ? 'fr' : 'ar')" aria-label="Language"><i class="fas fa-language"></i><span data-pos-i18n="language">FR</span></button><button type="button" class="pos-workspace-exit-btn" onclick="adminLogout()" title="خروج"><i class="fas fa-sign-out-alt"></i></button></div></div>
+                    <div class="pos-workspace-topbar"><div class="pos-workspace-brand"><span class="pos-workspace-brand-icon"><i class="fas fa-cash-register"></i></span><div><strong>THIER DÉCOR</strong><small>POINT OF SALE</small></div></div><div class="pos-workspace-actions"><button type="button" class="pos-view-tab active" data-pos-view="sale" aria-pressed="true" onclick="setPOSView('sale')"><i class="fas fa-cash-register"></i><span data-pos-i18n="saleTab">البيع</span></button><button type="button" class="pos-view-tab" data-pos-view="reports" aria-pressed="false" onclick="setPOSView('reports')"><i class="fas fa-chart-line"></i><span data-pos-i18n="reportsTab">سجل الفواتير والتقارير</span></button><button type="button" class="pos-workspace-site-btn" onclick="showAdminHub()"><i class="fas fa-th-large"></i><span data-pos-i18n="backToHub">اختيار الإدارة</span></button><button type="button" class="pos-workspace-site-btn" onclick="adminGo('dashboard')"><i class="fas fa-globe"></i><span data-pos-i18n="backToWebsite">إدارة الموقع</span></button><button type="button" class="pos-workspace-language-btn" onclick="switchLanguage(state.currentLang === 'ar' ? 'fr' : 'ar')" aria-label="Language"><i class="fas fa-language"></i><span data-pos-i18n="language">FR</span></button><button type="button" class="pos-workspace-exit-btn" onclick="adminLogout()" title="خروج"><i class="fas fa-sign-out-alt"></i></button></div></div>
                     <div id="pos-sale-view"><div class="pos-page-heading">
                         <div class="pos-heading-icon"><i class="fas fa-store"></i></div>
                         <div><span class="pos-eyebrow">THIER DÉCOR · POINT DE VENTE</span><h2 data-pos-i18n="heading">البيع من المحل</h2><p data-pos-i18n="intro">اختر المنتجات، راجع السلة، ثم أكّد عملية البيع</p></div>
@@ -581,7 +590,7 @@
     <script src="supabase-config.js"></script>
     
     <script src="https://cdn.jsdelivr.net/npm/crypto-js@4.1.1/crypto-js.min.js"></script>
-    <script src="app.js?v=69"></script>
+    <script src="app.js?v=70"></script>
     <script src="featured-products.js?v=3"></script>
     <script src="analytics-notifications.js"></script>
     <script>
