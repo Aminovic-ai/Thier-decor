@@ -214,49 +214,49 @@
                 <section class="admin-section pos-admin-section" id="sec-pos" style="display:none;">
                     <div class="pos-page-heading">
                         <div class="pos-heading-icon"><i class="fas fa-store"></i></div>
-                        <div><span class="pos-eyebrow">THIER DÉCOR · POINT DE VENTE</span><h2>البيع من المحل</h2><p>اختر المنتجات، راجع السلة، ثم أكّد عملية البيع</p></div>
+                        <div><span class="pos-eyebrow">THIER DÉCOR · POINT DE VENTE</span><h2 data-pos-i18n="heading">البيع من المحل</h2><p data-pos-i18n="intro">اختر المنتجات، راجع السلة، ثم أكّد عملية البيع</p></div>
                     </div>
                     <section class="admin-card pos-customer-panel" aria-label="معلومات العميل">
                         <div class="pos-customer-fields">
-                            <div class="pos-customer-fields-heading"><i class="fas fa-user-circle"></i><strong>معلومات العميل للفاتورة</strong><small>اختياري — اترك الحقول فارغة إذا كان البيع دون بيانات عميل</small></div>
-                            <div class="pos-customer-field"><label for="pos-customer-name">اسم العميل</label><input id="pos-customer-name" type="text" maxlength="120" autocomplete="name" placeholder="اسم العميل"></div>
-                            <div class="pos-customer-field"><label for="pos-customer-phone">رقم الهاتف</label><input id="pos-customer-phone" type="tel" maxlength="40" autocomplete="tel" placeholder="05 / 06 / 07 ..."></div>
-                            <div class="pos-customer-field pos-customer-address-field"><label for="pos-customer-address">العنوان</label><textarea id="pos-customer-address" rows="1" maxlength="300" autocomplete="street-address" placeholder="عنوان العميل"></textarea></div>
+                            <div class="pos-customer-fields-heading"><i class="fas fa-user-circle"></i><strong data-pos-i18n="customerPanel">معلومات العميل للفاتورة</strong><small data-pos-i18n="optional">اختياري — اترك الحقول فارغة إذا كان البيع دون بيانات عميل</small></div>
+                            <div class="pos-customer-field"><label for="pos-customer-name" data-pos-i18n="customerName">اسم العميل</label><input id="pos-customer-name" type="text" maxlength="120" autocomplete="name" placeholder="اسم العميل" data-pos-placeholder="customerName"></div>
+                            <div class="pos-customer-field"><label for="pos-customer-phone" data-pos-i18n="customerPhone">رقم الهاتف</label><input id="pos-customer-phone" type="tel" maxlength="40" autocomplete="tel" placeholder="05 / 06 / 07 ..."></div>
+                            <div class="pos-customer-field pos-customer-address-field"><label for="pos-customer-address" data-pos-i18n="address">العنوان</label><textarea id="pos-customer-address" rows="1" maxlength="300" autocomplete="street-address" placeholder="عنوان العميل" data-pos-placeholder="customerAddress"></textarea></div>
                         </div>
                     </section>
                     <div class="pos-layout">
                         <section class="admin-card pos-products-panel" aria-labelledby="pos-products-title">
-                            <div class="pos-panel-heading"><div><h3 id="pos-products-title">المنتجات</h3><p>ابحث واختر المنتجات لإضافتها إلى البيع</p></div><span class="pos-panel-icon"><i class="fas fa-box-open"></i></span></div>
-                            <label class="pos-search-wrap" for="pos-search"><i class="fas fa-search"></i><input id="pos-search" type="search" placeholder="ابحث باسم المنتج..." oninput="renderPOSProducts()"></label>
-                            <div id="pos-category-filters" class="pos-category-filters" aria-label="أصناف المنتجات"><button type="button" class="pos-category-chip active" aria-pressed="true" onclick="posSelectCategory(\'all\')">كل الأصناف</button></div>
+                            <div class="pos-panel-heading"><div><h3 id="pos-products-title" data-pos-i18n="products">المنتجات</h3><p data-pos-i18n="searchProducts">ابحث واختر المنتجات لإضافتها إلى البيع</p></div><span class="pos-panel-icon"><i class="fas fa-box-open"></i></span></div>
+                            <label class="pos-search-wrap" for="pos-search"><i class="fas fa-search"></i><input id="pos-search" type="search" placeholder="ابحث باسم المنتج..." data-pos-placeholder="searchPlaceholder" oninput="renderPOSProducts()"></label>
+                            <div id="pos-category-filters" class="pos-category-filters" aria-label="أصناف المنتجات"><button type="button" class="pos-category-chip active" aria-pressed="true" onclick="posSelectCategory('all')">كل الأصناف</button></div>
                             <div id="pos-products" class="pos-products-grid"></div>
                         </section>
                         <section class="admin-card pos-cart-panel" aria-labelledby="pos-cart-title">
-                            <div class="pos-panel-heading"><div><h3 id="pos-cart-title">سلة البيع</h3><p>راجع الكميات والمبلغ قبل التأكيد</p></div><span class="pos-panel-icon"><i class="fas fa-receipt"></i></span></div>
+                            <div class="pos-panel-heading"><div><h3 id="pos-cart-title" data-pos-i18n="cart">سلة البيع</h3><p data-pos-i18n="reviewCart">راجع الكميات والمبلغ قبل التأكيد</p></div><span class="pos-panel-icon"><i class="fas fa-receipt"></i></span></div>
                             <div id="pos-cart" class="pos-cart-content"></div>
                             <div class="pos-checkout-fields">
-                                <label for="pos-discount">التخفيض (دج)</label>
+                                <label for="pos-discount" data-pos-i18n="discount">التخفيض (دج)</label>
                                 <input id="pos-discount" type="number" min="0" step="1" value="0" oninput="renderPOSCart()">
-                                <label for="pos-payment">طريقة الدفع</label>
-                                <select id="pos-payment"><option value="cash">نقداً</option><option value="transfer">تحويل</option><option value="card">بطاقة</option><option value="other">أخرى</option></select>
+                                <label for="pos-payment" data-pos-i18n="payment">طريقة الدفع</label>
+                                <select id="pos-payment"><option value="cash" data-pos-i18n="cash">نقداً</option><option value="transfer" data-pos-i18n="transfer">تحويل</option><option value="card" data-pos-i18n="card">بطاقة</option><option value="other" data-pos-i18n="other">أخرى</option></select>
                             </div>
                             <div id="pos-total" class="pos-total">الإجمالي: 0 دج</div>
-                            <button type="button" class="btn-icon" style="width:100%;margin:10px 0;" onclick="recoverPendingPOSSales()"><i class="fas fa-sync-alt"></i> استعادة الفواتير المعلّقة</button>
-                            <button type="button" class="btn-primary pos-submit-button" onclick="submitPOSSale()"><i class="fas fa-check-circle"></i> تأكيد البيع وطباعة الفاتورة</button>
-                            <p class="pos-stock-note"><i class="fas fa-shield-alt"></i> يتم خصم المخزون عند تأكيد البيع فقط.</p>
+                            <button type="button" class="btn-icon" style="width:100%;margin:10px 0;" onclick="recoverPendingPOSSales()"><i class="fas fa-sync-alt"></i> <span data-pos-i18n="recover">استعادة الفواتير المعلّقة</span></button>
+                            <button type="button" class="btn-primary pos-submit-button" onclick="submitPOSSale()"><i class="fas fa-check-circle"></i> <span data-pos-i18n="submit">تأكيد البيع وطباعة الفاتورة</span></button>
+                            <p class="pos-stock-note"><i class="fas fa-shield-alt"></i> <span data-pos-i18n="stockNote">يتم خصم المخزون عند تأكيد البيع فقط.</span></p>
                         </section>
                     </div>
                     <section class="admin-card pos-history-panel" aria-labelledby="pos-history-title" style="margin-top:18px;">
                         <div class="pos-panel-heading">
-                            <div><h3 id="pos-history-title">مبيعات المحل وتقارير الأرباح</h3><p>بيانات مستقلة من قاعدة POS — لا تشمل طلبيات المتجر الإلكتروني أو مصاريفه</p></div>
-                            <button type="button" class="btn-icon" onclick="refreshPOSSales()"><i class="fas fa-sync-alt"></i> تحديث</button>
+                            <div><h3 id="pos-history-title" data-pos-i18n="history">سجل الفواتير وتقارير الأرباح</h3><p data-pos-i18n="historyNote">ملخص مبيعات هذا النظام فقط.</p></div>
+                            <button type="button" class="btn-icon" onclick="refreshPOSSales()"><i class="fas fa-sync-alt"></i> <span data-pos-i18n="refresh">تحديث</span></button>
                         </div>
                         <div class="stats-grid pos-sales-summary" style="margin:14px 0;">
-                            <div class="stat-card"><span>مبيعات اليوم</span><h3 id="pos-day-sales">—</h3><small id="pos-day-profit">الربح: —</small></div>
-                            <div class="stat-card"><span>مبيعات آخر 7 أيام</span><h3 id="pos-week-sales">—</h3><small id="pos-week-profit">الربح: —</small></div>
-                            <div class="stat-card"><span>مبيعات هذا الشهر</span><h3 id="pos-month-sales">—</h3><small id="pos-month-profit">الربح: —</small></div>
+                            <div class="stat-card"><span data-pos-i18n="today">مبيعات اليوم</span><h3 id="pos-day-sales">—</h3><small id="pos-day-profit">الربح: —</small></div>
+                            <div class="stat-card"><span data-pos-i18n="week">مبيعات آخر 7 أيام</span><h3 id="pos-week-sales">—</h3><small id="pos-week-profit">الربح: —</small></div>
+                            <div class="stat-card"><span data-pos-i18n="month">مبيعات هذا الشهر</span><h3 id="pos-month-sales">—</h3><small id="pos-month-profit">الربح: —</small></div>
                         </div>
-                        <div id="pos-sales-history" class="pos-sales-history"><p style="text-align:center;color:var(--text-mid);padding:18px;">اضغط تحديث لعرض آخر الفواتير.</p></div>
+                        <div id="pos-sales-history" class="pos-sales-history"><p style="text-align:center;color:var(--text-mid);padding:18px;" data-pos-i18n="loadInvoices">اضغط تحديث لعرض آخر الفواتير.</p></div>
                     </section>
                 </section>
                 <section class="admin-section active" id="sec-dashboard" style="display:block;">
