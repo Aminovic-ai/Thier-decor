@@ -2949,16 +2949,17 @@ function renderPOSSalesRows(rows, append = false) {
  }else target.innerHTML=htmlRows?tableHead+htmlRows+'</tbody></table></div>':'<p style="text-align:center;color:var(--text-mid);padding:18px;">'+posText('noInvoices')+'</p>';
 }
 async function downloadPOSSaleInvoice(saleId){
+ const popup=window.open('about:blank','_blank','width=760,height=800');
+ if(!popup){toast(posText('allowPrint'),'error');return;}
  try{
+  popup.document.write('<!doctype html><html><head><meta charset="utf-8"><title>...</title></head><body style="font-family:Arial;padding:30px;text-align:center;">'+(state.currentLang==='fr'?'Chargement de la facture...':'جارٍ تحميل الفاتورة...')+'</body></html>');
   const result=await callAdminWorker('adminGetPOSSaleInvoice',{id:String(saleId)});
   const sale=result.sale;
   if(!sale||!Array.isArray(sale.pos_sale_items)||!sale.pos_sale_items.length)throw new Error(state.currentLang==='fr'?'Les détails de la facture sont indisponibles.':'تفاصيل الفاتورة غير متاحة.');
   const items=sale.pos_sale_items.map(item=>({name:item.product_name||item.name||'—',qty:Number(item.quantity||0),price:Number(item.unit_price||0)}));
   const invoice={invoice_no:sale.invoice_no,created_at:sale.created_at,customer_name:sale.customer_name,customer_phone:sale.customer_phone,customer_address:sale.customer_address,store_name:sale.store_name||state.settings?.shopName||'Thier Décor',store_phone:sale.store_phone||state.settings?.shopPhone||'',store_address:sale.store_address||state.settings?.shopAddress||'',discount:sale.discount,total:sale.total,items};
-  const popup=window.open('about:blank','_blank','width=760,height=800');
-  if(!popup){toast(posText('allowPrint'),'error');return;}
   printPOSSale(invoice,popup);
- }catch(error){toast((state.currentLang==='fr'?'Téléchargement impossible : ':'تعذر تحميل الفاتورة: ')+(error.message||''),'error');}
+ }catch(error){try{popup.close();}catch(_){}toast((state.currentLang==='fr'?'Téléchargement impossible : ':'تعذر تحميل الفاتورة: ')+(error.message||''),'error');}
 }
 window.downloadPOSSaleInvoice=downloadPOSSaleInvoice;
 async function refreshPOSSales(options={}){
