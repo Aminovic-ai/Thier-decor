@@ -1430,22 +1430,31 @@ async function adminRecoverPendingStoreSales(env) {
 
   const operations = await dbRequest(
     env,
-    "td_pos_stock_operations?select=operation_id,request_key,request_payload,canonical_items,subtotal,discount,total,created_at&order=created_at.desc&limit=1000"
+    "td_pos_stock_operations?select=operation_id,request_key,request_payload,canonical_items,subtotal,discount,total,created_at&order=created_at.desc&limit=500"
   );
   const rows = Array.isArray(operations) ? operations : [];
   if (!rows.length) return json({ success: true, recovered: [], pending: 0 });
 
   const operationIds = rows.map(row => row.operation_id).filter(Boolean);
-  const existing = await posDbRequest(
-    env,
-    "pos_sales?select=stock_operation_id&stock_operation_id=in.(" + operationIds.join(",") + ")"
+  const recorded = new Set();
+  // Keep PostgREST URLs small even when the store has many sales.
+  for (let offset = 0; offset < operationIds.length; offset += 100) {
+    const batch = operationIds.slice(offset, offset + 100);
+    const existing = await posDbRequest(
+      env,
+      "pos_sales?select=stock_operation_id&stock_operation_id=in.(" + batch.join(",") + ")"
+    );
+    for (const row of (Array.isArray(existing) ? existing : [])) {
+      recorded.add(String(row.stock_operation_id));
+    }
+  }
+  const orphaned = rows.filter(operation =>
+    operation.operation_id && !recorded.has(String(operation.operation_id))
   );
-  const recorded = new Set((Array.isArray(existing) ? existing : []).map(row => String(row.stock_operation_id)));
+  const work = orphaned.slice(0, 50);
   const recovered = [];
-  let pending = 0;
 
-  for (const operation of rows) {
-    if (!operation.operation_id || recorded.has(String(operation.operation_id))) continue;
+  for (const operation of work) {
     const original = operation.request_payload || {};
     const payload = {
       request_key: operation.request_key,
@@ -1481,6 +1490,7 @@ async function adminRecoverPendingStoreSales(env) {
     }
   }
 
+  const pending = Math.max(0, orphaned.length - recovered.length);
   return json({ success: true, recovered, pending });
 }
 
