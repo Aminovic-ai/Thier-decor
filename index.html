@@ -24,7 +24,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&family=Tajawal:wght@400;700;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="style.css?v=41">
-    <link rel="stylesheet" href="custom.css?v=55">
+    <link rel="stylesheet" href="custom.css?v=56">
     <style>
         #guest-register-cta{margin:18px auto 22px;padding:clamp(18px,3vw,28px);max-width:1180px;border:1px solid #bfdbfe;border-radius:18px;background:linear-gradient(120deg,#eff6ff 0%,#f8fbff 55%,#e0f2fe 100%);box-shadow:0 8px 24px rgba(37,99,235,.09);display:flex;align-items:center;justify-content:space-between;gap:18px}
         #guest-register-cta .guest-cta-copy{min-width:0}
@@ -228,6 +228,7 @@
                         <section class="admin-card pos-products-panel" aria-labelledby="pos-products-title">
                             <div class="pos-panel-heading"><div><h3 id="pos-products-title">المنتجات</h3><p>ابحث واختر المنتجات لإضافتها إلى البيع</p></div><span class="pos-panel-icon"><i class="fas fa-box-open"></i></span></div>
                             <label class="pos-search-wrap" for="pos-search"><i class="fas fa-search"></i><input id="pos-search" type="search" placeholder="ابحث باسم المنتج..." oninput="renderPOSProducts()"></label>
+                            <div id="pos-category-filters" class="pos-category-filters" aria-label="أصناف المنتجات"></div>
                             <div id="pos-products" class="pos-products-grid"></div>
                         </section>
                         <section class="admin-card pos-cart-panel" aria-labelledby="pos-cart-title">
