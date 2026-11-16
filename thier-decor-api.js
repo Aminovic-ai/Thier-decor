@@ -1420,6 +1420,67 @@ async function adminCreateStoreSale(body, env, request) {
   }
 }
 
+async function adminRecoverPendingStoreSales(env) {
+  if (!env.POS_SUPABASE_URL || !env.POS_SUPABASE_SERVICE_ROLE_KEY) {
+    return fail("قاعدة POS غير مهيأة.", 503);
+  }
+
+  const operations = await dbRequest(
+    env,
+    "td_pos_stock_operations?select=operation_id,request_key,request_payload,canonical_items,subtotal,discount,total,created_at&order=created_at.asc&limit=100"
+  );
+  const rows = Array.isArray(operations) ? operations : [];
+  if (!rows.length) return json({ success: true, recovered: [], pending: 0 });
+
+  const operationIds = rows.map(row => row.operation_id).filter(Boolean);
+  const existing = await posDbRequest(
+    env,
+    "pos_sales?select=stock_operation_id&stock_operation_id=in.(" + operationIds.join(",") + ")"
+  );
+  const recorded = new Set((Array.isArray(existing) ? existing : []).map(row => String(row.stock_operation_id)));
+  const recovered = [];
+  let pending = 0;
+
+  for (const operation of rows) {
+    if (!operation.operation_id || recorded.has(String(operation.operation_id))) continue;
+    const original = operation.request_payload || {};
+    const payload = {
+      request_key: operation.request_key,
+      stock_operation_id: operation.operation_id,
+      invoice_no: null,
+      items: operation.canonical_items,
+      subtotal: operation.subtotal,
+      discount: operation.discount,
+      total: operation.total,
+      payment_method: original.payment_method || "cash",
+      paid_amount: operation.total,
+      customer_name: original.customer_name || "",
+      customer_phone: original.customer_phone || "",
+      customer_address: original.customer_address || "",
+      store_name: original.store_name || "Thier Décor",
+      store_phone: original.store_phone || "",
+      store_address: original.store_address || "",
+      created_at: operation.created_at
+    };
+    try {
+      const result = await posDbRequest(env, "rpc/td_pos_record_sale", {
+        method: "POST",
+        body: JSON.stringify({ p_sale: payload })
+      });
+      if (result?.ok && result.invoice_no) {
+        recovered.push({ invoice_no: result.invoice_no, operation_id: operation.operation_id });
+      } else {
+        pending++;
+      }
+    } catch (error) {
+      console.error("POS pending invoice recovery failed:", operation.operation_id, error);
+      pending++;
+    }
+  }
+
+  return json({ success: true, recovered, pending });
+}
+
 async function adminDeleteOrder(body, env) {
   const id = positiveId(body.id, "معرّف الطلبية");
   const result = await dbRequest(env, "rpc/td_admin_delete_order", { method: "POST", body: JSON.stringify({ p_order_id: id }) });
@@ -1675,6 +1736,7 @@ async function handleRequest(request, env) {
         case "adminMigrateLegacyImages":
         case "adminNotifyCustomerProductAvailable":
         case "adminCreateStoreSale":
+        case "adminRecoverPendingStoreSales":
         case "adminDeleteOrder":
         case "adminEditOrder":
         case "adminVisitStats": {
@@ -1685,6 +1747,7 @@ async function handleRequest(request, env) {
           if (action === "updateOrderStatus") return await updateOrderStatus(body, env);
           if (action === "adminNotifyCustomerProductAvailable") return await adminNotifyCustomerProductAvailable(body, env);
           if (action === "adminCreateStoreSale") return await adminCreateStoreSale(body, env, request);
+          if (action === "adminRecoverPendingStoreSales") return await adminRecoverPendingStoreSales(env);
           if (action === "adminDeleteOrder") return await adminDeleteOrder(body, env);
           if (action === "adminEditOrder") return await adminEditOrder(body, env);
           if (action === "adminVisitStats") return await adminVisitStats(env);
