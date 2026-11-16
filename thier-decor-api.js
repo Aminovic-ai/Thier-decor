@@ -314,6 +314,30 @@ async function dbRequest(env, path, options = {}) {
 }
 
 
+async function posDbRequest(env, path, options = {}) {
+  if (!env.POS_SUPABASE_URL || !env.POS_SUPABASE_SERVICE_ROLE_KEY) {
+    throw new Error("POS database configuration is missing");
+  }
+  const url = env.POS_SUPABASE_URL.replace(/\\/+$/, "") + "/rest/v1/" + path;
+  const response = await fetch(url, {
+    ...options,
+    headers: {
+      "apikey": env.POS_SUPABASE_SERVICE_ROLE_KEY,
+      "Authorization": "Bearer " + env.POS_SUPABASE_SERVICE_ROLE_KEY,
+      "Content-Type": "application/json",
+      ...(options.headers || {})
+    }
+  });
+  const text = await response.text();
+  let data = null;
+  try { data = text ? JSON.parse(text) : null; } catch (_) { data = text; }
+  if (!response.ok) {
+    console.error("POS Supabase error:", response.status, data);
+    throw new Error(typeof data === "object" && data?.message ? data.message : "POS database request failed");
+  }
+  return data;
+}
+
 async function dbRequestPaged(env, path, pageSize = 1000, maxRows = 50000) {
   const all = [];
   for (let offset = 0; offset < maxRows; offset += pageSize) {
@@ -1273,54 +1297,111 @@ async function adminCreateStoreSale(body, env, request) {
   if (!Array.isArray(items) || items.length < 1 || items.length > 100) {
     return fail("أضف منتجاً واحداً على الأقل إلى سلة البيع.");
   }
+
   const cleanItems = [];
   for (const item of items) {
     const id = Number(item?.id);
     const qty = Number(item?.qty);
-    if (!Number.isSafeInteger(id) || id <= 0 || !Number.isSafeInteger(qty) || qty <= 0 || qty > 1000) {
+    if (!Number.isSafeInteger(id) || id <= 0 ||
+        !Number.isSafeInteger(qty) || qty <= 0 || qty > 1000) {
       return fail("أحد المنتجات أو الكميات غير صالح.");
     }
     cleanItems.push({ id, qty });
   }
+
   const discount = Number(body.discount || 0);
   if (!Number.isFinite(discount) || discount < 0 || discount > 100000000) {
     return fail("قيمة التخفيض غير صالحة.");
   }
+
   const paymentMethod = String(body.paymentMethod || "cash").trim().toLowerCase();
   if (!["cash", "transfer", "card", "other"].includes(paymentMethod)) {
     return fail("طريقة الدفع غير صالحة.");
   }
+
   const requestKey = String(body.requestKey || "");
-  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(requestKey)) return fail("مفتاح عملية البيع غير صالح.");
-  const cleanText = (value, max) => String(value || "").trim().slice(0, max);
-  const customerName = cleanText(body.customerName, 120);
-  const customerPhone = cleanText(body.customerPhone, 40);
-  const customerAddress = cleanText(body.customerAddress, 300);
-  const storeName = cleanText(body.storeName, 120) || "Thier Décor";
-  const storePhone = cleanText(body.storePhone, 40);
-  const storeAddress = cleanText(body.storeAddress, 300);
-  const result = await dbRequest(env, "rpc/td_admin_create_store_sale", {
-    method: "POST",
-    body: JSON.stringify({
-      p_sale: {
-        request_key: requestKey,
-        items: cleanItems,
-        discount,
-        payment_method: paymentMethod,
-        customer_name: customerName,
-        customer_phone: customerPhone,
-        customer_address: customerAddress,
-        store_name: storeName,
-        store_phone: storePhone,
-        store_address: storeAddress,
-        cashier_uid: ""
-      }
-    })
-  });
-  if (!result?.ok || !result.invoice_no) {
-    return fail("تعذر تسجيل البيع أو لم يؤكد الخادم خصم المخزون.", 409);
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(requestKey)) {
+    return fail("مفتاح عملية البيع غير صالح.");
   }
-  return json({ success: true, sale: result });
+
+  const cleanText = (value, max) => String(value || "").trim().slice(0, max);
+  const saleInput = {
+    request_key: requestKey.toLowerCase(),
+    items: cleanItems,
+    discount,
+    payment_method: paymentMethod,
+    customer_name: cleanText(body.customerName, 120),
+    customer_phone: cleanText(body.customerPhone, 40),
+    customer_address: cleanText(body.customerAddress, 300),
+    store_name: cleanText(body.storeName, 120) || "Thier Décor",
+    store_phone: cleanText(body.storePhone, 40),
+    store_address: cleanText(body.storeAddress, 300)
+  };
+
+  // Step 1: commit inventory only in the store database. This RPC must be
+  // idempotent by request_key and must persist its operation in the same
+  // transaction as the stock decrement.
+  let stockResult;
+  try {
+    stockResult = await dbRequest(env, "rpc/td_pos_commit_stock", {
+      method: "POST",
+      body: JSON.stringify({ p_sale: saleInput })
+    });
+  } catch (error) {
+    console.error("POS stock commit failed:", error);
+    return fail("تعذر تأكيد خصم المخزون. لم يتم تسجيل الفاتورة.", 409);
+  }
+
+  if (!stockResult?.ok || !stockResult.operation_id ||
+      !Array.isArray(stockResult.items) || !stockResult.items.length) {
+    return fail("لم يؤكد نظام المخزون عملية البيع.", 409);
+  }
+
+  // Step 2: persist the immutable invoice snapshot in the independent POS DB.
+  // Retrying the same request_key must return the same invoice without
+  // touching inventory again. Never fall back to the store database.
+  const posPayload = {
+    request_key: requestKey.toLowerCase(),
+    stock_operation_id: stockResult.operation_id,
+    invoice_no: null,
+    items: stockResult.items,
+    subtotal: stockResult.subtotal,
+    discount: stockResult.discount,
+    total: stockResult.total,
+    payment_method: paymentMethod,
+    paid_amount: stockResult.total,
+    customer_name: saleInput.customer_name,
+    customer_phone: saleInput.customer_phone,
+    customer_address: saleInput.customer_address,
+    store_name: saleInput.store_name,
+    store_phone: saleInput.store_phone,
+    store_address: saleInput.store_address,
+    created_at: stockResult.created_at || new Date().toISOString()
+  };
+
+  try {
+    const saleResult = await posDbRequest(env, "rpc/td_pos_record_sale", {
+      method: "POST",
+      body: JSON.stringify({ p_sale: posPayload })
+    });
+    if (!saleResult?.ok || !saleResult.invoice_no) {
+      return json({
+        success: false,
+        pending: true,
+        requestKey,
+        error: "تم حجز/خصم المخزون، لكن لم يكتمل حفظ الفاتورة. أعد المحاولة بنفس العملية."
+      }, 202);
+    }
+    return json({ success: true, sale: saleResult });
+  } catch (error) {
+    console.error("POS invoice persistence pending:", error);
+    return json({
+      success: false,
+      pending: true,
+      requestKey,
+      error: "تم تأكيد المخزون، لكن قاعدة POS غير متاحة مؤقتاً. أعد المحاولة دون إنشاء عملية بيع جديدة."
+    }, 202);
+  }
 }
 
 async function adminDeleteOrder(body, env) {
