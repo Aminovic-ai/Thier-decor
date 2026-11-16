@@ -38,7 +38,7 @@ Record the initial stock values before each test. Use a fresh UUID request_key p
 | T12 | Timeout after invoice commit | Commit POS invoice but simulate lost response | Retry returns the same invoice; no duplicate invoice or stock change. |
 | T13 | Browser refresh | Save pending sale, refresh browser, resume | Same saved payload/key is reused; never create a new sale key for the pending operation. |
 | T14 | Browser storage lost | Clear local storage after stock commit | Admin recovery finds the orphan ledger operation and creates exactly one invoice. |
-| T15 | Recovery batching | Seed more than 50 orphan operations | One recovery run processes at most 50; subsequent runs continue; no operation is invoiced twice. |
+| T15 | Recovery batching | Seed more than 50 orphan operations | One recovery run processes at most 50 orphan invoices and scans at most 500 ledger rows using a stable `(created_at, operation_id)` cursor; repeated runs resume from the cursor until `done=true`, including operations older than the first 500; no operation is invoiced twice. |
 | T16 | Invoice validation | Submit bad totals, fractional quantity, negative cost, unsupported payment method, or malformed line | RPC rejects the invoice transaction; no partial sale or line rows remain. |
 | T17 | RLS / privilege | Attempt table reads/writes and RPC calls as anon/authenticated | No direct access; only service_role can execute privileged POS RPCs. |
 | T18 | Existing POS history | Run additive migration with existing synthetic sales | Existing rows and invoice numbers remain unchanged; new indexes/columns/functions install successfully. |
@@ -46,6 +46,7 @@ Record the initial stock values before each test. Use a fresh UUID request_key p
 ## Required SQL assertions after each successful sale
 
 - Exactly one `pos_sales` row for the request_key and exactly one row for the stock_operation_id.
+- POS invoice history and POS-only sales/profit reporting read from `obxjemvuympyddckghom`; store expenses remain in the old store database and are not copied into POS.
 - The sum of `pos_sale_items.line_total` equals `pos_sales.subtotal`.
 - `pos_sales.total = subtotal - discount`.
 - Item name, unit price, unit cost, quantity, pack flag, and pack snapshot are sale-time snapshots.
