@@ -9,6 +9,7 @@ Status: review design only. No production SQL, Worker deployment, Pages deployme
 - Store operating expenses remain exclusively in the existing store Supabase project. Do not copy or migrate expenses into POS.
 - The Cloudflare Worker is the only application component allowed to use either service-role key. Browser code must never receive either key.
 - The Worker uses the existing `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` pair for the store database and a separate `POS_SUPABASE_URL` / `POS_SUPABASE_SERVICE_ROLE_KEY` pair for POS.
+- The POS key setting may contain either the legacy `service_role` JWT or the new `sb_secret_*` key. For the new opaque secret key, send it in the `apikey` header only; do not send it as `Authorization: Bearer` because it is not a JWT.
 - No inventory mirror or copied stock table is created in POS.
 
 ## Cross-database consistency model
