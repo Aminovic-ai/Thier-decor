@@ -165,7 +165,7 @@ begin
   for v_key, v_required_qty in
     select key, value::numeric from jsonb_each_text(v_required) order by key::bigint
   loop
-    if v_required_qty <= 0 or v_required_qty <> trunc(v_required_qty) then
+    if v_required_qty <= 0 or v_required_qty <> trunc(v_required_qty) or v_required_qty > 2147483647 then
       raise exception 'Stock quantities must be positive integers';
     end if;
     select qty into v_stock
