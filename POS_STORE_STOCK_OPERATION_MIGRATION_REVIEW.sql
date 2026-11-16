@@ -89,7 +89,14 @@ begin
     );
   end if;
 
-  -- Lock/read products in ascending top-level id order.
+  -- Serialize inventory writers before taking any row locks. Online order RPCs
+  -- update this same table and therefore wait at the table lock before holding
+  -- product row locks. This avoids cross-order deadlocks while this short POS
+  -- transaction discovers pack components and later locks required rows by id.
+  -- Trade-off: product writes are briefly serialized during a POS stock commit.
+  lock table public.products in share row exclusive mode;
+
+  -- Read top-level products only after the inventory-writer barrier is acquired.
   for v_item in
     select value from jsonb_array_elements(p_sale->'items')
     order by (value->>'id')::bigint
@@ -106,8 +113,7 @@ begin
 
     select * into v_product
     from public.products
-    where id = v_product_id
-    for update;
+    where id = v_product_id;
 
     if not found then
       raise exception 'Product % not found', v_product_id;
