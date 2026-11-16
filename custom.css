@@ -2506,3 +2506,37 @@ a { text-underline-offset: 3px; }
  #screen-admin .pos-customer-address-field{grid-column:auto}
  #screen-admin .pos-products-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
+
+
+/* POS navigation: visually distinguish checkout from invoice history */
+#screen-admin .pos-view-tab[data-pos-view="sale"]{
+  color:#fff!important;
+  border:1px solid #059669!important;
+  background:linear-gradient(135deg,#10b981,#059669)!important;
+  box-shadow:0 6px 16px rgba(5,150,105,.20)!important;
+}
+#screen-admin .pos-view-tab[data-pos-view="sale"] i{
+  color:#fff!important;
+}
+#screen-admin .pos-view-tab[data-pos-view="reports"]{
+  color:#6d28d9!important;
+  border:1px solid #ddd6fe!important;
+  background:linear-gradient(135deg,#f5f3ff,#ede9fe)!important;
+  box-shadow:0 4px 12px rgba(124,58,237,.09)!important;
+}
+#screen-admin .pos-view-tab[data-pos-view="reports"] i{
+  color:#8b5cf6!important;
+}
+#screen-admin .pos-view-tab[data-pos-view="reports"].active{
+  color:#fff!important;
+  border-color:#7c3aed!important;
+  background:linear-gradient(135deg,#a78bfa,#7c3aed)!important;
+  box-shadow:0 6px 16px rgba(124,58,237,.20)!important;
+}
+#screen-admin .pos-view-tab[data-pos-view="reports"].active i{
+  color:#fff!important;
+}
+#screen-admin .pos-view-tab[data-pos-view="sale"].active{
+  color:#fff!important;
+  background:linear-gradient(135deg,#10b981,#047857)!important;
+}
