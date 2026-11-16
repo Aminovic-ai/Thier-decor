@@ -2730,18 +2730,30 @@ window.renderCustomerMessages = renderCustomerMessages;
 
 let posCart = [];
 let posPendingRequestKey = null;
+let posSelectedCategory = 'all';
 function renderPOSProducts() {
  const target=document.getElementById('pos-products'); if(!target)return;
  const q=String(document.getElementById('pos-search')?.value||'').trim().toLocaleLowerCase();
- const products=(state.products||[]).filter(p=>String(p.name||'').toLocaleLowerCase().includes(q)&&Number(p.qty)>0).slice(0,80);
- target.innerHTML=products.map(p=>{const image=getProductImages(p)[0];return '<button type="button" class="admin-card" onclick="posAddProduct('+Number(p.id)+')" style="text-align:start;display:block;cursor:pointer;padding:10px;"><div style="height:90px;border-radius:8px;overflow:hidden;background:var(--primary-light);margin-bottom:8px;">'+(image?'<img src="'+esc(image)+'" loading="lazy" style="width:100%;height:100%;object-fit:cover;">':'📦')+'</div><strong>'+esc(p.name)+'</strong><br><small>'+fmtMoney(effectiveProductPrice(p))+' · متوفر: '+Number(p.qty)+'</small></button>';}).join('')||'<p>لا توجد منتجات متاحة.</p>';
+ const available=(state.products||[]).filter(p=>Number(p.qty)>0);
+ const categories=[...new Set(available.map(p=>String(p.category||'').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'ar'));
+ if(posSelectedCategory!=='all'&&!categories.includes(posSelectedCategory))posSelectedCategory='all';
+ const filters=document.getElementById('pos-category-filters');
+ if(filters)filters.innerHTML=[['all','كل الأصناف',available.length],...categories.map(name=>[name,name,available.filter(p=>String(p.category||'').trim()===name).length])].map(([key,label,count])=>'<button type="button" class="pos-category-chip'+(posSelectedCategory===key?' active':'')+'" aria-pressed="'+(posSelectedCategory===key?'true':'false')+'" onclick="posSelectCategory(decodeURIComponent(\''+encodeURIComponent(key)+'\'))">'+esc(label)+' <span>'+count+'</span></button>').join('');
+ const products=available.filter(p=>(posSelectedCategory==='all'||String(p.category||'').trim()===posSelectedCategory)&&String(p.name||'').toLocaleLowerCase().includes(q)).slice(0,80);
+ target.innerHTML=products.map(p=>{const image=getProductImages(p)[0];return '<button type="button" class="admin-card pos-product-card" onclick="posAddProduct('+Number(p.id)+')"><div class="pos-product-image">'+(image?'<img src="'+esc(image)+'" loading="lazy">':'<i class="fas fa-box-open"></i>')+'</div><strong>'+esc(p.name)+'</strong><small>'+fmtMoney(effectiveProductPrice(p))+' · متوفر: '+Number(p.qty)+'</small></button>';}).join('')||'<p class="pos-empty-products">لا توجد منتجات في هذا الصنف.</p>';
 }
+function posSelectCategory(category){posSelectedCategory=category||'all';renderPOSProducts();}
+window.posSelectCategory=posSelectCategory;
 window.renderPOSProducts=renderPOSProducts;
 function posAddProduct(id){const p=(state.products||[]).find(x=>Number(x.id)===Number(id));if(!p||Number(p.qty)<=0)return toast('المنتج غير متوفر.','error');const line=posCart.find(x=>Number(x.id)===Number(id));if(line)line.qty=Math.min(Number(p.qty),line.qty+1);else posCart.push({id:Number(p.id),qty:1});renderPOSCart();}
 window.posAddProduct=posAddProduct;
 function posChangeQty(id,delta){const line=posCart.find(x=>Number(x.id)===Number(id));const p=(state.products||[]).find(x=>Number(x.id)===Number(id));if(!line||!p)return;line.qty=Math.max(0,Math.min(Number(p.qty),line.qty+delta));if(!line.qty)posCart=posCart.filter(x=>Number(x.id)!==Number(id));renderPOSCart();}
 window.posChangeQty=posChangeQty;
-function renderPOSCart(){const target=document.getElementById('pos-cart');if(!target)return;let subtotal=0;target.innerHTML=posCart.map(line=>{const p=(state.products||[]).find(x=>Number(x.id)===Number(line.id));if(!p)return '';const price=effectiveProductPrice(p);subtotal+=price*line.qty;return '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;border-bottom:1px solid var(--border);padding:9px 0;"><div><strong>'+esc(p.name)+'</strong><br><small>'+fmtMoney(price)+' × '+line.qty+'</small></div><div><button type="button" class="btn-icon" onclick="posChangeQty('+line.id+',-1)">−</button> <b>'+line.qty+'</b> <button type="button" class="btn-icon" onclick="posChangeQty('+line.id+',1)">+</button></div></div>';}).join('')||'<p>السلة فارغة.</p>';const discount=Math.max(0,Number(document.getElementById('pos-discount')?.value||0));const total=Math.max(0,subtotal-discount);const el=document.getElementById('pos-total');if(el)el.textContent='الإجمالي: '+fmtMoney(total);return {subtotal,discount,total};}
+function renderPOSCart(){
+ const target=document.getElementById('pos-cart');if(!target)return;let subtotal=0;
+ target.innerHTML=posCart.map(line=>{const p=(state.products||[]).find(x=>Number(x.id)===Number(line.id));if(!p)return '';const price=effectiveProductPrice(p);const lineTotal=price*line.qty;subtotal+=lineTotal;return '<article class="pos-cart-line"><div class="pos-cart-line-info"><strong>'+esc(p.name)+'</strong><small>'+fmtMoney(price)+' للوحدة</small></div><div class="pos-cart-line-actions"><button type="button" class="pos-qty-button" aria-label="إنقاص الكمية" onclick="posChangeQty('+line.id+',-1)">−</button><b>'+line.qty+'</b><button type="button" class="pos-qty-button" aria-label="زيادة الكمية" onclick="posChangeQty('+line.id+',1)">+</button></div><strong class="pos-cart-line-total">'+fmtMoney(lineTotal)+'</strong></article>';}).join('')||'<p class="pos-empty-cart">السلة فارغة — اختر منتجًا من الأصناف لإضافته.</p>';
+ const discount=Math.max(0,Number(document.getElementById('pos-discount')?.value||0));const total=Math.max(0,subtotal-discount);const el=document.getElementById('pos-total');if(el)el.textContent='الإجمالي: '+fmtMoney(total);const count=posCart.reduce((n,x)=>n+x.qty,0);const badge=document.getElementById('pos-cart-count');if(badge)badge.textContent=String(count);return {subtotal,discount,total};
+}
 window.renderPOSCart=renderPOSCart;
 function printPOSSale(sale,popup){
  const rows=(sale.items||[]).map(x=>'<tr><td>'+esc(x.name)+'</td><td>'+Number(x.qty)+'</td><td>'+fmtMoney(x.price)+'</td><td>'+fmtMoney(Number(x.qty)*Number(x.price))+'</td></tr>').join('');
