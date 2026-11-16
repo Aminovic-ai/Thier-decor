@@ -1,4 +1,4 @@
-name: Deploy Thier Decor API V2 (manual)
+name: Deploy Thier Decor API (manual production)
 
 on:
   workflow_dispatch:
@@ -7,40 +7,38 @@ permissions:
   contents: read
 
 concurrency:
-  group: thier-decor-api-v2-deploy
+  group: thier-decor-api-production-deploy
   cancel-in-progress: false
 
 jobs:
   deploy:
+    # This workflow is intentionally restricted to the reviewed main branch.
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment: cloudflare-new
     steps:
-      - name: Checkout selected branch
+      - name: Checkout reviewed production branch
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.ref }}
+          ref: main
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Verify deployment configuration
+      - name: Verify Cloudflare deployment credentials
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
-          SUPABASE_URL: ${{ vars.SUPABASE_URL }}
-          ALLOWED_ORIGINS: ${{ vars.ALLOWED_ORIGINS }}
         run: |
-          test -n "$CLOUDFLARE_API_TOKEN" || { echo "Missing CLOUDFLARE_API_TOKEN secret"; exit 1; }
-          test -n "$CLOUDFLARE_ACCOUNT_ID" || { echo "Missing CLOUDFLARE_ACCOUNT_ID variable"; exit 1; }
-          test -n "$SUPABASE_URL" || { echo "Missing SUPABASE_URL variable"; exit 1; }
-          test -n "$ALLOWED_ORIGINS" || { echo "Missing ALLOWED_ORIGINS variable"; exit 1; }
-      - name: Deploy isolated V2 Worker
-        run: |
-          npx --yes wrangler@4 deploy --config wrangler.toml \
-            --var "SUPABASE_URL:$SUPABASE_URL" \
-            --var "ALLOWED_ORIGINS:$ALLOWED_ORIGINS"
+          test -n "$CLOUDFLARE_API_TOKEN" || { echo "Missing CLOUDFLARE_API_TOKEN secret in GitHub environment cloudflare-new"; exit 1; }
+          test -n "$CLOUDFLARE_ACCOUNT_ID" || { echo "Missing CLOUDFLARE_ACCOUNT_ID variable in GitHub environment cloudflare-new"; exit 1; }
+      - name: Validate Worker bundle and production bindings without deploying
+        run: npx --yes wrangler@4 deploy --config wrangler.toml --dry-run
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
-          SUPABASE_URL: ${{ vars.SUPABASE_URL }}
-          ALLOWED_ORIGINS: ${{ vars.ALLOWED_ORIGINS }}
+      - name: Deploy existing production Worker
+        run: npx --yes wrangler@4 deploy --config wrangler.toml
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
