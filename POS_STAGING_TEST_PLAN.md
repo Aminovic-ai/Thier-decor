@@ -56,3 +56,12 @@ Record the initial stock values before each test. Use a fresh UUID request_key p
 ## Final acceptance gate
 
 Do not merge until all tests T01–T18 pass on disposable projects, test evidence (before/after stock, invoice rows, ledger rows, and relevant logs) is recorded, and the Worker code is reviewed against the exact tested migration versions. Production migrations, Cloudflare secrets, Worker deployment, Pages deployment, and merge each require separate explicit approval.
+
+
+## POS history and reporting checks
+
+- Admin-only action `adminListPOSSales` reads the POS database using the POS secret API key in the `apikey` header only; it does not send an opaque `sb_secret_*` key as a Bearer JWT.
+- POS history shows the latest 50 invoices and customer/payment details; daily, rolling 7-day, and current-month totals and item-margin profit are calculated from the POS invoice snapshots, using Africa/Algiers calendar day/month boundaries.
+- Reporting must never read or subtract `pos_expenses` or store expenses. Existing store expense management stays connected to the original store database.
+- Verify a POS invoice and its items appear once after refresh/retry; verify sales and profit totals match manually calculated item margins less invoice discount.
+- Verify pack components cannot themselves be packs, including when the component is also present as a separately sold line in the same cart.
