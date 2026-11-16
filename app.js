@@ -3085,7 +3085,25 @@ function adminGo(sec, btnElement) {
     if (activeNav) activeNav.classList.add('active');
     const titleKey = sec === 'dashboard' ? 'admin_home' : 'admin_' + sec; document.getElementById('admin-page-title').textContent = sec === 'pos' ? (state.currentLang === 'fr' ? 'Vente' : 'البيع من المحل') : (i18n[state.currentLang][titleKey] || sec);
     if (sec === 'dashboard') renderAdminHome();
-    if (sec === 'pos') { setPOSView('sale'); applyPOSTranslations(); renderPOSProducts(); renderPOSCart(); }
+    if (sec === 'pos') {
+        setPOSView('sale');
+        applyPOSTranslations();
+        renderPOSProducts();
+        renderPOSCart();
+        // Always refresh the canonical catalog from the original store database
+        // when entering POS; POS database intentionally contains no products.
+        const posCatalogTarget = document.getElementById('pos-products');
+        if (posCatalogTarget) posCatalogTarget.innerHTML = '<p class="pos-empty-products" role="status">' + (state.currentLang === 'fr' ? 'Chargement des produits du magasin...' : 'جارٍ تحميل منتجات المتجر...') + '</p>';
+        loadOrdersListener({ forceProducts: true, forceWait: true })
+            .then(() => {
+                renderPOSProducts();
+                renderPOSCart();
+            })
+            .catch(error => {
+                console.error('POS catalog refresh failed:', error);
+                if (posCatalogTarget) posCatalogTarget.innerHTML = '<p class="pos-empty-products">' + (state.currentLang === 'fr' ? 'Impossible de charger les produits. Vérifiez la connexion à la base du magasin.' : 'تعذر تحميل المنتجات. تحقق من الاتصال بقاعدة بيانات المتجر.') + '</p>';
+            });
+    }
     if (sec === 'orders') renderAdminOrdersList();
     if (sec === 'products') renderAdminProducts();
     if (sec === 'customers') {
