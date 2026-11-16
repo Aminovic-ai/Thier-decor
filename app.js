@@ -84,7 +84,8 @@ async function callAdminWorker(action, payload = {}) {
     let result;
     try { result = await response.json(); }
     catch (_) { throw new Error(state.currentLang === 'fr' ? 'Réponse invalide du serveur administrateur.' : 'ردّ خادم الإدارة غير صالح.'); }
-    if (!response.ok || result?.success !== true) {
+    const pendingAccepted = response.status === 202 && result?.pending === true;
+    if ((!response.ok && !pendingAccepted) || (result?.success !== true && !pendingAccepted)) {
         const message = result?.error || (state.currentLang === 'fr' ? 'La requête administrateur a échoué.' : 'فشل طلب الإدارة.');
         throw new Error(message);
     }
@@ -2807,6 +2808,11 @@ async function submitPOSSale(){
    localStorage.setItem('td_pos_pending_sale_payload',JSON.stringify(posPendingSalePayload));
   }
   const result=await callAdminWorker('adminCreateStoreSale',posPendingSalePayload);
+  if(result?.pending===true){
+   if(invoiceWindow&&!invoiceWindow.closed)invoiceWindow.close();
+   toast(result.error||'البيع معلّق: تم التعامل مع المخزون، وتتم إعادة محاولة حفظ الفاتورة بنفس العملية.','error');
+   return;
+  }
   if(!result.sale?.invoice_no)throw new Error(result.error||'لم يتم استلام رقم الفاتورة.');
   printPOSSale(result.sale,invoiceWindow);
   posPendingRequestKey=null;
