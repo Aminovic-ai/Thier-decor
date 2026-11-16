@@ -198,7 +198,8 @@ begin
       'is_pack', v_is_pack,
       'pack_snapshot', v_pack_items
     ));
-    v_subtotal := v_subtotal + v_sale_price * v_qty;
+    -- Match each canonical invoice line's two-decimal rounding before summing.
+    v_subtotal := v_subtotal + round(v_sale_price * v_qty, 2);
   end loop;
 
   -- Lock and validate every required stock row in globally sorted order.
