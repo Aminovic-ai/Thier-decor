@@ -2845,20 +2845,23 @@ function renderPOSCart(){
 window.renderPOSCart=renderPOSCart;
 
 function printPOSSale(sale,popup){
- const rows=(sale.items||[]).map(item=>'<tr><td style="padding:12px;border-bottom:1px solid #eee;">'+esc(item.name)+'</td><td style="padding:12px;border-bottom:1px solid #eee;text-align:center;">'+Number(item.qty||0)+'</td><td style="padding:12px;border-bottom:1px solid #eee;text-align:right;">'+Number(item.price||0).toLocaleString('fr-FR')+' DA</td><td style="padding:12px;border-bottom:1px solid #eee;text-align:right;">'+(Number(item.qty||0)*Number(item.price||0)).toLocaleString('fr-FR')+' DA</td></tr>').join('');
+ const fr=state.currentLang==='fr';
+ const money=value=>Number(value||0).toLocaleString(fr?'fr-FR':'ar-DZ')+(fr?' DA':' دج');
+ const rows=(sale.items||[]).map(item=>'<tr><td>'+esc(item.name)+'</td><td>'+Number(item.qty||0)+'</td><td>'+money(item.price)+'</td><td>'+money(Number(item.qty||0)*Number(item.price||0))+'</td></tr>').join('');
  popup=popup||window.open('','_blank','width=760,height=800');
- if(!popup){toast('Autorisez la fenêtre d’impression.','error');return;}
+ if(!popup){toast(fr?'Autorisez la fenêtre de facture.':'اسمح بفتح نافذة الفاتورة.','error');return;}
  const shopName=sale.store_name||state.settings?.shopName||'Thier Décor';
  const shopPhone=sale.store_phone||state.settings?.shopPhone||'';
  const shopAddress=sale.store_address||state.settings?.shopAddress||'';
- const customerName=sale.customer_name||'Client comptant';
+ const customerName=sale.customer_name||(fr?'Client comptant':'زبون نقدي');
  const customerPhone=sale.customer_phone||'—';
  const customerAddress=sale.customer_address||'—';
- const date=sale.created_at?new Date(sale.created_at).toLocaleDateString('fr-FR'):new Date().toLocaleDateString('fr-FR');
+ const date=sale.created_at?new Date(sale.created_at).toLocaleString(fr?'fr-FR':'ar-DZ'):new Date().toLocaleString(fr?'fr-FR':'ar-DZ');
  const subtotal=(sale.items||[]).reduce((sum,item)=>sum+Number(item.price||0)*Number(item.qty||0),0);
  const discount=Math.max(0,Number(sale.discount)||0);
- const html='<!doctype html><html lang="fr" dir="ltr"><head><meta charset="utf-8"><title>Facture '+esc(sale.invoice_no)+'</title><style>*{box-sizing:border-box}body{font-family:Arial,sans-serif;padding:40px;color:#1e293b;max-width:850px;margin:auto}.header{border-bottom:3px solid #0ea5e9;padding-bottom:20px;margin-bottom:26px;display:flex;justify-content:space-between;gap:20px}.header h1{margin:0 0 8px;color:#075985}.header p{margin:4px 0;color:#475569;font-size:13px}.invoice-title{text-align:right}.invoice-title h2{margin:0 0 8px;color:#075985}.client{margin:20px 0 26px;line-height:1.8}.client strong{color:#075985}table{width:100%;border-collapse:collapse;margin-top:18px}th{background:#f8fafc;padding:12px;text-align:left;color:#075985}th:nth-child(n+2){text-align:right}td{text-align:left}.totals{width:55%;margin:22px 0 0 auto}.total-row{display:flex;justify-content:space-between;gap:18px;padding:9px 0;border-bottom:1px solid #eee}.grand{font-weight:bold;font-size:19px;color:#075985;border-top:2px solid #0ea5e9;margin-top:8px;padding-top:13px}.thanks{text-align:center;margin-top:45px;color:#64748b;font-size:12px}@page{size:A4;margin:16mm}@media print{.invoice-actions{display:none!important}body{padding:0;max-width:none}.header,.client,table,.totals{break-inside:avoid}}.invoice-actions{display:flex;justify-content:flex-end;margin:0 0 22px}.invoice-download{border:0;border-radius:9px;background:#0284c7;color:#fff;padding:12px 20px;font-size:15px;font-weight:700;cursor:pointer}.invoice-download:hover{background:#0369a1}@media(max-width:560px){body{padding:16px}.header{flex-direction:column}.invoice-title{text-align:left}.totals{width:100%}}</style></head><body><div class="invoice-actions"><button class="invoice-download" type="button" onclick="window.print()">&#8681; Télécharger la facture A4 (PDF)</button></div><header class="header"><div><h1>'+esc(shopName)+'</h1>'+(shopPhone?'<p>Tél. : '+esc(shopPhone)+'</p>':'')+(shopAddress?'<p>'+esc(shopAddress)+'</p>':'')+'</div><div class="invoice-title"><h2>FACTURE</h2><p>N° : '+esc(sale.invoice_no||'—')+'</p><p>Date : '+esc(date)+'</p></div></header><section class="client"><p><strong>Client :</strong> '+esc(customerName)+'</p><p><strong>Tél. :</strong> '+esc(customerPhone)+'</p><p><strong>Adresse :</strong> '+esc(customerAddress)+'</p></section><table><thead><tr><th>Désignation</th><th>Qté</th><th>Prix unitaire</th><th>Total</th></tr></thead><tbody>'+rows+'</tbody></table><section class="totals"><div class="total-row"><span>Sous-total :</span><span>'+subtotal.toLocaleString('fr-FR')+' DA</span></div>'+(discount>0?'<div class="total-row"><span>Remise :</span><span>− '+discount.toLocaleString('fr-FR')+' DA</span></div>':'')+'<div class="total-row grand"><span>Total à payer :</span><span>'+Number(sale.total||0).toLocaleString('fr-FR')+' DA</span></div></section><p class="thanks">Merci pour votre confiance !</p><script>window.onload=function(){window.focus()}<\\/script></body></html>';
- popup.document.open();popup.document.write(html);popup.document.close();
+ const labels=fr?{invoice:'FACTURE',number:'N°',date:'Date',client:'Client',phone:'Téléphone',address:'Adresse',item:'Désignation',qty:'Qté',price:'Prix unitaire',lineTotal:'Total',subtotal:'Sous-total',discount:'Remise',grand:'Total à payer',thanks:'Merci pour votre confiance !',download:'Télécharger la facture A4 (PDF)'}:{invoice:'فاتورة',number:'رقم الفاتورة',date:'التاريخ',client:'الزبون',phone:'الهاتف',address:'العنوان',item:'المنتج',qty:'الكمية',price:'السعر الوحدوي',lineTotal:'الإجمالي',subtotal:'المجموع الفرعي',discount:'التخفيض',grand:'المبلغ المستحق',thanks:'شكراً لثقتكم بنا!',download:'تحميل الفاتورة A4 (PDF)'};
+ const html='<!doctype html><html lang="'+(fr?'fr':'ar')+'" dir="'+(fr?'ltr':'rtl')+'"><head><meta charset="utf-8"><title>'+labels.invoice+' '+esc(sale.invoice_no||'')+'</title><style>*{box-sizing:border-box}body{font-family:Arial,Tahoma,sans-serif;padding:32px;color:#1e293b;max-width:850px;margin:auto;direction:'+(fr?'ltr':'rtl')+'}.header{border-bottom:3px solid #0ea5e9;padding-bottom:18px;margin-bottom:22px;display:flex;justify-content:space-between;gap:20px}.header h1{margin:0 0 8px;color:#075985}.header p{margin:4px 0;color:#475569;font-size:13px}.invoice-title{text-align:'+(fr?'right':'left')+'}.invoice-title h2{margin:0 0 8px;color:#075985}.client{margin:18px 0 24px;line-height:1.9}.client p{margin:4px 0}.client strong{color:#075985}table{width:100%;border-collapse:collapse;margin-top:16px}th{background:#f1f5f9;padding:11px;text-align:start;color:#075985}td{padding:11px;border-bottom:1px solid #e5e7eb;text-align:start}.totals{width:55%;margin:20px 0 0 auto}.total-row{display:flex;justify-content:space-between;gap:18px;padding:8px 0;border-bottom:1px solid #eee}.grand{font-weight:bold;font-size:19px;color:#075985;border-top:2px solid #0ea5e9;margin-top:8px;padding-top:12px}.thanks{text-align:center;margin-top:40px;color:#64748b;font-size:12px}.invoice-actions{display:flex;justify-content:flex-end;margin:0 0 20px}.invoice-download{border:0;border-radius:9px;background:#0284c7;color:#fff;padding:12px 20px;font-size:15px;font-weight:700;cursor:pointer}@page{size:A4;margin:15mm}@media print{.invoice-actions{display:none!important}body{padding:0;max-width:none}.header,.client,table,.totals{break-inside:avoid}}@media(max-width:560px){body{padding:15px}.header{flex-direction:column}.invoice-title{text-align:start}.totals{width:100%}}</style></head><body><div class="invoice-actions"><button class="invoice-download" type="button" onclick="window.print()">&#8681; '+labels.download+'</button></div><header class="header"><div><h1>'+esc(shopName)+'</h1>'+(shopPhone?'<p>'+labels.phone+': '+esc(shopPhone)+'</p>':'')+(shopAddress?'<p>'+esc(shopAddress)+'</p>':'')+'</div><div class="invoice-title"><h2>'+labels.invoice+'</h2><p>'+labels.number+': '+esc(sale.invoice_no||'—')+'</p><p>'+labels.date+': '+esc(date)+'</p></div></header><section class="client"><p><strong>'+labels.client+':</strong> '+esc(customerName)+'</p><p><strong>'+labels.phone+':</strong> '+esc(customerPhone)+'</p><p><strong>'+labels.address+':</strong> '+esc(customerAddress)+'</p></section><table><thead><tr><th>'+labels.item+'</th><th>'+labels.qty+'</th><th>'+labels.price+'</th><th>'+labels.lineTotal+'</th></tr></thead><tbody>'+rows+'</tbody></table><section class="totals"><div class="total-row"><span>'+labels.subtotal+':</span><span>'+money(subtotal)+'</span></div>'+(discount>0?'<div class="total-row"><span>'+labels.discount+':</span><span>− '+money(discount)+'</span></div>':'')+'<div class="total-row grand"><span>'+labels.grand+':</span><span>'+money(sale.total)+'</span></div></section><p class="thanks">'+labels.thanks+'</p></body></html>';
+ popup.document.open();popup.document.write(html);popup.document.close();popup.focus();
 }
 
 async function submitPOSSale(){
@@ -2917,6 +2920,28 @@ async function submitPOSSale(){
   if(button){button.disabled=false;button.innerHTML=posPendingSalePayload?'<i class="fas fa-sync-alt"></i> '+(state.currentLang==='fr'?'Terminer la vente en attente et imprimer':'استكمال البيع المعلّق وطباعة الفاتورة'):'<i class="fas fa-check-circle"></i> '+posText('submit');}
  }
 }
+const posInvoiceCache = new Map();
+function downloadPOSSaleInvoice(saleId){
+ const sale=posInvoiceCache.get(String(saleId));
+ if(!sale){toast(state.currentLang==='fr'?'Facture introuvable. Actualisez la liste.':'لم يتم العثور على الفاتورة. حدّث السجل.','error');return;}
+ const items=(Array.isArray(sale.pos_sale_items)?sale.pos_sale_items:[]).map(item=>({
+  name:item.product_name||item.name||item.product_snapshot?.name||'—',
+  qty:Number(item.quantity||0),
+  price:Number(item.unit_price||0)
+ }));
+ const invoice={
+  invoice_no:sale.invoice_no,created_at:sale.created_at,customer_name:sale.customer_name,
+  customer_phone:sale.customer_phone,customer_address:sale.customer_address,
+  store_name:sale.store_name||state.settings?.shopName||'Thier Décor',
+  store_phone:sale.store_phone||state.settings?.shopPhone||'',
+  store_address:sale.store_address||state.settings?.shopAddress||'',
+  discount:sale.discount,total:sale.total,items
+ };
+ const popup=window.open('about:blank','_blank','width=760,height=800');
+ if(!popup){toast(posText('allowPrint'),'error');return;}
+ printPOSSale(invoice,popup);
+}
+window.downloadPOSSaleInvoice=downloadPOSSaleInvoice;
 async function refreshPOSSales(){
  const target=document.getElementById('pos-sales-history');
  if(target)target.innerHTML='<p style="text-align:center;padding:18px;">'+posText('loading')+'</p>';
@@ -2932,14 +2957,17 @@ async function refreshPOSSales(){
    if(profit)profit.textContent=posText('profit')+': '+money(row.profit)+' · '+Number(row.count||0)+' '+posText('dayInvoice');
   }
   const rows=Array.isArray(result.sales)?result.sales:[];
+  posInvoiceCache.clear();
   if(!target)return;
   if(!rows.length){target.innerHTML='<p style="text-align:center;color:var(--text-mid);padding:18px;">'+posText('noInvoices')+'</p>';return;}
-  target.innerHTML='<div style="overflow-x:auto;"><table class="admin-table" style="width:100%;min-width:620px;"><thead><tr><th>'+posText('invoice')+'</th><th>'+posText('customer')+'</th><th>'+posText('date')+'</th><th>'+posText('paymentMethod')+'</th><th>'+posText('amount')+'</th><th>'+posText('profit')+'</th></tr></thead><tbody>'+rows.map(sale=>{
+  rows.forEach(sale=>posInvoiceCache.set(String(sale.id),sale));
+  const downloadLabel=state.currentLang==='fr'?'Télécharger A4':'تحميل A4';
+  target.innerHTML='<div style="overflow-x:auto;"><table class="admin-table pos-invoice-table" style="width:100%;min-width:760px;"><thead><tr><th>'+posText('invoice')+'</th><th>'+posText('customer')+'</th><th>'+posText('date')+'</th><th>'+posText('paymentMethod')+'</th><th>'+posText('amount')+'</th><th>'+posText('profit')+'</th><th>'+(state.currentLang==='fr'?'Facture':'الفاتورة')+'</th></tr></thead><tbody>'+rows.map(sale=>{
    const items=Array.isArray(sale.pos_sale_items)?sale.pos_sale_items:[];
    const margin=items.reduce((sum,item)=>sum+((Number(item.unit_price)||0)-(Number(item.unit_cost)||0))*(Number(item.quantity)||0),0);
    const profit=margin-(Number(sale.discount)||0);
    const date=new Date(sale.created_at);
-   return '<tr><td><strong>'+esc(sale.invoice_no||'—')+'</strong></td><td>'+esc(sale.customer_name||posText('cashCustomer'))+'<br><small>'+esc(sale.customer_phone||'')+'</small></td><td>'+date.toLocaleString(state.currentLang==='fr'?'fr-FR':'ar-DZ')+'</td><td>'+esc((state.currentLang==='fr'?{cash:'Espèces',transfer:'Virement',card:'Carte',other:'Autre'}:{cash:'نقداً',transfer:'تحويل',card:'بطاقة',other:'أخرى'})[sale.payment_method]||sale.payment_method||'—')+'</td><td>'+money(sale.total)+'</td><td>'+money(profit)+'</td></tr>';
+   return '<tr><td><strong>'+esc(sale.invoice_no||'—')+'</strong></td><td>'+esc(sale.customer_name||posText('cashCustomer'))+'<br><small>'+esc(sale.customer_phone||'')+'</small></td><td>'+date.toLocaleString(state.currentLang==='fr'?'fr-FR':'ar-DZ')+'</td><td>'+esc((state.currentLang==='fr'?{cash:'Espèces',transfer:'Virement',card:'Carte',other:'Autre'}:{cash:'نقداً',transfer:'تحويل',card:'بطاقة',other:'أخرى'})[sale.payment_method]||sale.payment_method||'—')+'</td><td>'+money(sale.total)+'</td><td>'+money(profit)+'</td><td><button type="button" class="pos-invoice-download-btn" data-sale-id="'+esc(String(sale.id))+'" onclick="downloadPOSSaleInvoice(this.dataset.saleId)"><i class="fas fa-file-pdf"></i> '+downloadLabel+'</button></td></tr>';
   }).join('')+'</tbody></table></div>';
  }catch(error){
   if(target)target.innerHTML='<p style="color:#b91c1c;padding:18px;">'+posText('loadError')+' '+esc(error.message||'')+'</p>';
