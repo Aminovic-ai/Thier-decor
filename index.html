@@ -24,7 +24,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&family=Tajawal:wght@400;700;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="style.css?v=41">
-    <link rel="stylesheet" href="custom.css?v=54">
+    <link rel="stylesheet" href="custom.css?v=55">
     <style>
         #guest-register-cta{margin:18px auto 22px;padding:clamp(18px,3vw,28px);max-width:1180px;border:1px solid #bfdbfe;border-radius:18px;background:linear-gradient(120deg,#eff6ff 0%,#f8fbff 55%,#e0f2fe 100%);box-shadow:0 8px 24px rgba(37,99,235,.09);display:flex;align-items:center;justify-content:space-between;gap:18px}
         #guest-register-cta .guest-cta-copy{min-width:0}
@@ -216,6 +216,14 @@
                         <div class="pos-heading-icon"><i class="fas fa-store"></i></div>
                         <div><span class="pos-eyebrow">THIER DÉCOR · POINT DE VENTE</span><h2>البيع من المحل</h2><p>اختر المنتجات، راجع السلة، ثم أكّد عملية البيع</p></div>
                     </div>
+                    <section class="admin-card pos-customer-panel" aria-label="معلومات العميل">
+                        <div class="pos-customer-fields">
+                            <div class="pos-customer-fields-heading"><i class="fas fa-user-circle"></i><strong>معلومات العميل للفاتورة</strong><small>اختياري — اترك الحقول فارغة إذا كان البيع دون بيانات عميل</small></div>
+                            <div class="pos-customer-field"><label for="pos-customer-name">اسم العميل</label><input id="pos-customer-name" type="text" maxlength="120" autocomplete="name" placeholder="اسم العميل"></div>
+                            <div class="pos-customer-field"><label for="pos-customer-phone">رقم الهاتف</label><input id="pos-customer-phone" type="tel" maxlength="40" autocomplete="tel" placeholder="05 / 06 / 07 ..."></div>
+                            <div class="pos-customer-field pos-customer-address-field"><label for="pos-customer-address">العنوان</label><textarea id="pos-customer-address" rows="1" maxlength="300" autocomplete="street-address" placeholder="عنوان العميل"></textarea></div>
+                        </div>
+                    </section>
                     <div class="pos-layout">
                         <section class="admin-card pos-products-panel" aria-labelledby="pos-products-title">
                             <div class="pos-panel-heading"><div><h3 id="pos-products-title">المنتجات</h3><p>ابحث واختر المنتجات لإضافتها إلى البيع</p></div><span class="pos-panel-icon"><i class="fas fa-box-open"></i></span></div>
@@ -224,15 +232,6 @@
                         </section>
                         <section class="admin-card pos-cart-panel" aria-labelledby="pos-cart-title">
                             <div class="pos-panel-heading"><div><h3 id="pos-cart-title">سلة البيع</h3><p>راجع الكميات والمبلغ قبل التأكيد</p></div><span class="pos-panel-icon"><i class="fas fa-receipt"></i></span></div>
-                            <div class="pos-customer-fields">
-                                <div class="pos-customer-fields-heading"><i class="fas fa-user-circle"></i><strong>معلومات العميل للفاتورة</strong><small>اتركها فارغة إذا كان البيع دون بيانات عميل</small></div>
-                                <label for="pos-customer-name">اسم العميل</label>
-                                <input id="pos-customer-name" type="text" maxlength="120" autocomplete="name" placeholder="اسم العميل">
-                                <label for="pos-customer-phone">رقم الهاتف</label>
-                                <input id="pos-customer-phone" type="tel" maxlength="40" autocomplete="tel" placeholder="05 / 06 / 07 ...">
-                                <label for="pos-customer-address">العنوان</label>
-                                <textarea id="pos-customer-address" rows="2" maxlength="300" autocomplete="street-address" placeholder="عنوان العميل"></textarea>
-                            </div>
                             <div id="pos-cart" class="pos-cart-content"></div>
                             <div class="pos-checkout-fields">
                                 <label for="pos-discount">التخفيض (دج)</label>
