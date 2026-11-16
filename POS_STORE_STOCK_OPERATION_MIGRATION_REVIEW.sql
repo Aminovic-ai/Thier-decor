@@ -38,7 +38,9 @@ declare
   v_product_id bigint;
   v_qty numeric;
   v_price numeric;
+  v_sale_price numeric;
   v_cost numeric;
+  v_today date;
   v_is_pack boolean;
   v_pack_items jsonb;
   v_required jsonb := '{}'::jsonb;
@@ -91,6 +93,10 @@ begin
     );
   end if;
 
+  -- Match the storefront's active promotional-price rule using Algeria's local date.
+  -- Keep the base price and promotion fields in the snapshot for race detection.
+  v_today := (now() at time zone 'Africa/Algiers')::date;
+
   -- Read product definitions without locks first. All required stock rows are
   -- then locked once, in the same ascending-id order used by web-order RPCs.
 
@@ -122,6 +128,14 @@ begin
       raise exception 'Invalid price or cost for product %', v_product_id;
     end if;
 
+    v_sale_price := v_price;
+    if coalesce(v_product."promoPrice", 0) > 0
+       and coalesce(v_product."promoPrice", 0) < v_price
+       and (v_product."promoStart" is null or v_product."promoStart" <= v_today)
+       and (v_product."promoEnd" is null or v_product."promoEnd" >= v_today) then
+      v_sale_price := v_product."promoPrice";
+    end if;
+
     v_is_pack := coalesce(v_product."isPack", false);
     v_pack_items := case when v_is_pack then coalesce(v_product."packItems", '[]'::jsonb) else '[]'::jsonb end;
     if v_is_pack and (jsonb_typeof(v_pack_items) <> 'array' or jsonb_array_length(v_pack_items) = 0) then
@@ -137,6 +151,9 @@ begin
         'name', v_product.name,
         'price', v_price,
         'cost', v_cost,
+        'promoPrice', v_product."promoPrice",
+        'promoStart', v_product."promoStart",
+        'promoEnd', v_product."promoEnd",
         'isPack', v_is_pack,
         'packItems', v_pack_items
       ),
@@ -170,13 +187,13 @@ begin
       'product_id', v_product_id::text,
       'product_name', coalesce(v_product.name,''),
       'quantity', v_qty,
-      'unit_price', v_price,
+      'unit_price', v_sale_price,
       'unit_cost', v_cost,
-      'line_total', round(v_price * v_qty, 2),
+      'line_total', round(v_sale_price * v_qty, 2),
       'is_pack', v_is_pack,
       'pack_snapshot', v_pack_items
     ));
-    v_subtotal := v_subtotal + v_price * v_qty;
+    v_subtotal := v_subtotal + v_sale_price * v_qty;
   end loop;
 
   -- Lock and validate every required stock row in globally sorted order.
@@ -200,6 +217,9 @@ begin
       if coalesce(v_product.name,'') is distinct from coalesce(v_snapshot->>'name','')
          or coalesce(v_product.price,0) is distinct from coalesce((v_snapshot->>'price')::numeric,0)
          or coalesce(v_product.cost,0) is distinct from coalesce((v_snapshot->>'cost')::numeric,0)
+         or v_product."promoPrice" is distinct from (v_snapshot->>'promoPrice')::numeric
+         or v_product."promoStart" is distinct from (v_snapshot->>'promoStart')::date
+         or v_product."promoEnd" is distinct from (v_snapshot->>'promoEnd')::date
          or coalesce(v_product."isPack",false) is distinct from coalesce((v_snapshot->>'isPack')::boolean,false)
          or (case when coalesce(v_product."isPack",false) then coalesce(v_product."packItems",'[]'::jsonb) else '[]'::jsonb end)
             is distinct from coalesce(v_snapshot->'packItems','[]'::jsonb) then
