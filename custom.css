@@ -2249,3 +2249,45 @@ a { text-underline-offset: 3px; }
     max-height:96px !important;
   }
 }
+
+
+/* Dedicated POS workspace: independent full-screen cashier experience */
+#screen-admin .admin-layout.pos-workspace-mode { grid-template-columns:minmax(0,1fr); }
+#screen-admin .admin-layout.pos-workspace-mode .admin-sidebar,
+#screen-admin .admin-layout.pos-workspace-mode > .admin-content > .admin-header { display:none !important; }
+#screen-admin .admin-layout.pos-workspace-mode .admin-content { width:100%; min-width:0; max-width:none; padding:clamp(12px,2vw,28px); }
+#screen-admin .pos-workspace-topbar { display:flex; align-items:center; justify-content:space-between; gap:14px; margin:0 0 18px; padding:13px 17px; border:1px solid #d8eaf6; border-radius:16px; background:#fff; box-shadow:0 7px 24px rgba(25,88,130,.06); }
+#screen-admin .pos-workspace-brand { display:flex; align-items:center; gap:11px; min-width:0; }
+#screen-admin .pos-workspace-brand-icon { display:grid; place-items:center; width:43px; height:43px; flex:0 0 43px; border-radius:13px; background:linear-gradient(145deg,#dff3ff,#c7eaff); color:#0879b5; font-size:1.15rem; }
+#screen-admin .pos-workspace-brand strong { display:block; color:#153b56; font-size:.95rem; letter-spacing:.04em; }
+#screen-admin .pos-workspace-brand small { display:block; margin-top:2px; color:#6b879a; font-size:.62rem; font-weight:900; letter-spacing:.13em; }
+#screen-admin .pos-workspace-actions { display:flex; align-items:center; gap:8px; }
+#screen-admin .pos-workspace-actions button { display:inline-flex; align-items:center; justify-content:center; gap:8px; min-height:39px; padding:8px 12px; border:1px solid #d8eaf6; border-radius:10px; background:#f7fbfe; color:#28536e; font:inherit; font-size:.8rem; font-weight:800; cursor:pointer; }
+#screen-admin .pos-workspace-actions .pos-workspace-site-btn { background:#eaf7ff; border-color:#c8e8fa; color:#0879b5; }
+#screen-admin .pos-workspace-actions .pos-workspace-exit-btn { width:40px; padding:8px; color:#c34e5a; background:#fff7f7; border-color:#f4dada; }
+#screen-admin .admin-nav a.admin-pos-entry { position:relative; margin-top:9px; padding-block:12px; border:1px solid #bfe4f8; border-radius:12px; background:linear-gradient(110deg,#eaf7ff,#f8fcff); color:#0879b5; font-weight:900; }
+#screen-admin .admin-nav a.admin-pos-entry i { color:#0879b5; }
+#screen-admin .admin-nav a.admin-pos-entry small { display:block; margin-inline-start:auto; color:#65a5c8; font-size:.55rem; font-weight:900; letter-spacing:.08em; }
+#screen-admin .admin-nav a.admin-pos-entry.active { border-color:#70c4ef; background:#dff2ff; box-shadow:inset 3px 0 #168fc9; }
+#screen-admin .pos-workspace-mode .admin-content { background:#f4f9fd; }
+#screen-admin .pos-workspace-mode .pos-page-heading { margin-bottom:16px; }
+@media(max-width:600px) {
+ #screen-admin .admin-layout.pos-workspace-mode .admin-content { padding:10px; }
+ #screen-admin .pos-workspace-topbar { align-items:flex-start; padding:10px; }
+ #screen-admin .pos-workspace-brand { gap:7px; }
+ #screen-admin .pos-workspace-brand-icon { width:37px; height:37px; flex-basis:37px; }
+ #screen-admin .pos-workspace-actions { gap:5px; }
+ #screen-admin .pos-workspace-actions button { min-height:36px; padding:7px 9px; font-size:.72rem; }
+}
+
+
+/* POS workspace navigation tabs */
+#screen-admin .pos-workspace-actions { flex-wrap:wrap; }
+#screen-admin .pos-workspace-actions .pos-view-tab { background:#f5faff; border-color:#d7e8f5; color:#41627a; }
+#screen-admin .pos-workspace-actions .pos-view-tab.active { background:#087fbd; border-color:#087fbd; color:#fff; box-shadow:0 4px 12px rgba(8,127,189,.18); }
+#screen-admin .pos-workspace-actions .pos-view-tab i { font-size:.85rem; }
+#screen-admin #pos-reports-view { width:100%; }
+@media(max-width:700px) {
+ #screen-admin .pos-workspace-actions { justify-content:flex-end; }
+ #screen-admin .pos-workspace-actions .pos-view-tab { flex:1 1 auto; }
+}

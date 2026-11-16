@@ -2746,7 +2746,7 @@ let posSelectedCategory = 'all';
 
 const posTranslations = {
  ar: {
-  heading:'البيع من المحل', intro:'اختر المنتجات، راجع السلة، ثم أكّد عملية البيع',
+  heading:'البيع من المحل', intro:'اختر المنتجات، راجع السلة، ثم أكّد عملية البيع', saleTab:'البيع', reportsTab:'سجل الفواتير والتقارير', backToWebsite:'إدارة الموقع', language:'FR',
   customerPanel:'معلومات العميل للفاتورة', optional:'اختياري — اترك الحقول فارغة إذا كان البيع دون بيانات عميل',
   customerName:'اسم العميل', customerPhone:'رقم الهاتف', address:'العنوان', customerAddress:'عنوان العميل',
   products:'المنتجات', searchProducts:'ابحث واختر المنتجات لإضافتها إلى البيع', searchPlaceholder:'ابحث باسم المنتج...',
@@ -2774,7 +2774,7 @@ const posTranslations = {
   recoverError:'تعذرت استعادة الفواتير:', noData:'لا توجد بيانات'
  },
  fr: {
-  heading:'Vente', intro:'Choisissez les produits, vérifiez le panier, puis confirmez la vente.',
+  heading:'Vente', intro:'Choisissez les produits, vérifiez le panier, puis confirmez la vente.', saleTab:'Vente', reportsTab:'Factures et rapports', backToWebsite:'Administration du site', language:'AR',
   customerPanel:'Informations client pour la facture', optional:'Facultatif — laissez les champs vides pour une vente sans coordonnées client.',
   customerName:'Nom du client', customerPhone:'Téléphone', address:'Adresse', customerAddress:'Adresse du client',
   products:'Produits', searchProducts:'Recherchez et choisissez les produits à ajouter à la vente.',
@@ -2981,12 +2981,35 @@ async function recoverPendingPOSSales(){
 }
 window.recoverPendingPOSSales=recoverPendingPOSSales;
 window.submitPOSSale=submitPOSSale;
+function setPOSView(view = 'sale') {
+    const saleView = document.getElementById('pos-sale-view');
+    const reportsView = document.getElementById('pos-reports-view');
+    if (!saleView || !reportsView) return;
+    const showReports = view === 'reports';
+    saleView.style.display = showReports ? 'none' : 'block';
+    reportsView.style.display = showReports ? 'block' : 'none';
+    document.querySelectorAll('#sec-pos .pos-view-tab').forEach(button => {
+        const active = button.dataset.posView === (showReports ? 'reports' : 'sale');
+        button.classList.toggle('active', active);
+        button.setAttribute('aria-pressed', active ? 'true' : 'false');
+    });
+    if (showReports) refreshPOSSales();
+}
+window.setPOSView = setPOSView;
+
 function adminGo(sec, btnElement) {
-    document.querySelectorAll('.admin-section').forEach(s => s.style.display = 'none'); document.getElementById('sec-' + sec).style.display = 'block';
-    document.querySelectorAll('.admin-nav a').forEach(a => a.classList.remove('active')); if (btnElement) btnElement.classList.add('active');
+    const adminLayout = document.querySelector('#screen-admin .admin-layout');
+    const targetSection = document.getElementById('sec-' + sec);
+    if (!targetSection) return;
+    if (adminLayout) adminLayout.classList.toggle('pos-workspace-mode', sec === 'pos');
+    document.querySelectorAll('#screen-admin .admin-section').forEach(s => s.style.display = 'none');
+    targetSection.style.display = 'block';
+    document.querySelectorAll('#screen-admin .admin-nav a').forEach(a => a.classList.remove('active'));
+    const activeNav = btnElement || Array.from(document.querySelectorAll('#screen-admin .admin-nav a')).find(a => a.getAttribute('onclick')?.includes("adminGo('dashboard'"));
+    if (activeNav) activeNav.classList.add('active');
     const titleKey = sec === 'dashboard' ? 'admin_home' : 'admin_' + sec; document.getElementById('admin-page-title').textContent = sec === 'pos' ? (state.currentLang === 'fr' ? 'Vente' : 'البيع من المحل') : (i18n[state.currentLang][titleKey] || sec);
     if (sec === 'dashboard') renderAdminHome();
-    if (sec === 'pos') { applyPOSTranslations(); renderPOSProducts(); renderPOSCart(); refreshPOSSales(); }
+    if (sec === 'pos') { setPOSView('sale'); applyPOSTranslations(); renderPOSProducts(); renderPOSCart(); }
     if (sec === 'orders') renderAdminOrdersList();
     if (sec === 'products') renderAdminProducts();
     if (sec === 'customers') {
