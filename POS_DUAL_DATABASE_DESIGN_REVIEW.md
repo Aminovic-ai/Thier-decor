@@ -63,9 +63,13 @@ POS database:
 4. Validate the Worker payload against trusted store product rows; reject stale/invalid pack definitions and fractional stock quantities.
 5. Ensure the same `request_key` is retained by the UI until the sale is definitively completed. Do not generate a new key on a network retry.
 6. Implement POS invoice history and POS-only sales/profit summaries from the POS database; keep expense CRUD pointed at the old store database.
-6. Test: normal product sale, pack sale, insufficient stock, duplicate submit, timeout after stock commit, timeout after POS commit, POS outage/retry, concurrent sales competing for the last units, and invoice printing.
-7. Confirm no changes to web checkout, customer orders, R2 image handling, production Worker, or live Pages.
-8. Only after review and explicit approval: apply POS migration to the POS project, apply store migration to the store project, add the two POS secrets in Cloudflare, test on a non-production Worker environment, then manually deploy only when the user requests it.
+7. Test: normal product sale, pack sale, insufficient stock, duplicate submit, timeout after stock commit, timeout after POS commit, POS outage/retry, concurrent sales competing for the last units, and invoice printing.
+8. Confirm no changes to web checkout, customer orders, R2 image handling, production Worker, or live Pages.
+9. Only after review and explicit approval: apply POS migration to the POS project, apply store migration to the store project, add the POS URL and secret key in Cloudflare, test on a non-production Worker environment, then manually deploy only when the user requests it.
+
+## Superseded migration
+
+- `POS_STORE_SALES_MIGRATION_REVIEW.sql` is an obsolete single-database draft. Do not execute it. Use only the two dual-database migrations named above, each in its designated project.
 
 ## Explicit non-actions
 
