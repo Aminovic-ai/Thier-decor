@@ -1564,7 +1564,8 @@ async function handleRequest(request, env) {
         case "adminCouponUsage":
         case "adminMigrateLegacyImages":
         case "adminNotifyCustomerProductAvailable":
-        case "adminCreateStoreSale":\n        case "adminDeleteOrder":
+        case "adminCreateStoreSale":
+        case "adminDeleteOrder":
         case "adminEditOrder":
         case "adminVisitStats": {
           const isAdmin = await verifyFirebaseAdmin(request, env);
