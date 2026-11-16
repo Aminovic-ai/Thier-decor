@@ -149,7 +149,11 @@ begin
        or coalesce(v_item->>'quantity','') !~ '^[0-9]{1,6}$'
        or (v_item->>'quantity')::numeric <= 0
        or coalesce(v_item->>'unit_price','') !~ '^[0-9]+(\.[0-9]+)?$'
-       or coalesce(v_item->>'unit_cost','') !~ '^[0-9]+(\.[0-9]+)?
+       or coalesce(v_item->>'unit_cost','') !~ '^[0-9]+(\.[0-9]+)?$'
+       or coalesce(v_item->>'line_total','') !~ '^[0-9]+(\.[0-9]+)?$'
+       or (v_item->>'unit_cost')::numeric < 0
+       or round((v_item->>'quantity')::numeric * (v_item->>'unit_price')::numeric,2)
+          <> round((v_item->>'line_total')::numeric,2) then
       raise exception 'Invalid POS invoice line';
     end if;
     insert into public.pos_sale_items (
