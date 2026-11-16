@@ -2556,3 +2556,386 @@ a { text-underline-offset: 3px; }
 }
 #screen-admin .pos-invoice-download-btn i{color:#dc2626}
 #screen-admin .pos-invoice-table td{vertical-align:middle}
+
+
+/* =========================================================
+   Thier Décor POS — phone-first layout refinement (v1)
+   Scoped to the POS workspace; desktop and storefront stay intact.
+   ========================================================= */
+#screen-admin .admin-layout.pos-workspace-mode,
+#screen-admin .admin-layout.pos-workspace-mode .admin-content,
+#screen-admin .admin-layout.pos-workspace-mode #sec-pos {
+  min-width: 0;
+  max-width: 100%;
+}
+#screen-admin .admin-layout.pos-workspace-mode .admin-content {
+  box-sizing: border-box;
+}
+#screen-admin .pos-workspace-topbar,
+#screen-admin .pos-page-heading,
+#screen-admin .pos-customer-panel,
+#screen-admin .pos-products-panel,
+#screen-admin .pos-cart-panel,
+#screen-admin #pos-reports-view {
+  min-width: 0;
+  box-sizing: border-box;
+}
+#screen-admin .pos-workspace-actions button {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+#screen-admin .pos-product-card,
+#screen-admin .pos-cart-line,
+#screen-admin .pos-customer-field {
+  min-width: 0;
+}
+#screen-admin .pos-product-card img {
+  object-fit: contain;
+}
+#screen-admin .pos-invoice-search {
+  min-width: 0;
+}
+#screen-admin .pos-invoice-search input {
+  box-sizing: border-box;
+  min-width: 0 !important;
+}
+#screen-admin .pos-sales-history,
+#screen-admin #pos-sales-history {
+  max-width: 100%;
+  min-width: 0;
+}
+#screen-admin #pos-sales-history > div {
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border: 1px solid #e7edf6;
+  border-radius: 12px;
+}
+#screen-admin .pos-invoice-table {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+#screen-admin .pos-invoice-table th {
+  white-space: nowrap;
+}
+#screen-admin .pos-invoice-table td {
+  overflow-wrap: anywhere;
+}
+@media (max-width: 700px) {
+  #screen-admin .admin-layout.pos-workspace-mode .admin-content {
+    width: 100%;
+    padding: 10px max(10px, env(safe-area-inset-right)) 18px max(10px, env(safe-area-inset-left));
+  }
+  #screen-admin #sec-pos {
+    padding: 0 !important;
+  }
+  #screen-admin .pos-workspace-topbar {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+    width: 100%;
+    margin: 0 0 14px;
+    padding: 12px;
+    border-radius: 16px;
+  }
+  #screen-admin .pos-workspace-brand {
+    width: 100%;
+    min-width: 0;
+    gap: 10px;
+  }
+  #screen-admin .pos-workspace-brand > div {
+    min-width: 0;
+  }
+  #screen-admin .pos-workspace-brand strong {
+    font-size: .98rem;
+  }
+  #screen-admin .pos-workspace-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: stretch;
+    justify-content: stretch;
+    width: 100%;
+    max-width: none;
+    gap: 7px;
+  }
+  #screen-admin .pos-workspace-actions button,
+  #screen-admin .pos-workspace-actions .pos-view-tab {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    width: 100%;
+    min-width: 0;
+    min-height: 44px;
+    padding: 8px 7px;
+    border-radius: 11px;
+    font-size: .76rem;
+    line-height: 1.3;
+    white-space: normal;
+    text-align: center;
+  }
+  #screen-admin .pos-workspace-actions .pos-view-tab span,
+  #screen-admin .pos-workspace-actions button span {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  #screen-admin .pos-workspace-actions .pos-workspace-exit-btn {
+    width: 100%;
+    min-width: 0;
+  }
+  #screen-admin .pos-page-heading {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    width: 100%;
+    margin: 0 0 12px;
+    padding: 13px;
+    border-radius: 15px;
+  }
+  #screen-admin .pos-heading-icon {
+    width: 43px;
+    height: 43px;
+    flex: 0 0 43px;
+    border-radius: 12px;
+    font-size: 1.12rem;
+  }
+  #screen-admin .pos-page-heading > div:last-child {
+    min-width: 0;
+  }
+  #screen-admin .pos-page-heading .pos-eyebrow {
+    font-size: .58rem;
+    letter-spacing: .06em;
+    overflow-wrap: anywhere;
+  }
+  #screen-admin .pos-page-heading h2 {
+    font-size: 1rem;
+    line-height: 1.4;
+  }
+  #screen-admin .pos-page-heading p {
+    font-size: .73rem;
+    line-height: 1.45;
+  }
+  #screen-admin .pos-customer-panel,
+  #screen-admin .pos-products-panel,
+  #screen-admin .pos-cart-panel {
+    width: 100%;
+    margin-inline: 0;
+    padding: 12px;
+    border-radius: 15px;
+  }
+  #screen-admin .pos-customer-fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 9px;
+  }
+  #screen-admin .pos-customer-fields-heading {
+    gap: 7px;
+    min-width: 0;
+  }
+  #screen-admin .pos-customer-fields-heading strong {
+    font-size: .82rem;
+  }
+  #screen-admin .pos-customer-fields-heading small {
+    flex-basis: 100%;
+    margin: 0;
+    font-size: .68rem;
+    line-height: 1.45;
+  }
+  #screen-admin .pos-customer-field label {
+    font-size: .75rem;
+  }
+  #screen-admin .pos-customer-field input,
+  #screen-admin .pos-customer-field textarea,
+  #screen-admin .pos-checkout-fields input,
+  #screen-admin .pos-checkout-fields select {
+    width: 100%;
+    min-width: 0;
+    min-height: 44px;
+    box-sizing: border-box;
+    font-size: 16px;
+  }
+  #screen-admin .pos-customer-field textarea {
+    min-height: 44px;
+  }
+  #screen-admin .pos-panel-heading {
+    gap: 9px;
+    margin-bottom: 12px;
+    padding-bottom: 10px;
+  }
+  #screen-admin .pos-panel-heading h3 {
+    font-size: .94rem;
+  }
+  #screen-admin .pos-panel-heading p {
+    font-size: .7rem;
+    line-height: 1.4;
+  }
+  #screen-admin .pos-search-wrap {
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+  }
+  #screen-admin .pos-category-filters {
+    max-width: 100%;
+    padding-bottom: 9px;
+    scroll-snap-type: x proximity;
+  }
+  #screen-admin .pos-category-chip {
+    min-height: 40px;
+    scroll-snap-align: start;
+  }
+  #screen-admin .pos-products-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 8px !important;
+  }
+  #screen-admin .pos-product-card {
+    gap: 7px;
+    padding: 8px !important;
+    border-radius: 12px !important;
+  }
+  #screen-admin .pos-product-image {
+    height: clamp(88px, 27vw, 112px) !important;
+    min-height: 88px !important;
+    max-height: 112px !important;
+  }
+  #screen-admin .pos-product-card strong {
+    min-height: 2.6em;
+    font-size: .77rem !important;
+    line-height: 1.35 !important;
+  }
+  #screen-admin .pos-product-card small {
+    font-size: .68rem !important;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+  }
+  #screen-admin .pos-cart-line {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 7px;
+    padding: 10px 0;
+  }
+  #screen-admin .pos-cart-line-info strong {
+    font-size: .78rem;
+    line-height: 1.4;
+  }
+  #screen-admin .pos-cart-line-actions {
+    gap: 6px;
+  }
+  #screen-admin .pos-qty-button {
+    width: 34px;
+    height: 34px;
+    min-width: 34px;
+  }
+  #screen-admin .pos-cart-line-total {
+    grid-column: 1 / -1;
+    justify-self: end;
+    font-size: .8rem;
+  }
+  #screen-admin .pos-checkout-fields {
+    gap: 7px;
+    margin-top: 12px;
+    padding-top: 12px;
+  }
+  #screen-admin .pos-total {
+    margin: 12px 0;
+    padding: 13px 10px;
+    font-size: 1.02rem;
+  }
+  #screen-admin .pos-submit-button {
+    min-height: 50px;
+    padding: 11px 10px;
+    font-size: .84rem;
+  }
+  #screen-admin .pos-stock-note {
+    font-size: .68rem;
+    line-height: 1.45;
+  }
+  #screen-admin #pos-reports-view {
+    width: 100%;
+    margin-top: 12px !important;
+    padding: 12px;
+    border-radius: 15px;
+  }
+  #screen-admin .pos-sales-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+  #screen-admin .pos-sales-summary .stat-card {
+    min-width: 0;
+    padding: 11px;
+  }
+  #screen-admin .pos-sales-summary .stat-card span {
+    font-size: .72rem;
+    line-height: 1.35;
+  }
+  #screen-admin .pos-sales-summary .stat-card h3 {
+    font-size: 1rem;
+    overflow-wrap: anywhere;
+  }
+  #screen-admin .pos-sales-summary .stat-card small {
+    font-size: .66rem !important;
+    line-height: 1.4;
+  }
+  #screen-admin #pos-reports-view .pos-panel-heading {
+    flex-wrap: wrap;
+  }
+  #screen-admin .pos-invoice-search {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 7px !important;
+  }
+  #screen-admin .pos-invoice-search input {
+    grid-column: 1 / -1;
+    width: 100%;
+    min-height: 44px;
+    font-size: 16px;
+  }
+  #screen-admin .pos-invoice-search button {
+    min-height: 42px;
+    padding: 8px 9px;
+    font-size: .74rem;
+  }
+  #screen-admin #pos-sales-history > div {
+    border-radius: 10px;
+  }
+  #screen-admin .pos-invoice-table {
+    min-width: 700px !important;
+    font-size: .76rem;
+  }
+  #screen-admin .pos-invoice-table th,
+  #screen-admin .pos-invoice-table td {
+    padding: 9px 8px;
+  }
+  #screen-admin .pos-invoice-download-btn {
+    min-height: 40px;
+    padding: 8px 9px;
+    font-size: .72rem;
+  }
+}
+@media (max-width: 420px) {
+  #screen-admin .pos-customer-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  #screen-admin .pos-customer-address-field {
+    grid-column: auto;
+  }
+  #screen-admin .pos-sales-summary {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  #screen-admin .pos-workspace-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 350px) {
+  #screen-admin .admin-layout.pos-workspace-mode .admin-content {
+    padding-inline: 7px;
+  }
+  #screen-admin .pos-workspace-actions button {
+    font-size: .7rem;
+    padding-inline: 5px;
+  }
+  #screen-admin .pos-products-grid {
+    gap: 6px !important;
+  }
+  #screen-admin .pos-product-card {
+    padding: 6px !important;
+  }
+}
