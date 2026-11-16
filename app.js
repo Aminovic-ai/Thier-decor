@@ -2873,7 +2873,7 @@ async function recoverPendingPOSSales(){
  let cursor=null,totalRecovered=0,blocked=false,finished=false;
  try{
   try{cursor=JSON.parse(localStorage.getItem('td_pos_recovery_cursor')||'null');}catch(_){cursor=null;}
-  for(let page=0;page<1000;page++){
+  for(let page=0;page<10;page++){
    const result=await callAdminWorker('adminRecoverPendingStoreSales',{cursor});
    totalRecovered+=(Array.isArray(result.recovered)?result.recovered.length:0);
    if(result.done===true){
