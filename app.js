@@ -2906,7 +2906,7 @@ function adminGo(sec, btnElement) {
     document.querySelectorAll('.admin-nav a').forEach(a => a.classList.remove('active')); if (btnElement) btnElement.classList.add('active');
     const titleKey = sec === 'dashboard' ? 'admin_home' : 'admin_' + sec; document.getElementById('admin-page-title').textContent = i18n[state.currentLang][titleKey] || sec;
     if (sec === 'dashboard') renderAdminHome();
-    if (sec === 'pos') { renderPOSProducts(); renderPOSCart(); }
+    if (sec === 'pos') { renderPOSProducts(); renderPOSCart(); refreshPOSSales(); }
     if (sec === 'orders') renderAdminOrdersList();
     if (sec === 'products') renderAdminProducts();
     if (sec === 'customers') {
