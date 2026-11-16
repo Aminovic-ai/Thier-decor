@@ -1362,7 +1362,7 @@ async function adminCreateStoreSale(body, env, request) {
       stockError = error;
       console.error("POS stock commit attempt failed:", attempt + 1, error);
       const retryable = error instanceof TypeError ||
-        /deadlock|timeout|temporar|connection|network|could not serialize/i.test(String(error?.message || ""));
+        /deadlock|timeout|temporar|connection|network|could not serialize|configuration changed during sale/i.test(String(error?.message || ""));
       if (!retryable || attempt >= 2) break;
       await new Promise(resolve => setTimeout(resolve, 180 * (attempt + 1)));
     }
