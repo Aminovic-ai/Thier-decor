@@ -91,10 +91,10 @@ begin
 
   -- Serialize inventory writers before taking any row locks. Online order RPCs
   -- update this same table and therefore wait at the table lock before holding
-  -- product row locks. This avoids cross-order deadlocks while this short POS
-  -- transaction discovers pack components and later locks required rows by id.
-  -- Trade-off: product writes are briefly serialized during a POS stock commit.
-  lock table public.products in share row exclusive mode;
+  -- product row locks. EXCLUSIVE conflicts with both ROW SHARE (FOR UPDATE)
+  -- and ROW EXCLUSIVE (UPDATE), while ordinary SELECTs remain available.
+  -- Trade-off: stock writers/lockers are briefly serialized during POS commit.
+  lock table public.products in exclusive mode;
 
   -- Read top-level products only after the inventory-writer barrier is acquired.
   for v_item in
