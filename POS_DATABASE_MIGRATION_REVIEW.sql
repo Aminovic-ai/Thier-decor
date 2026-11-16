@@ -110,6 +110,9 @@ begin
   if v_paid < 0 or v_paid > v_total then
     raise exception 'Invalid paid amount';
   end if;
+  if abs(coalesce((select sum((value->>'line_total')::numeric) from jsonb_array_elements(p_sale->'items')),0) - v_subtotal) > 0.01 then
+    raise exception 'Invoice line totals do not match subtotal';
+  end if;
   v_created_at := coalesce(nullif(p_sale->>'created_at','')::timestamptz, now());
 
   v_sale_id := gen_random_uuid();
@@ -136,8 +139,8 @@ begin
     if coalesce(v_item->>'product_id','') !~ '^[0-9]{1,18}$'
        or coalesce(v_item->>'quantity','') !~ '^[0-9]{1,6}$'
        or (v_item->>'quantity')::numeric <= 0
-       or coalesce(v_item->>'unit_price','') !~ '^[0-9]+(\\.[0-9]+)?$'
-       or coalesce(v_item->>'unit_cost','') !~ '^[0-9]+(\\.[0-9]+)?$' then
+       or coalesce(v_item->>'unit_price','') !~ '^[0-9]+(\.[0-9]+)?$'
+       or coalesce(v_item->>'unit_cost','') !~ '^[0-9]+(\.[0-9]+)?$' then
       raise exception 'Invalid POS invoice line';
     end if;
     insert into public.pos_sale_items (
