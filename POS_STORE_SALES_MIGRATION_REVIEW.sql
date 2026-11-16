@@ -31,7 +31,7 @@ security definer
 set search_path=public,pg_temp
 as $$
 declare
-  request_key uuid;
+  v_request_key uuid;
   canonical_items jsonb;
   required jsonb;
   item_key text;
@@ -52,15 +52,15 @@ begin
   end if;
 
   begin
-    request_key := (p_sale->>'request_key')::uuid;
+    v_request_key := (p_sale->>'request_key')::uuid;
   exception when others then
     raise exception 'A valid request key is required';
   end;
 
-  perform pg_advisory_xact_lock(hashtext('td-store-sale:' || request_key::text));
+  perform pg_advisory_xact_lock(hashtext('td-store-sale:' || v_request_key::text));
   select * into existing_sale
     from public.td_store_sales
-    where td_store_sales.request_key = td_admin_create_store_sale.request_key
+    where td_store_sales.request_key = v_request_key
     for update;
   if found then
     return jsonb_build_object(
@@ -115,7 +115,7 @@ begin
     request_key, items, items_total, discount, total,
     payment_method, paid_amount, cashier_uid
   ) values (
-    request_key, canonical_items, subtotal, discount_amount, total_amount,
+    v_request_key, canonical_items, subtotal, discount_amount, total_amount,
     payment, paid, nullif(cashier,'')
   ) returning id into sale_id;
 
