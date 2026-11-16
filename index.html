@@ -241,6 +241,7 @@
                                 <select id="pos-payment"><option value="cash">نقداً</option><option value="transfer">تحويل</option><option value="card">بطاقة</option><option value="other">أخرى</option></select>
                             </div>
                             <div id="pos-total" class="pos-total">الإجمالي: 0 دج</div>
+                            <button type="button" class="btn-icon" style="width:100%;margin:10px 0;" onclick="recoverPendingPOSSales()"><i class="fas fa-sync-alt"></i> استعادة الفواتير المعلّقة</button>
                             <button type="button" class="btn-primary pos-submit-button" onclick="submitPOSSale()"><i class="fas fa-check-circle"></i> تأكيد البيع وطباعة الفاتورة</button>
                             <p class="pos-stock-note"><i class="fas fa-shield-alt"></i> يتم خصم المخزون عند تأكيد البيع فقط.</p>
                         </section>
