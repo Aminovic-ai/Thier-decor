@@ -1,6 +1,6 @@
 # Thier Décor POS — Dual Supabase Database Design
 
-Status: review design only. No production SQL, Worker deployment, Pages deployment, or merge is authorized by this document.
+Status: implementation prepared on the POS feature branch for review. No staging SQL has been executed, no production SQL has been executed, and no Worker/Pages deployment or merge is authorized.
 
 ## Fixed architecture
 
@@ -17,7 +17,7 @@ Status: review design only. No production SQL, Worker deployment, Pages deployme
 PostgreSQL cannot provide one atomic transaction spanning two independent Supabase projects. The POS flow therefore uses a retryable saga with a durable idempotency key.
 
 1. The authenticated admin submits a sale with a client-generated UUID `request_key`. The Worker validates the Firebase admin identity.
-2. The Worker reads current product rows from the store database and builds canonical sale-line snapshots using trusted database values only. Browser-supplied names, prices, costs, pack flags, or pack components are ignored.
+2. The Worker validates the submitted product identifiers and sends only IDs, quantities, and allowed sale metadata to the store RPC. The store RPC reads the live product rows and builds canonical sale-line snapshots using trusted database values only. Browser-supplied names, prices, costs, pack flags, or pack components are ignored.
 3. The Worker calls a store-database RPC to commit the stock deduction. That RPC:
    - serializes requests by `request_key`;
    - returns the prior result if the key has already committed;
@@ -62,7 +62,7 @@ POS database:
 3. Implement separate Worker REST/RPC helpers for store and POS. Never fall back from missing POS configuration to the store database.
 4. Validate the Worker payload against trusted store product rows; reject stale/invalid pack definitions and fractional stock quantities.
 5. Ensure the same `request_key` is retained by the UI until the sale is definitively completed. Do not generate a new key on a network retry.
-6. Implement POS invoice history and POS-only sales/profit summaries from the POS database; keep expense CRUD pointed at the old store database.
+6. Implement POS invoice history and POS-only sales/profit summaries from the POS database; keep expense CRUD pointed at the old store database. (Branch implementation is now present; staging verification remains outstanding.)
 7. Test: normal product sale, pack sale, insufficient stock, duplicate submit, timeout after stock commit, timeout after POS commit, POS outage/retry, concurrent sales competing for the last units, and invoice printing.
 8. Confirm no changes to web checkout, customer orders, R2 image handling, production Worker, or live Pages.
 9. Only after review and explicit approval: apply POS migration to the POS project, apply store migration to the store project, add the POS URL and secret key in Cloudflare, test on a non-production Worker environment, then manually deploy only when the user requests it.
