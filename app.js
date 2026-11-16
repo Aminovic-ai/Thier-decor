@@ -1183,6 +1183,7 @@ const ALGERIA_WILAYAS = [
 ];
 
 function switchLanguage(lang) {
+    if (document.getElementById('admin-area-hub')) updateAdminHubLanguage();
     state.currentLang = lang; save(K.lang, lang);
     document.getElementById('html-root').setAttribute('lang', lang);
     document.getElementById('html-root').setAttribute('dir', lang === 'ar' ? 'rtl' : 'ltr');
@@ -1253,7 +1254,7 @@ function openAdminEntry() {
         : null;
     if (user && user.uid === TD_ADMIN_UID) {
         goScreen('screen-admin');
-        adminGo('dashboard');
+        showAdminHub();
         return;
     }
     goScreen('screen-admin-login');
@@ -1777,7 +1778,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
             firebase.auth().signInWithEmailAndPassword(email, enteredPass)
-                .then(() => { document.getElementById('admin-login-email').value = ''; document.getElementById('admin-login-pass').value = ''; goScreen('screen-admin'); adminGo('dashboard'); toast('✅ ' + i18n[state.currentLang].welcome_back); })
+                .then(() => { document.getElementById('admin-login-email').value = ''; document.getElementById('admin-login-pass').value = ''; goScreen('screen-admin'); showAdminHub(); toast('✅ ' + i18n[state.currentLang].welcome_back); })
                 .catch((error) => { console.error(error); toast('❌ ' + error.message, 'error'); if (navigator.vibrate) navigator.vibrate(200); });
         });
     }
@@ -3045,6 +3046,17 @@ async function recoverPendingPOSSales(){
 }
 window.recoverPendingPOSSales=recoverPendingPOSSales;
 window.submitPOSSale=submitPOSSale;
+function updateAdminHubLanguage() {
+    const fr=state.currentLang==='fr';
+    const values={title:fr?'Bienvenue dans votre espace de gestion':'مرحباً بك في لوحة التحكم',subtitle:fr?'Choisissez l’espace que vous souhaitez gérer':'اختر المساحة التي تريد إدارتها',site:fr?'Gestion du site':'إدارة الموقع',siteDesc:fr?'Produits, commandes, clients et paramètres de la boutique':'المنتجات والطلبات والزبائن وإعدادات المتجر',pos:fr?'Gestion du magasin':'إدارة المحل',posDesc:fr?'Vente directe, historique des factures et rapports de bénéfices':'البيع المباشر وسجل الفواتير وتقارير الأرباح',language:fr?'العربية':'Français',logout:fr?'Déconnexion':'خروج'};
+    const set=(id,value)=>{const el=document.getElementById(id);if(el)el.textContent=value;};
+    set('admin-hub-title',values.title);set('admin-hub-subtitle',values.subtitle);set('admin-hub-site-title',values.site);set('admin-hub-site-desc',values.siteDesc);set('admin-hub-pos-title',values.pos);set('admin-hub-pos-desc',values.posDesc);set('admin-hub-language',values.language);set('admin-hub-logout',values.logout);
+    const hub=document.getElementById('admin-area-hub');if(hub)hub.dir=fr?'ltr':'rtl';
+}
+function showAdminHub(){const hub=document.getElementById('admin-area-hub');const layout=document.querySelector('#screen-admin .admin-layout');if(hub)hub.style.display='flex';if(layout)layout.style.display='none';updateAdminHubLanguage();}
+function openAdminArea(area){const hub=document.getElementById('admin-area-hub');const layout=document.querySelector('#screen-admin .admin-layout');if(hub)hub.style.display='none';if(layout)layout.style.display='';adminGo(area==='pos'?'pos':'dashboard');}
+window.showAdminHub=showAdminHub;window.openAdminArea=openAdminArea;
+
 function setPOSView(view = 'sale') {
     const saleView = document.getElementById('pos-sale-view');
     const reportsView = document.getElementById('pos-reports-view');
