@@ -2920,33 +2920,51 @@ async function submitPOSSale(){
   if(button){button.disabled=false;button.innerHTML=posPendingSalePayload?'<i class="fas fa-sync-alt"></i> '+(state.currentLang==='fr'?'Terminer la vente en attente et imprimer':'استكمال البيع المعلّق وطباعة الفاتورة'):'<i class="fas fa-check-circle"></i> '+posText('submit');}
  }
 }
-const posInvoiceCache = new Map();
-function downloadPOSSaleInvoice(saleId){
- const sale=posInvoiceCache.get(String(saleId));
- if(!sale){toast(state.currentLang==='fr'?'Facture introuvable. Actualisez la liste.':'لم يتم العثور على الفاتورة. حدّث السجل.','error');return;}
- const items=(Array.isArray(sale.pos_sale_items)?sale.pos_sale_items:[]).map(item=>({
-  name:item.product_name||item.name||item.product_snapshot?.name||'—',
-  qty:Number(item.quantity||0),
-  price:Number(item.unit_price||0)
- }));
- const invoice={
-  invoice_no:sale.invoice_no,created_at:sale.created_at,customer_name:sale.customer_name,
-  customer_phone:sale.customer_phone,customer_address:sale.customer_address,
-  store_name:sale.store_name||state.settings?.shopName||'Thier Décor',
-  store_phone:sale.store_phone||state.settings?.shopPhone||'',
-  store_address:sale.store_address||state.settings?.shopAddress||'',
-  discount:sale.discount,total:sale.total,items
- };
- const popup=window.open('about:blank','_blank','width=760,height=800');
- if(!popup){toast(posText('allowPrint'),'error');return;}
- printPOSSale(invoice,popup);
+let posSalesOffset = 0;
+let posSalesSearch = '';
+let posSalesLoading = false;
+function renderPOSSalesRows(rows, append = false) {
+ const target=document.getElementById('pos-sales-history');
+ if(!target)return;
+ const money=value=>fmtMoney(Number(value||0))+(state.currentLang==='fr'?' DA':' دج');
+ const downloadLabel=state.currentLang==='fr'?'Télécharger A4':'تحميل A4';
+ const htmlRows=rows.map(sale=>{
+  const items=Array.isArray(sale.pos_sale_items)?sale.pos_sale_items:[];
+  const margin=items.reduce((sum,item)=>sum+((Number(item.unit_price)||0)-(Number(item.unit_cost)||0))*(Number(item.quantity)||0),0);
+  const profit=margin-(Number(sale.discount)||0);
+  const date=new Date(sale.created_at);
+  const payment=(state.currentLang==='fr'?{cash:'Espèces',transfer:'Virement',card:'Carte',other:'Autre'}:{cash:'نقداً',transfer:'تحويل',card:'بطاقة',other:'أخرى'})[sale.payment_method]||sale.payment_method||'—';
+  return '<tr><td><strong>'+esc(sale.invoice_no||'—')+'</strong></td><td>'+esc(sale.customer_name||posText('cashCustomer'))+'<br><small>'+esc(sale.customer_phone||'')+'</small></td><td>'+date.toLocaleString(state.currentLang==='fr'?'fr-FR':'ar-DZ')+'</td><td>'+esc(payment)+'</td><td>'+money(sale.total)+'</td><td>'+money(profit)+'</td><td><button type="button" class="pos-invoice-download-btn" data-sale-id="'+esc(String(sale.id))+'" onclick="downloadPOSSaleInvoice(this.dataset.saleId)"><i class="fas fa-file-pdf"></i> '+downloadLabel+'</button></td></tr>';
+ }).join('');
+ const tableHead='<div style="overflow-x:auto;"><table class="admin-table pos-invoice-table" style="width:100%;min-width:760px;"><thead><tr><th>'+posText('invoice')+'</th><th>'+posText('customer')+'</th><th>'+posText('date')+'</th><th>'+posText('paymentMethod')+'</th><th>'+posText('amount')+'</th><th>'+posText('profit')+'</th><th>'+(state.currentLang==='fr'?'Facture':'الفاتورة')+'</th></tr></thead><tbody>';
+ if(append){
+  const tbody=target.querySelector('tbody');
+  if(tbody)tbody.insertAdjacentHTML('beforeend',htmlRows);
+  else target.innerHTML=tableHead+htmlRows+'</tbody></table></div>';
+ }else target.innerHTML=htmlRows?tableHead+htmlRows+'</tbody></table></div>':'<p style="text-align:center;color:var(--text-mid);padding:18px;">'+posText('noInvoices')+'</p>';
+}
+async function downloadPOSSaleInvoice(saleId){
+ try{
+  const result=await callAdminWorker('adminGetPOSSaleInvoice',{id:String(saleId)});
+  const sale=result.sale;
+  if(!sale||!Array.isArray(sale.pos_sale_items)||!sale.pos_sale_items.length)throw new Error(state.currentLang==='fr'?'Les détails de la facture sont indisponibles.':'تفاصيل الفاتورة غير متاحة.');
+  const items=sale.pos_sale_items.map(item=>({name:item.product_name||item.name||'—',qty:Number(item.quantity||0),price:Number(item.unit_price||0)}));
+  const invoice={invoice_no:sale.invoice_no,created_at:sale.created_at,customer_name:sale.customer_name,customer_phone:sale.customer_phone,customer_address:sale.customer_address,store_name:sale.store_name||state.settings?.shopName||'Thier Décor',store_phone:sale.store_phone||state.settings?.shopPhone||'',store_address:sale.store_address||state.settings?.shopAddress||'',discount:sale.discount,total:sale.total,items};
+  const popup=window.open('about:blank','_blank','width=760,height=800');
+  if(!popup){toast(posText('allowPrint'),'error');return;}
+  printPOSSale(invoice,popup);
+ }catch(error){toast((state.currentLang==='fr'?'Téléchargement impossible : ':'تعذر تحميل الفاتورة: ')+(error.message||''),'error');}
 }
 window.downloadPOSSaleInvoice=downloadPOSSaleInvoice;
-async function refreshPOSSales(){
+async function refreshPOSSales(options={}){
  const target=document.getElementById('pos-sales-history');
- if(target)target.innerHTML='<p style="text-align:center;padding:18px;">'+posText('loading')+'</p>';
+ if(posSalesLoading)return;
+ const append=options.append===true;
+ if(!append)posSalesOffset=0;
+ if(target&&!append)target.innerHTML='<p style="text-align:center;padding:18px;">'+posText('loading')+'</p>';
+ posSalesLoading=true;
  try{
-  const result=await callAdminWorker('adminListPOSSales',{limit:50});
+  const result=await callAdminWorker('adminListPOSSales',{limit:50,offset:posSalesOffset,search:posSalesSearch});
   const summary=result.summary||{};
   const money=value=>fmtMoney(Number(value||0))+(state.currentLang==='fr'?' DA':' دج');
   for(const [period,label] of [['today','day'],['week','week'],['month','month']]){
@@ -2957,22 +2975,29 @@ async function refreshPOSSales(){
    if(profit)profit.textContent=posText('profit')+': '+money(row.profit)+' · '+Number(row.count||0)+' '+posText('dayInvoice');
   }
   const rows=Array.isArray(result.sales)?result.sales:[];
-  posInvoiceCache.clear();
-  if(!target)return;
-  if(!rows.length){target.innerHTML='<p style="text-align:center;color:var(--text-mid);padding:18px;">'+posText('noInvoices')+'</p>';return;}
-  rows.forEach(sale=>posInvoiceCache.set(String(sale.id),sale));
-  const downloadLabel=state.currentLang==='fr'?'Télécharger A4':'تحميل A4';
-  target.innerHTML='<div style="overflow-x:auto;"><table class="admin-table pos-invoice-table" style="width:100%;min-width:760px;"><thead><tr><th>'+posText('invoice')+'</th><th>'+posText('customer')+'</th><th>'+posText('date')+'</th><th>'+posText('paymentMethod')+'</th><th>'+posText('amount')+'</th><th>'+posText('profit')+'</th><th>'+(state.currentLang==='fr'?'Facture':'الفاتورة')+'</th></tr></thead><tbody>'+rows.map(sale=>{
-   const items=Array.isArray(sale.pos_sale_items)?sale.pos_sale_items:[];
-   const margin=items.reduce((sum,item)=>sum+((Number(item.unit_price)||0)-(Number(item.unit_cost)||0))*(Number(item.quantity)||0),0);
-   const profit=margin-(Number(sale.discount)||0);
-   const date=new Date(sale.created_at);
-   return '<tr><td><strong>'+esc(sale.invoice_no||'—')+'</strong></td><td>'+esc(sale.customer_name||posText('cashCustomer'))+'<br><small>'+esc(sale.customer_phone||'')+'</small></td><td>'+date.toLocaleString(state.currentLang==='fr'?'fr-FR':'ar-DZ')+'</td><td>'+esc((state.currentLang==='fr'?{cash:'Espèces',transfer:'Virement',card:'Carte',other:'Autre'}:{cash:'نقداً',transfer:'تحويل',card:'بطاقة',other:'أخرى'})[sale.payment_method]||sale.payment_method||'—')+'</td><td>'+money(sale.total)+'</td><td>'+money(profit)+'</td><td><button type="button" class="pos-invoice-download-btn" data-sale-id="'+esc(String(sale.id))+'" onclick="downloadPOSSaleInvoice(this.dataset.saleId)"><i class="fas fa-file-pdf"></i> '+downloadLabel+'</button></td></tr>';
-  }).join('')+'</tbody></table></div>';
+  renderPOSSalesRows(rows,append);
+  posSalesOffset+=rows.length;
+  const more=document.getElementById('pos-load-more');
+  if(more)more.style.display=result.hasMore?'inline-flex':'none';
+  const count=document.getElementById('pos-sales-count');
+  if(count)count.textContent=String(posSalesOffset);
  }catch(error){
-  if(target)target.innerHTML='<p style="color:#b91c1c;padding:18px;">'+posText('loadError')+' '+esc(error.message||'')+'</p>';
- }
+  if(target&&!append)target.innerHTML='<p style="color:#b91c1c;padding:18px;">'+posText('loadError')+' '+esc(error.message||'')+'</p>';
+  else toast(posText('loadError')+' '+(error.message||''),'error');
+ }finally{posSalesLoading=false;}
 }
+async function searchPOSSales(){
+ posSalesSearch=String(document.getElementById('pos-invoice-search')?.value||'').trim().slice(0,100);
+ await refreshPOSSales();
+}
+async function clearPOSSalesSearch(){
+ const input=document.getElementById('pos-invoice-search');if(input)input.value='';
+ posSalesSearch='';await refreshPOSSales();
+}
+async function loadMorePOSSales(){await refreshPOSSales({append:true});}
+window.searchPOSSales=searchPOSSales;
+window.clearPOSSalesSearch=clearPOSSalesSearch;
+window.loadMorePOSSales=loadMorePOSSales;
 window.refreshPOSSales=refreshPOSSales;
 
 async function recoverPendingPOSSales(){
