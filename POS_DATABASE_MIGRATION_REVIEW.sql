@@ -83,7 +83,14 @@ begin
       'ok', true, 'sale_id', v_existing.id, 'invoice_no', v_existing.invoice_no,
       'subtotal', v_existing.subtotal, 'discount', v_existing.discount,
       'total', v_existing.total, 'payment_method', v_existing.payment_method,
-      'created_at', v_existing.created_at, 'already_created', true
+      'created_at', v_existing.created_at, 'items', coalesce((select jsonb_agg(jsonb_build_object('name', i.product_name, 'qty', i.quantity, 'price', i.unit_price) order by i.id) from public.pos_sale_items i where i.sale_id = v_existing.id), '[]'::jsonb),
+      'customer_name', v_existing.customer_name,
+      'customer_phone', v_existing.customer_phone,
+      'customer_address', v_existing.customer_address,
+      'store_name', v_existing.store_name,
+      'store_phone', v_existing.store_phone,
+      'store_address', v_existing.store_address,
+      'already_created', true
     );
   end if;
 
@@ -160,6 +167,7 @@ begin
     'store_phone', coalesce(p_sale->>'store_phone',''),
     'store_address', coalesce(p_sale->>'store_address',''),
     'created_at', v_created_at,
+    'items', coalesce((select jsonb_agg(jsonb_build_object('name', i.product_name, 'qty', i.quantity, 'price', i.unit_price) order by i.id) from public.pos_sale_items i where i.sale_id = v_sale_id), '[]'::jsonb),
     'already_created', false
   );
 end;
