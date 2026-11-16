@@ -2115,3 +2115,28 @@ a { text-underline-offset: 3px; }
 #screen-admin .pos-customer-fields input, #screen-admin .pos-customer-fields textarea { width:100%; min-width:0; padding:10px 11px; border:1px solid #dbeafe; border-radius:9px; background:#fff; font:inherit; font-size:.84rem; }
 #screen-admin .pos-customer-fields textarea { resize:vertical; min-height:58px; }
 #screen-admin .pos-customer-fields input:focus, #screen-admin .pos-customer-fields textarea:focus { border-color:#38bdf8; outline:0; box-shadow:0 0 0 3px rgba(56,189,248,.12); }
+
+
+/* POS — customer details are kept near the top, before the product list. */
+#screen-admin .pos-customer-panel { margin:0 0 16px; padding:15px 18px; border:1px solid #dbeafe; border-radius:15px; background:linear-gradient(120deg,#fff 0%,#f5fbff 100%); }
+#screen-admin .pos-customer-fields { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px 13px; align-items:end; margin:0; padding:0; border:0; background:transparent; }
+#screen-admin .pos-customer-fields-heading { grid-column:1/-1; display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin:0 0 2px; }
+#screen-admin .pos-customer-fields-heading small { margin-inline-start:auto; font-size:.73rem; }
+#screen-admin .pos-customer-field { display:flex; flex-direction:column; gap:6px; min-width:0; }
+#screen-admin .pos-customer-field label { margin:0; color:#334155; font-size:.8rem; font-weight:800; }
+#screen-admin .pos-customer-field input,
+#screen-admin .pos-customer-field textarea { width:100%; min-width:0; min-height:43px; padding:9px 12px; border:1px solid #d7e5f2; border-radius:10px; background:#fff; color:#0f172a; font:inherit; font-size:.86rem; box-sizing:border-box; }
+#screen-admin .pos-customer-field textarea { min-height:43px; height:43px; resize:vertical; }
+#screen-admin .pos-customer-field input:focus,
+#screen-admin .pos-customer-field textarea:focus { border-color:#38bdf8; outline:0; box-shadow:0 0 0 3px rgba(56,189,248,.12); }
+@media(max-width:700px) {
+  #screen-admin .pos-customer-panel { margin-bottom:13px; padding:13px; }
+  #screen-admin .pos-customer-fields { grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+  #screen-admin .pos-customer-fields-heading { align-items:flex-start; }
+  #screen-admin .pos-customer-fields-heading small { flex-basis:100%; margin:0; }
+  #screen-admin .pos-customer-address-field { grid-column:1/-1; }
+}
+@media(max-width:380px) {
+  #screen-admin .pos-customer-fields { grid-template-columns:minmax(0,1fr); }
+  #screen-admin .pos-customer-address-field { grid-column:auto; }
+}
