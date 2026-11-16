@@ -1423,6 +1423,50 @@ async function adminCreateStoreSale(body, env, request) {
   }
 }
 
+async function adminListPOSSales(body, env) {
+  if (!env.POS_SUPABASE_URL || !env.POS_SUPABASE_SERVICE_ROLE_KEY) {
+    return fail("قاعدة POS غير مهيأة.", 503);
+  }
+  const requestedLimit = Number(body?.limit || 50);
+  const limit = Number.isInteger(requestedLimit) ? Math.min(100, Math.max(1, requestedLimit)) : 50;
+  const rows = await posDbRequest(
+    env,
+    "pos_sales?select=id,invoice_no,customer_name,customer_phone,customer_address,subtotal,discount,total,payment_method,paid_amount,created_at,store_name,store_phone,store_address,pos_sale_items(id,product_id,product_name,quantity,unit_price,unit_cost,line_total,is_pack,pack_snapshot)&order=created_at.desc&limit=" + limit
+  );
+  const sales = Array.isArray(rows) ? rows : [];
+  const now = Date.now();
+  const dayStart = new Date();
+  dayStart.setHours(0, 0, 0, 0);
+  const dayMs = dayStart.getTime();
+  const weekMs = now - 7 * 24 * 60 * 60 * 1000;
+  const monthStart = new Date();
+  monthStart.setDate(1);
+  monthStart.setHours(0, 0, 0, 0);
+  const monthMs = monthStart.getTime();
+  const summary = {
+    today: { count: 0, sales: 0, profit: 0 },
+    week: { count: 0, sales: 0, profit: 0 },
+    month: { count: 0, sales: 0, profit: 0 }
+  };
+  for (const sale of sales) {
+    const stamp = Date.parse(sale.created_at || "");
+    if (!Number.isFinite(stamp)) continue;
+    const saleTotal = Number(sale.total) || 0;
+    const discount = Number(sale.discount) || 0;
+    const itemMargin = (Array.isArray(sale.pos_sale_items) ? sale.pos_sale_items : []).reduce((sum, item) =>
+      sum + ((Number(item.unit_price) || 0) - (Number(item.unit_cost) || 0)) * (Number(item.quantity) || 0), 0);
+    const profit = itemMargin - discount;
+    for (const [key, since] of [["today", dayMs], ["week", weekMs], ["month", monthMs]]) {
+      if (stamp >= since) {
+        summary[key].count++;
+        summary[key].sales += saleTotal;
+        summary[key].profit += profit;
+      }
+    }
+  }
+  return json({ success: true, sales, summary, limit });
+}
+
 async function adminRecoverPendingStoreSales(body, env) {
   if (!env.POS_SUPABASE_URL || !env.POS_SUPABASE_SERVICE_ROLE_KEY) {
     return fail("قاعدة POS غير مهيأة.", 503);
@@ -1782,6 +1826,7 @@ async function handleRequest(request, env) {
         case "adminMigrateLegacyImages":
         case "adminNotifyCustomerProductAvailable":
         case "adminCreateStoreSale":
+        case "adminListPOSSales":
         case "adminRecoverPendingStoreSales":
         case "adminDeleteOrder":
         case "adminEditOrder":
@@ -1793,6 +1838,7 @@ async function handleRequest(request, env) {
           if (action === "updateOrderStatus") return await updateOrderStatus(body, env);
           if (action === "adminNotifyCustomerProductAvailable") return await adminNotifyCustomerProductAvailable(body, env);
           if (action === "adminCreateStoreSale") return await adminCreateStoreSale(body, env, request);
+          if (action === "adminListPOSSales") return await adminListPOSSales(body, env);
           if (action === "adminRecoverPendingStoreSales") return await adminRecoverPendingStoreSales(body, env);
           if (action === "adminDeleteOrder") return await adminDeleteOrder(body, env);
           if (action === "adminEditOrder") return await adminEditOrder(body, env);
