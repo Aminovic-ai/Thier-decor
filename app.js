@@ -1404,6 +1404,12 @@ async function loadOrdersListener(options = {}) {
             if (typeof renderAdminProductCategories === 'function') {
                 renderAdminProductCategories();
             }
+            // POS may have been opened before the asynchronous product catalog arrived.
+            const posSection = document.getElementById('sec-pos');
+            if (posSection && posSection.style.display !== 'none') {
+                renderPOSProducts();
+                renderPOSCart();
+            }
         }
 
         // Settings can finish afterwards; their own task updates the banner and branding.
@@ -2734,8 +2740,10 @@ let posSelectedCategory = 'all';
 function renderPOSProducts() {
  const target=document.getElementById('pos-products'); if(!target)return;
  const q=String(document.getElementById('pos-search')?.value||'').trim().toLocaleLowerCase();
- const available=(state.products||[]).filter(p=>Number(p.qty)>0);
- const categories=[...new Set(available.map(p=>String(p.category||'').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'ar'));
+ const allProducts=Array.isArray(state.products)?state.products:[];
+ const available=allProducts.filter(p=>Number(p.qty)>0);
+ // Show every configured category, even if its products are temporarily out of stock.
+ const categories=[...new Set(allProducts.map(p=>String(p.category||'').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'ar'));
  if(posSelectedCategory!=='all'&&!categories.includes(posSelectedCategory))posSelectedCategory='all';
  const filters=document.getElementById('pos-category-filters');
  if(filters)filters.innerHTML=[['all','كل الأصناف',available.length],...categories.map(name=>[name,name,available.filter(p=>String(p.category||'').trim()===name).length])].map(([key,label,count])=>'<button type="button" class="pos-category-chip'+(posSelectedCategory===key?' active':'')+'" aria-pressed="'+(posSelectedCategory===key?'true':'false')+'" onclick="posSelectCategory(decodeURIComponent(\''+encodeURIComponent(key)+'\'))">'+esc(label)+' <span>'+count+'</span></button>').join('');
