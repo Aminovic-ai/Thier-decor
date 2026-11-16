@@ -2847,7 +2847,7 @@ window.renderPOSCart=renderPOSCart;
 function printPOSSale(sale,popup){
  const rows=(sale.items||[]).map(item=>'<tr><td style="padding:12px;border-bottom:1px solid #eee;">'+esc(item.name)+'</td><td style="padding:12px;border-bottom:1px solid #eee;text-align:center;">'+Number(item.qty||0)+'</td><td style="padding:12px;border-bottom:1px solid #eee;text-align:right;">'+Number(item.price||0).toLocaleString('fr-FR')+' DA</td><td style="padding:12px;border-bottom:1px solid #eee;text-align:right;">'+(Number(item.qty||0)*Number(item.price||0)).toLocaleString('fr-FR')+' DA</td></tr>').join('');
  popup=popup||window.open('','_blank','width=760,height=800');
- if(!popup){toast(state.currentLang==='fr'?'Autorisez la fenêtre d’impression.':'اسمح بفتح نافذة الطباعة.','error');return;}
+ if(!popup){toast('Autorisez la fenêtre d’impression.','error');return;}
  const shopName=sale.store_name||state.settings?.shopName||'Thier Décor';
  const shopPhone=sale.store_phone||state.settings?.shopPhone||'';
  const shopAddress=sale.store_address||state.settings?.shopAddress||'';
