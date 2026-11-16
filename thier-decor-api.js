@@ -1338,6 +1338,10 @@ async function adminCreateStoreSale(body, env, request) {
     store_address: cleanText(body.storeAddress, 300)
   };
 
+  if (!env.POS_SUPABASE_URL || !env.POS_SUPABASE_SERVICE_ROLE_KEY) {
+    return fail("قاعدة POS غير مهيأة. لم يتم خصم المخزون.", 503);
+  }
+
   // Step 1: commit inventory only in the store database. This RPC must be
   // idempotent by request_key and must persist its operation in the same
   // transaction as the stock decrement.
