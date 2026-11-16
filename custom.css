@@ -2291,3 +2291,268 @@ a { text-underline-offset: 3px; }
  #screen-admin .pos-workspace-actions { justify-content:flex-end; }
  #screen-admin .pos-workspace-actions .pos-view-tab { flex:1 1 auto; }
 }
+
+
+/* =========================================================
+   THIER DECOR POS — Professional colorful cashier interface
+   Scoped to POS only; does not alter storefront/admin modules.
+   ========================================================= */
+#screen-admin .admin-layout.pos-workspace-mode .admin-content{
+  background:linear-gradient(145deg,#f5f9ff 0%,#f8fbff 48%,#f4f8ff 100%);
+}
+#screen-admin .pos-workspace-topbar{
+  position:relative; display:flex; align-items:center; justify-content:space-between;
+  gap:18px; min-height:78px; margin:0 0 22px; padding:14px 20px;
+  border:1px solid #dce8fb; border-radius:20px;
+  background:linear-gradient(110deg,#fff 0%,#f8fbff 55%,#f0f7ff 100%);
+  box-shadow:0 10px 30px rgba(48,78,145,.08);
+}
+#screen-admin .pos-workspace-brand-icon{
+  width:50px;height:50px;flex:0 0 50px;border-radius:16px;
+  background:linear-gradient(145deg,#8b5cf6,#6366f1 55%,#3b82f6);
+  color:#fff;font-size:1.3rem;box-shadow:0 7px 16px rgba(99,102,241,.25);
+}
+#screen-admin .pos-workspace-brand strong{font-size:1.05rem;color:#182b4d;letter-spacing:.055em}
+#screen-admin .pos-workspace-brand small{color:#8292ad;letter-spacing:.16em;font-size:.66rem}
+#screen-admin .pos-workspace-actions{display:flex;align-items:center;justify-content:flex-end;gap:9px;flex-wrap:wrap}
+#screen-admin .pos-workspace-actions button{
+  min-height:43px;padding:9px 14px;border:1px solid #e0e8f5;border-radius:12px;
+  background:#fff;color:#40516e;font-size:.82rem;font-weight:850;
+  box-shadow:0 3px 9px rgba(35,55,95,.045);white-space:nowrap;
+}
+#screen-admin .pos-workspace-actions button i{font-size:1rem}
+#screen-admin .pos-workspace-actions .pos-view-tab{background:#f7f9ff;color:#596783;border-color:#e5e9f4}
+#screen-admin .pos-workspace-actions .pos-view-tab:first-child i{color:#0ea5e9}
+#screen-admin .pos-workspace-actions .pos-view-tab:nth-child(2) i{color:#8b5cf6}
+#screen-admin .pos-workspace-actions .pos-view-tab.active{
+  color:#fff;background:linear-gradient(120deg,#2563eb,#4f46e5);
+  border-color:#405de6;box-shadow:0 6px 15px rgba(63,91,220,.22)
+}
+#screen-admin .pos-workspace-actions .pos-view-tab.active i{color:#fff}
+#screen-admin .pos-workspace-actions .pos-workspace-site-btn{
+  color:#087e72;background:#e9fbf6;border-color:#c6f0e5
+}
+#screen-admin .pos-workspace-actions .pos-workspace-site-btn i{color:#0d9488}
+#screen-admin .pos-workspace-actions .pos-workspace-language-btn{
+  color:#a16207;background:#fff8e8;border-color:#f8e5b5
+}
+#screen-admin .pos-workspace-actions .pos-workspace-language-btn i{color:#e5a000}
+#screen-admin .pos-workspace-actions .pos-workspace-exit-btn{
+  width:43px;min-width:43px;color:#dc4564;background:#fff0f3;border-color:#ffd5df
+}
+#screen-admin .pos-workspace-actions .pos-workspace-exit-btn i{color:#e54869}
+#screen-admin .pos-page-heading{
+  display:flex;align-items:center;gap:17px;padding:22px 25px;margin:0 0 18px;
+  border:1px solid #e2e9fb;border-radius:19px;
+  background:linear-gradient(110deg,#fff 0%,#f5f7ff 65%,#f0f9ff 100%);
+  box-shadow:0 8px 22px rgba(55,75,130,.055)
+}
+#screen-admin .pos-heading-icon{
+  display:grid;place-items:center;width:58px;height:58px;flex:0 0 58px;
+  border-radius:18px;color:#fff;font-size:1.55rem;
+  background:linear-gradient(145deg,#fb7185,#f43f5e 55%,#e879f9);
+  box-shadow:0 8px 18px rgba(244,63,94,.2)
+}
+#screen-admin .pos-page-heading .pos-eyebrow{color:#8b5cf6;font-size:.68rem;font-weight:950;letter-spacing:.12em}
+#screen-admin .pos-page-heading h2{margin:4px 0;color:#172554;font-size:1.35rem;font-weight:950}
+#screen-admin .pos-page-heading p{margin:3px 0 0;color:#73819a;font-size:.86rem}
+#screen-admin .pos-customer-panel,#screen-admin .pos-products-panel,
+#screen-admin .pos-cart-panel,#screen-admin #pos-reports-view{
+  border:1px solid #e2eaf6;border-radius:18px;background:#fff;
+  box-shadow:0 8px 24px rgba(39,61,105,.055)
+}
+#screen-admin .pos-customer-panel{padding:17px 20px;background:linear-gradient(115deg,#fff 0%,#f7f4ff 100%);border-color:#e8defd}
+#screen-admin .pos-customer-fields-heading{color:#6d4bc3}
+#screen-admin .pos-customer-fields-heading i{
+  display:grid;place-items:center;width:35px;height:35px;border-radius:11px;
+  color:#fff;background:linear-gradient(145deg,#a78bfa,#7c3aed);font-size:1rem
+}
+#screen-admin .pos-customer-fields-heading strong{color:#49347f;font-size:.9rem}
+#screen-admin .pos-customer-field label{color:#596783}
+#screen-admin .pos-customer-field input,#screen-admin .pos-customer-field textarea{
+  border-color:#e1e7f2;background:#fff;border-radius:11px
+}
+#screen-admin .pos-panel-heading{
+  align-items:center;margin-bottom:16px;padding-bottom:14px;border-bottom:1px solid #edf1f8
+}
+#screen-admin .pos-panel-heading h3{color:#1f2f50;font-size:1.02rem;font-weight:950}
+#screen-admin .pos-panel-heading p{color:#8a96aa;font-size:.76rem}
+#screen-admin .pos-products-panel .pos-panel-icon,
+#screen-admin .pos-cart-panel .pos-panel-icon{
+  width:43px;height:43px;flex:0 0 43px;border-radius:14px;font-size:1.05rem
+}
+#screen-admin .pos-products-panel .pos-panel-icon{color:#fff;background:linear-gradient(145deg,#38bdf8,#2563eb);box-shadow:0 6px 13px rgba(37,99,235,.18)}
+#screen-admin .pos-cart-panel .pos-panel-icon{color:#fff;background:linear-gradient(145deg,#fb923c,#f43f5e);box-shadow:0 6px 13px rgba(244,63,94,.16)}
+#screen-admin .pos-search-wrap{
+  min-height:48px;border:1px solid #dce6f5;border-radius:13px;
+  background:#f8faff;color:#7c8ba5;padding-inline:15px
+}
+#screen-admin .pos-search-wrap>i{color:#818cf8;font-size:1rem}
+#screen-admin .pos-search-wrap input{font-size:.86rem;color:#263653}
+#screen-admin .pos-category-chip{
+  min-height:38px;padding:7px 14px;border-radius:12px;
+  border:1px solid #e2e8f3;background:#f8faff;color:#566580;
+  box-shadow:0 2px 5px rgba(40,60,100,.035)
+}
+#screen-admin .pos-category-chip span{background:#e9edfa;color:#6675a0}
+#screen-admin .pos-category-chip.active{
+  color:#fff;border-color:#6366f1;background:linear-gradient(120deg,#6366f1,#8b5cf6);
+  box-shadow:0 5px 12px rgba(99,102,241,.18)
+}
+#screen-admin .pos-category-chip.active span{background:rgba(255,255,255,.22);color:#fff}
+#screen-admin .pos-products-grid{grid-template-columns:repeat(auto-fill,minmax(155px,1fr));gap:13px}
+#screen-admin .pos-product-card{
+  position:relative;gap:8px;padding:10px!important;border:1px solid #e7ecf5!important;
+  border-radius:15px!important;background:#fff!important;text-align:start;
+  box-shadow:0 3px 10px rgba(37,55,95,.035);
+  transition:transform .18s ease,box-shadow .18s ease,border-color .18s ease
+}
+#screen-admin .pos-product-card:hover{
+  transform:translateY(-3px);border-color:#a5b4fc!important;
+  box-shadow:0 10px 22px rgba(79,70,229,.11)
+}
+#screen-admin .pos-product-image{
+  height:125px;border-radius:11px;background:linear-gradient(145deg,#f0f9ff,#f5f3ff);
+  color:#8b5cf6
+}
+#screen-admin .pos-product-image>i{font-size:2rem;color:#a78bfa}
+#screen-admin .pos-product-card strong{color:#263653;font-size:.83rem;line-height:1.4}
+#screen-admin .pos-product-card small{
+  display:block;padding-top:5px;border-top:1px solid #f0f2f8;
+  color:#0d9488;font-size:.73rem;font-weight:850
+}
+#screen-admin .pos-cart-panel{border-color:#f4e3e8;box-shadow:0 8px 24px rgba(128,55,80,.055)}
+#screen-admin .pos-cart-count{background:#fff0f3;color:#e04468}
+#screen-admin .pos-cart-line{gap:10px;border-bottom:1px solid #f1edf2}
+#screen-admin .pos-cart-line-info strong{color:#283653}
+#screen-admin .pos-cart-line-info small{color:#8994a8}
+#screen-admin .pos-cart-line-actions{gap:8px}
+#screen-admin .pos-qty-button{
+  width:31px;height:31px;border:0;border-radius:10px;
+  background:#eaf4ff;color:#2875d8;font-size:1.15rem;
+  box-shadow:inset 0 0 0 1px #d5e8ff
+}
+#screen-admin .pos-cart-line-actions .pos-qty-button:last-child{background:#e9fbf4;color:#0d9a70;box-shadow:inset 0 0 0 1px #c8f2df}
+#screen-admin .pos-cart-line-actions b{min-width:18px;text-align:center;color:#334155}
+#screen-admin .pos-cart-line-total{color:#e05b79;font-weight:950}
+#screen-admin .pos-checkout-fields{
+  padding:16px 0 0;border-top:1px solid #f0edf2;gap:8px
+}
+#screen-admin .pos-checkout-fields label{color:#596783;font-size:.8rem}
+#screen-admin .pos-checkout-fields input,#screen-admin .pos-checkout-fields select{
+  min-height:44px;border:1px solid #e4e8f1;border-radius:11px;background:#fbfcff
+}
+#screen-admin .pos-total{
+  padding:17px;border:1px solid #bfeee1;border-radius:14px;
+  background:linear-gradient(120deg,#e9fbf4,#effcfb);
+  color:#087f69;font-size:1.18rem;font-weight:950
+}
+#screen-admin .pos-cart-panel button[onclick="recoverPendingPOSSales()"]{
+  min-height:43px;border:1px solid #f7dfad!important;border-radius:11px;
+  background:#fff8e8!important;color:#a56a05!important;font-weight:850
+}
+#screen-admin .pos-cart-panel button[onclick="recoverPendingPOSSales()"] i{color:#e5a000}
+#screen-admin .pos-submit-button{
+  min-height:52px;border:0;border-radius:13px;
+  background:linear-gradient(115deg,#10b981,#059669 55%,#0d9488);
+  color:#fff;box-shadow:0 7px 16px rgba(5,150,105,.2);
+  font-size:.9rem;font-weight:950
+}
+#screen-admin .pos-submit-button:hover{background:linear-gradient(115deg,#059669,#047857);transform:translateY(-1px)}
+#screen-admin .pos-stock-note{color:#8290a5}
+#screen-admin #pos-reports-view{padding:20px}
+#screen-admin .pos-sales-summary .stat-card{
+  position:relative;overflow:hidden;border:1px solid #e6eaf5;border-radius:16px;
+  background:linear-gradient(145deg,#fff,#f7f9ff);box-shadow:0 5px 15px rgba(45,65,110,.05)
+}
+#screen-admin .pos-sales-summary .stat-card:nth-child(1){border-top:3px solid #0ea5e9}
+#screen-admin .pos-sales-summary .stat-card:nth-child(2){border-top:3px solid #8b5cf6}
+#screen-admin .pos-sales-summary .stat-card:nth-child(3){border-top:3px solid #10b981}
+#screen-admin .pos-sales-summary .stat-card span{color:#73819a;font-weight:800}
+#screen-admin .pos-sales-summary .stat-card h3{color:#273b65;font-weight:950}
+#screen-admin .pos-sales-summary .stat-card small{color:#0d9488;font-weight:850}
+#screen-admin #pos-reports-view .pos-panel-heading .btn-icon{
+  min-height:39px;padding:8px 13px;border:1px solid #d8e7fb;border-radius:11px;
+  background:#eff6ff;color:#2563eb
+}
+#screen-admin #pos-reports-view .pos-panel-heading .btn-icon i{color:#2563eb}
+#screen-admin .pos-empty-cart,#screen-admin .pos-empty-products{
+  padding:24px 12px;border:1px dashed #dce4f2;border-radius:13px;
+  background:#fafbff;color:#8a96aa
+}
+@media(max-width:900px){
+ #screen-admin .pos-workspace-topbar{align-items:flex-start}
+ #screen-admin .pos-workspace-actions{max-width:68%}
+ #screen-admin .pos-layout{gap:13px}
+}
+@media(max-width:700px){
+ #screen-admin .pos-workspace-topbar{display:flex;flex-direction:column;gap:12px;padding:13px}
+ #screen-admin .pos-workspace-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));width:100%;max-width:none;gap:7px}
+ #screen-admin .pos-workspace-actions button{justify-content:center;min-width:0;min-height:42px;padding:8px 9px;font-size:.76rem}
+ #screen-admin .pos-workspace-actions .pos-workspace-exit-btn{width:auto;min-width:0}
+ #screen-admin .pos-page-heading{padding:16px;gap:12px}
+ #screen-admin .pos-heading-icon{width:47px;height:47px;flex-basis:47px;border-radius:14px;font-size:1.25rem}
+ #screen-admin .pos-page-heading h2{font-size:1.08rem}
+ #screen-admin .pos-page-heading p{font-size:.76rem;line-height:1.5}
+ #screen-admin .pos-customer-fields{grid-template-columns:repeat(2,minmax(0,1fr))}
+ #screen-admin .pos-products-panel,#screen-admin .pos-cart-panel{padding:14px}
+ #screen-admin .pos-products-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+ #screen-admin .pos-product-image{height:105px;min-height:105px;max-height:105px}
+ #screen-admin #pos-reports-view{padding:14px}
+}
+@media(max-width:380px){
+ #screen-admin .pos-workspace-actions{grid-template-columns:1fr 1fr}
+ #screen-admin .pos-customer-fields{grid-template-columns:1fr}
+ #screen-admin .pos-customer-address-field{grid-column:auto}
+ #screen-admin .pos-products-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+
+
+/* POS navigation: visually distinguish checkout from invoice history */
+#screen-admin .pos-view-tab[data-pos-view="sale"]{
+  color:#fff!important;
+  border:1px solid #059669!important;
+  background:linear-gradient(135deg,#10b981,#059669)!important;
+  box-shadow:0 6px 16px rgba(5,150,105,.20)!important;
+}
+#screen-admin .pos-view-tab[data-pos-view="sale"] i{
+  color:#fff!important;
+}
+#screen-admin .pos-view-tab[data-pos-view="reports"]{
+  color:#6d28d9!important;
+  border:1px solid #ddd6fe!important;
+  background:linear-gradient(135deg,#f5f3ff,#ede9fe)!important;
+  box-shadow:0 4px 12px rgba(124,58,237,.09)!important;
+}
+#screen-admin .pos-view-tab[data-pos-view="reports"] i{
+  color:#8b5cf6!important;
+}
+#screen-admin .pos-view-tab[data-pos-view="reports"].active{
+  color:#fff!important;
+  border-color:#7c3aed!important;
+  background:linear-gradient(135deg,#a78bfa,#7c3aed)!important;
+  box-shadow:0 6px 16px rgba(124,58,237,.20)!important;
+}
+#screen-admin .pos-view-tab[data-pos-view="reports"].active i{
+  color:#fff!important;
+}
+#screen-admin .pos-view-tab[data-pos-view="sale"].active{
+  color:#fff!important;
+  background:linear-gradient(135deg,#10b981,#047857)!important;
+}
+
+
+/* A4 invoice download action in POS history */
+#screen-admin .pos-invoice-download-btn{
+ display:inline-flex;align-items:center;justify-content:center;gap:7px;
+ min-height:36px;padding:7px 11px;border:1px solid #bfdbfe;border-radius:10px;
+ background:linear-gradient(135deg,#eff6ff,#dbeafe);color:#1d4ed8;
+ font-size:.78rem;font-weight:900;white-space:nowrap;cursor:pointer;
+ transition:transform .15s ease,box-shadow .15s ease;
+}
+#screen-admin .pos-invoice-download-btn:hover{
+ transform:translateY(-1px);box-shadow:0 5px 12px rgba(37,99,235,.15);
+ background:linear-gradient(135deg,#dbeafe,#bfdbfe);
+}
+#screen-admin .pos-invoice-download-btn i{color:#dc2626}
+#screen-admin .pos-invoice-table td{vertical-align:middle}
