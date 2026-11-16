@@ -2743,13 +2743,25 @@ function posChangeQty(id,delta){const line=posCart.find(x=>Number(x.id)===Number
 window.posChangeQty=posChangeQty;
 function renderPOSCart(){const target=document.getElementById('pos-cart');if(!target)return;let subtotal=0;target.innerHTML=posCart.map(line=>{const p=(state.products||[]).find(x=>Number(x.id)===Number(line.id));if(!p)return '';const price=effectiveProductPrice(p);subtotal+=price*line.qty;return '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;border-bottom:1px solid var(--border);padding:9px 0;"><div><strong>'+esc(p.name)+'</strong><br><small>'+fmtMoney(price)+' × '+line.qty+'</small></div><div><button type="button" class="btn-icon" onclick="posChangeQty('+line.id+',-1)">−</button> <b>'+line.qty+'</b> <button type="button" class="btn-icon" onclick="posChangeQty('+line.id+',1)">+</button></div></div>';}).join('')||'<p>السلة فارغة.</p>';const discount=Math.max(0,Number(document.getElementById('pos-discount')?.value||0));const total=Math.max(0,subtotal-discount);const el=document.getElementById('pos-total');if(el)el.textContent='الإجمالي: '+fmtMoney(total);return {subtotal,discount,total};}
 window.renderPOSCart=renderPOSCart;
-function printPOSSale(sale,popup){const rows=(sale.items||[]).map(x=>'<tr><td>'+esc(x.name)+'</td><td>'+Number(x.qty)+'</td><td>'+fmtMoney(x.price)+'</td><td>'+fmtMoney(Number(x.qty)*Number(x.price))+'</td></tr>').join('');popup=popup||window.open('','_blank','width=420,height=720');if(!popup){toast('اسمح بفتح نافذة الطباعة.','error');return;}popup.document.write('<!doctype html><html lang="ar" dir="rtl"><meta charset="utf-8"><title>فاتورة '+esc(sale.invoice_no)+'</title><style>body{font-family:Arial;padding:18px;color:#222}h2,p{text-align:center}table{width:100%;border-collapse:collapse;margin-top:18px}th,td{border-bottom:1px solid #ddd;padding:7px;text-align:right;font-size:12px}.total{text-align:left;font-size:18px;font-weight:bold}</style><body><h2>Thier Décor</h2><p>فاتورة بيع من المحل</p><p>'+esc(sale.invoice_no)+'</p><p>'+new Date().toLocaleString('ar-DZ')+'</p><table><thead><tr><th>المنتج</th><th>الكمية</th><th>السعر</th><th>المجموع</th></tr></thead><tbody>'+rows+'</tbody></table><p class="total">الإجمالي: '+fmtMoney(sale.total)+' دج</p><p>شكراً لزيارتكم</p><script>window.onload=function(){window.print()}<\/script></body></html>');popup.document.close();}
+function printPOSSale(sale,popup){
+ const rows=(sale.items||[]).map(x=>'<tr><td>'+esc(x.name)+'</td><td>'+Number(x.qty)+'</td><td>'+fmtMoney(x.price)+'</td><td>'+fmtMoney(Number(x.qty)*Number(x.price))+'</td></tr>').join('');
+ popup=popup||window.open('','_blank','width=420,height=720');
+ if(!popup){toast('اسمح بفتح نافذة الطباعة.','error');return;}
+ const shopName=sale.store_name||state.settings?.shopName||'Thier Décor';
+ const shopPhone=sale.store_phone||state.settings?.shopPhone||'';
+ const shopAddress=sale.store_address||state.settings?.shopAddress||'';
+ const customerName=sale.customer_name||'—';
+ const customerPhone=sale.customer_phone||'—';
+ const customerAddress=sale.customer_address||'—';
+ const date=sale.created_at?new Date(sale.created_at).toLocaleString('ar-DZ'):new Date().toLocaleString('ar-DZ');
+ const html='<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>فاتورة '+esc(sale.invoice_no)+'</title><style>*{box-sizing:border-box}body{font-family:Arial,Tahoma,sans-serif;padding:18px;color:#1e293b;max-width:760px;margin:auto}.shop{text-align:center;border-bottom:2px solid #0284c7;padding-bottom:12px}.shop h2{margin:0 0 7px;color:#075985}.shop p{margin:3px 0;font-size:12px;color:#475569}.invoice-title{text-align:center;margin:15px 0}.invoice-title h3{margin:0 0 5px}.invoice-title p{margin:3px;font-size:12px;color:#64748b}.parties{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:14px 0}.info{border:1px solid #dbeafe;border-radius:9px;padding:10px;min-width:0}.info h4{margin:0 0 8px;color:#0369a1}.info p{margin:5px 0;font-size:12px;overflow-wrap:anywhere}table{width:100%;border-collapse:collapse;margin-top:15px}th,td{border-bottom:1px solid #e2e8f0;padding:8px 5px;text-align:right;font-size:12px}th{background:#eff8ff;color:#075985}.total{margin-top:14px;padding:12px;background:#eff8ff;border-radius:9px;text-align:left;font-size:18px;font-weight:bold;color:#075985}.thanks{text-align:center;margin-top:24px;color:#64748b;font-size:12px}@media print{body{padding:0}.info{break-inside:avoid}}@media(max-width:460px){.parties{grid-template-columns:1fr}}</style></head><body><header class="shop"><h2>'+esc(shopName)+'</h2>'+(shopPhone?'<p>الهاتف: '+esc(shopPhone)+'</p>':'')+(shopAddress?'<p>العنوان: '+esc(shopAddress)+'</p>':'')+'</header><div class="invoice-title"><h3>فاتورة بيع من المحل</h3><p>رقم الفاتورة: '+esc(sale.invoice_no)+'</p><p>التاريخ: '+esc(date)+'</p></div><section class="parties"><div class="info"><h4>معلومات العميل</h4><p><strong>الاسم:</strong> '+esc(customerName)+'</p><p><strong>الهاتف:</strong> '+esc(customerPhone)+'</p><p><strong>العنوان:</strong> '+esc(customerAddress)+'</p></div><div class="info"><h4>معلومات المحل</h4><p><strong>المتجر:</strong> '+esc(shopName)+'</p><p><strong>الهاتف:</strong> '+esc(shopPhone||'—')+'</p><p><strong>العنوان:</strong> '+esc(shopAddress||'—')+'</p></div></section><table><thead><tr><th>المنتج</th><th>الكمية</th><th>السعر</th><th>المجموع</th></tr></thead><tbody>'+rows+'</tbody></table><p class="total">الإجمالي: '+fmtMoney(sale.total)+' دج</p><p class="thanks">شكراً لثقتكم في Thier Décor</p><script>window.onload=function(){window.print()}<\\/script></body></html>';
+ popup.document.open();popup.document.write(html);popup.document.close();
+}
 async function submitPOSSale(){
  if(!posCart.length)return toast('السلة فارغة.','error');
  const totals=renderPOSCart();
  if(totals.discount>totals.subtotal)return toast('التخفيض أكبر من المجموع.','error');
- // Open the invoice window synchronously from the user's click, before awaiting the Worker.
- const invoiceWindow=window.open('about:blank','_blank','width=420,height=720');
+ const invoiceWindow=window.open('about:blank','_blank','width=520,height=760');
  if(!invoiceWindow)return toast('اسمح بفتح نافذة الفاتورة ثم أعد المحاولة.','error');
  const button=document.querySelector('#sec-pos button[onclick="submitPOSSale()"]');
  if(button){button.disabled=true;button.textContent='جارٍ تسجيل البيع...';}
@@ -2759,13 +2771,20 @@ async function submitPOSSale(){
    requestKey:posPendingRequestKey,
    items:posCart.map(x=>({id:x.id,qty:x.qty})),
    discount:totals.discount,
-   paymentMethod:document.getElementById('pos-payment')?.value||'cash'
+   paymentMethod:document.getElementById('pos-payment')?.value||'cash',
+   customerName:document.getElementById('pos-customer-name')?.value?.trim()||'',
+   customerPhone:document.getElementById('pos-customer-phone')?.value?.trim()||'',
+   customerAddress:document.getElementById('pos-customer-address')?.value?.trim()||'',
+   storeName:state.settings?.shopName||'Thier Décor',
+   storePhone:state.settings?.shopPhone||'',
+   storeAddress:state.settings?.shopAddress||''
   });
   if(!result.sale?.invoice_no)throw new Error('لم يتم استلام رقم الفاتورة.');
   printPOSSale(result.sale,invoiceWindow);
   posPendingRequestKey=null;
   posCart=[];
   const d=document.getElementById('pos-discount');if(d)d.value='0';
+  ['pos-customer-name','pos-customer-phone','pos-customer-address'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   await loadOrdersListener({forceProducts:true,forceWait:true});
   renderPOSProducts();renderPOSCart();
   toast('تم تسجيل البيع بنجاح: '+result.sale.invoice_no);
@@ -2773,7 +2792,7 @@ async function submitPOSSale(){
   if(invoiceWindow&&!invoiceWindow.closed)invoiceWindow.close();
   toast('تعذر تسجيل البيع: '+(e.message||''),'error');
  }finally{
-  if(button){button.disabled=false;button.textContent='تأكيد البيع وطباعة الفاتورة';}
+  if(button){button.disabled=false;button.innerHTML='<i class="fas fa-check-circle"></i> تأكيد البيع وطباعة الفاتورة';}
  }
 }
 window.submitPOSSale=submitPOSSale;
