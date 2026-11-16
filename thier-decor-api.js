@@ -1268,6 +1268,47 @@ async function adminNotifyCustomerProductAvailable(body, env) {
   if (!Array.isArray(inserted) || !inserted.length) return fail("لم يؤكد الخادم إرسال الإشعار.", 409);
   return json({ success: true, message });
 }
+async function adminCreateStoreSale(body, env, request) {
+  const items = body.items;
+  if (!Array.isArray(items) || items.length < 1 || items.length > 100) {
+    return fail("أضف منتجاً واحداً على الأقل إلى سلة البيع.");
+  }
+  const cleanItems = [];
+  for (const item of items) {
+    const id = Number(item?.id);
+    const qty = Number(item?.qty);
+    if (!Number.isSafeInteger(id) || id <= 0 || !Number.isSafeInteger(qty) || qty <= 0 || qty > 1000) {
+      return fail("أحد المنتجات أو الكميات غير صالح.");
+    }
+    cleanItems.push({ id, qty });
+  }
+  const discount = Number(body.discount || 0);
+  if (!Number.isFinite(discount) || discount < 0 || discount > 100000000) {
+    return fail("قيمة التخفيض غير صالحة.");
+  }
+  const paymentMethod = String(body.paymentMethod || "cash").trim().toLowerCase();
+  if (!["cash", "transfer", "card", "other"].includes(paymentMethod)) {
+    return fail("طريقة الدفع غير صالحة.");
+  }
+  const requestKey = crypto.randomUUID();
+  const result = await dbRequest(env, "rpc/td_admin_create_store_sale", {
+    method: "POST",
+    body: JSON.stringify({
+      p_sale: {
+        request_key: requestKey,
+        items: cleanItems,
+        discount,
+        payment_method: paymentMethod,
+        cashier_uid: ""
+      }
+    })
+  });
+  if (!result?.ok || !result.invoice_no) {
+    return fail("تعذر تسجيل البيع أو لم يؤكد الخادم خصم المخزون.", 409);
+  }
+  return json({ success: true, sale: result });
+}
+
 async function adminDeleteOrder(body, env) {
   const id = positiveId(body.id, "معرّف الطلبية");
   const result = await dbRequest(env, "rpc/td_admin_delete_order", { method: "POST", body: JSON.stringify({ p_order_id: id }) });
@@ -1522,7 +1563,7 @@ async function handleRequest(request, env) {
         case "adminCouponUsage":
         case "adminMigrateLegacyImages":
         case "adminNotifyCustomerProductAvailable":
-        case "adminDeleteOrder":
+        case "adminCreateStoreSale":\n        case "adminDeleteOrder":
         case "adminEditOrder":
         case "adminVisitStats": {
           const isAdmin = await verifyFirebaseAdmin(request, env);
@@ -1531,7 +1572,7 @@ async function handleRequest(request, env) {
           if (action === "listAdminData") return await listAdminData(env);
           if (action === "updateOrderStatus") return await updateOrderStatus(body, env);
           if (action === "adminNotifyCustomerProductAvailable") return await adminNotifyCustomerProductAvailable(body, env);
-          if (action === "adminDeleteOrder") return await adminDeleteOrder(body, env);
+          if (action === "adminCreateStoreSale") return await adminCreateStoreSale(body, env, request);\n          if (action === "adminDeleteOrder") return await adminDeleteOrder(body, env);
           if (action === "adminEditOrder") return await adminEditOrder(body, env);
           if (action === "adminVisitStats") return await adminVisitStats(env);
           if (action === "adminMigrateLegacyImages") return await adminMigrateLegacyImages(body, env);
