@@ -2839,7 +2839,7 @@ function posChangeQty(id,delta){if(posPendingSalePayload)return toast(posText('p
 window.posChangeQty=posChangeQty;
 function renderPOSCart(){
  const target=document.getElementById('pos-cart');if(!target)return;let subtotal=0;
- target.innerHTML=posCart.map(line=>{const p=(state.products||[]).find(x=>Number(x.id)===Number(line.id));if(!p)return '';const price=effectiveProductPrice(p);const lineTotal=price*line.qty;subtotal+=lineTotal;return '<article class="pos-cart-line"><div class="pos-cart-line-info"><strong>'+esc(p.name)+'</strong><small>'+fmtMoney(price)+' للوحدة</small></div><div class="pos-cart-line-actions"><button type="button" class="pos-qty-button" aria-label="'+posText('decrease')+'" onclick="posChangeQty('+line.id+',-1)">−</button><b>'+line.qty+'</b><button type="button" class="pos-qty-button" aria-label="'+posText('increase')+'" onclick="posChangeQty('+line.id+',1)">+</button></div><strong class="pos-cart-line-total">'+fmtMoney(lineTotal)+'</strong></article>';}).join('')||'<p class="pos-empty-cart">'+posText('emptyCart')+'</p>';
+ target.innerHTML=posCart.map(line=>{const p=(state.products||[]).find(x=>Number(x.id)===Number(line.id));if(!p)return '';const price=effectiveProductPrice(p);const lineTotal=price*line.qty;subtotal+=lineTotal;return '<article class="pos-cart-line"><div class="pos-cart-line-info"><strong>'+esc(p.name)+'</strong><small>'+fmtMoney(price)+' '+posText('unit')+'</small></div><div class="pos-cart-line-actions"><button type="button" class="pos-qty-button" aria-label="'+posText('decrease')+'" onclick="posChangeQty('+line.id+',-1)">−</button><b>'+line.qty+'</b><button type="button" class="pos-qty-button" aria-label="'+posText('increase')+'" onclick="posChangeQty('+line.id+',1)">+</button></div><strong class="pos-cart-line-total">'+fmtMoney(lineTotal)+'</strong></article>';}).join('')||'<p class="pos-empty-cart">'+posText('emptyCart')+'</p>';
  const discount=Math.max(0,Number(document.getElementById('pos-discount')?.value||0));const total=Math.max(0,subtotal-discount);const el=document.getElementById('pos-total');if(el)el.textContent=posText('total')+': '+fmtMoney(total);const count=posCart.reduce((n,x)=>n+x.qty,0);const badge=document.getElementById('pos-cart-count');if(badge)badge.textContent=String(count);return {subtotal,discount,total};
 }
 window.renderPOSCart=renderPOSCart;
@@ -2968,7 +2968,7 @@ async function recoverPendingPOSSales(){
    }
    cursor=result.nextCursor;
    localStorage.setItem('td_pos_recovery_cursor',JSON.stringify(cursor));
-   if(button)button.textContent='تمت استعادة '+totalRecovered+' فاتورة...';
+   if(button)button.textContent=posText('recovered')+totalRecovered+' '+posText('invoices')+'...';
   }
   const incomplete=blocked||(!finished&&Boolean(cursor));
   toast(posText('recovered')+totalRecovered+' '+posText('invoices')+(incomplete?posText('remaining'):''),incomplete?'error':'success');
@@ -2984,7 +2984,7 @@ window.submitPOSSale=submitPOSSale;
 function adminGo(sec, btnElement) {
     document.querySelectorAll('.admin-section').forEach(s => s.style.display = 'none'); document.getElementById('sec-' + sec).style.display = 'block';
     document.querySelectorAll('.admin-nav a').forEach(a => a.classList.remove('active')); if (btnElement) btnElement.classList.add('active');
-    const titleKey = sec === 'dashboard' ? 'admin_home' : 'admin_' + sec; document.getElementById('admin-page-title').textContent = i18n[state.currentLang][titleKey] || sec;
+    const titleKey = sec === 'dashboard' ? 'admin_home' : 'admin_' + sec; document.getElementById('admin-page-title').textContent = sec === 'pos' ? (state.currentLang === 'fr' ? 'Vente' : 'البيع من المحل') : (i18n[state.currentLang][titleKey] || sec);
     if (sec === 'dashboard') renderAdminHome();
     if (sec === 'pos') { applyPOSTranslations(); renderPOSProducts(); renderPOSCart(); refreshPOSSales(); }
     if (sec === 'orders') renderAdminOrdersList();
