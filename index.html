@@ -224,6 +224,15 @@
                         </section>
                         <section class="admin-card pos-cart-panel" aria-labelledby="pos-cart-title">
                             <div class="pos-panel-heading"><div><h3 id="pos-cart-title">سلة البيع</h3><p>راجع الكميات والمبلغ قبل التأكيد</p></div><span class="pos-panel-icon"><i class="fas fa-receipt"></i></span></div>
+                            <div class="pos-customer-fields">
+                                <div class="pos-customer-fields-heading"><i class="fas fa-user-circle"></i><strong>معلومات العميل للفاتورة</strong><small>اتركها فارغة إذا كان البيع دون بيانات عميل</small></div>
+                                <label for="pos-customer-name">اسم العميل</label>
+                                <input id="pos-customer-name" type="text" maxlength="120" autocomplete="name" placeholder="اسم العميل">
+                                <label for="pos-customer-phone">رقم الهاتف</label>
+                                <input id="pos-customer-phone" type="tel" maxlength="40" autocomplete="tel" placeholder="05 / 06 / 07 ...">
+                                <label for="pos-customer-address">العنوان</label>
+                                <textarea id="pos-customer-address" rows="2" maxlength="300" autocomplete="street-address" placeholder="عنوان العميل"></textarea>
+                            </div>
                             <div id="pos-cart" class="pos-cart-content"></div>
                             <div class="pos-checkout-fields">
                                 <label for="pos-discount">التخفيض (دج)</label>
