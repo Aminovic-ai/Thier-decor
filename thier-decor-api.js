@@ -323,7 +323,6 @@ async function posDbRequest(env, path, options = {}) {
     ...options,
     headers: {
       "apikey": env.POS_SUPABASE_SERVICE_ROLE_KEY,
-      "Authorization": "Bearer " + env.POS_SUPABASE_SERVICE_ROLE_KEY,
       "Content-Type": "application/json",
       ...(options.headers || {})
     }
@@ -1429,18 +1428,21 @@ async function adminListPOSSales(body, env) {
   }
   const requestedLimit = Number(body?.limit || 50);
   const limit = Number.isInteger(requestedLimit) ? Math.min(100, Math.max(1, requestedLimit)) : 50;
-  const monthStart = new Date();
-  monthStart.setDate(1);
-  monthStart.setHours(0, 0, 0, 0);
+  // Reports use Algeria local calendar days/months, not the Worker UTC date.
+  const dateParts = Object.fromEntries(new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Africa/Algiers", year: "numeric", month: "2-digit", day: "2-digit"
+  }).formatToParts(new Date()).filter(part => part.type !== "literal").map(part => [part.type, part.value]));
+  const dayStart = new Date(dateParts.year + "-" + dateParts.month + "-" + dateParts.day + "T00:00:00+01:00");
+  const monthStart = new Date(dateParts.year + "-" + dateParts.month + "-01T00:00:00+01:00");
+  const weekStart = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+  const queryStart = new Date(Math.min(monthStart.getTime(), weekStart.getTime()));
   const rows = await posDbRequest(
     env,
-    "pos_sales?select=id,invoice_no,customer_name,customer_phone,customer_address,subtotal,discount,total,payment_method,paid_amount,created_at,store_name,store_phone,store_address,pos_sale_items(id,product_id,product_name,quantity,unit_price,unit_cost,line_total,is_pack,pack_snapshot)&created_at=gte." + encodeURIComponent(monthStart.toISOString()) + "&order=created_at.desc&limit=1000"
+    "pos_sales?select=id,invoice_no,customer_name,customer_phone,customer_address,subtotal,discount,total,payment_method,paid_amount,created_at,store_name,store_phone,store_address,pos_sale_items(id,product_id,product_name,quantity,unit_price,unit_cost,line_total,is_pack,pack_snapshot)&created_at=gte." + encodeURIComponent(queryStart.toISOString()) + "&order=created_at.desc&limit=1000"
   );
   const allSales = Array.isArray(rows) ? rows : [];
   const sales = allSales.slice(0, limit);
   const now = Date.now();
-  const dayStart = new Date();
-  dayStart.setHours(0, 0, 0, 0);
   const dayMs = dayStart.getTime();
   const weekMs = now - 7 * 24 * 60 * 60 * 1000;
   const monthMs = monthStart.getTime();
