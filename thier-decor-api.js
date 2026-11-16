@@ -1428,6 +1428,11 @@ async function adminListPOSSales(body, env) {
   }
   const requestedLimit = Number(body?.limit || 50);
   const limit = Number.isInteger(requestedLimit) ? Math.min(100, Math.max(1, requestedLimit)) : 50;
+  const requestedOffset = Number(body?.offset || 0);
+  const offset = Number.isSafeInteger(requestedOffset) ? Math.min(1000000, Math.max(0, requestedOffset)) : 0;
+  const search = String(body?.search || "").trim().slice(0, 100)
+    .replace(/[^\\p{L}\\p{N}\\s._#-]/gu, "").trim();
+
   // Reports use Algeria local calendar days/months, not the Worker UTC date.
   const dateParts = Object.fromEntries(new Intl.DateTimeFormat("en-CA", {
     timeZone: "Africa/Algiers", year: "numeric", month: "2-digit", day: "2-digit"
@@ -1436,12 +1441,34 @@ async function adminListPOSSales(body, env) {
   const monthStart = new Date(dateParts.year + "-" + dateParts.month + "-01T00:00:00+01:00");
   const weekStart = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
   const queryStart = new Date(Math.min(monthStart.getTime(), weekStart.getTime()));
-  const rows = await posDbRequest(
-    env,
-    "pos_sales?select=id,invoice_no,customer_name,customer_phone,customer_address,subtotal,discount,total,payment_method,paid_amount,created_at,store_name,store_phone,store_address,pos_sale_items(id,product_id,product_name,quantity,unit_price,unit_cost,line_total,is_pack,pack_snapshot)&created_at=gte." + encodeURIComponent(queryStart.toISOString()) + "&order=created_at.desc&limit=1000"
-  );
-  const allSales = Array.isArray(rows) ? rows : [];
-  const sales = allSales.slice(0, limit);
+
+  const select = "id,invoice_no,customer_name,customer_phone,customer_address,subtotal,discount,total,payment_method,paid_amount,created_at,store_name,store_phone,store_address,pos_sale_items(id,product_id,product_name,quantity,unit_price,unit_cost,line_total,is_pack,pack_snapshot)";
+  const pageParams = new URLSearchParams({
+    select,
+    order: "created_at.desc",
+    limit: String(limit + 1),
+    offset: String(offset)
+  });
+  if (search) {
+    const term = search.replace(/[\\s]+/g, " ");
+    const pattern = "*" + term + "*";
+    pageParams.set("or", "(invoice_no.ilike." + pattern + ",customer_name.ilike." + pattern + ",customer_phone.ilike." + pattern + ")");
+  }
+  const pageRows = await posDbRequest(env, "pos_sales?" + pageParams.toString());
+  const page = Array.isArray(pageRows) ? pageRows : [];
+  const hasMore = page.length > limit;
+  const sales = hasMore ? page.slice(0, limit) : page;
+
+  // Keep the dashboard totals independent from the current search/page.
+  // The reporting window is bounded to the current month / rolling week.
+  const summaryParams = new URLSearchParams({
+    select,
+    created_at: "gte." + queryStart.toISOString(),
+    order: "created_at.desc",
+    limit: "1000"
+  });
+  const summaryRows = await posDbRequest(env, "pos_sales?" + summaryParams.toString());
+  const allSales = Array.isArray(summaryRows) ? summaryRows : [];
   const now = Date.now();
   const dayMs = dayStart.getTime();
   const weekMs = now - 7 * 24 * 60 * 60 * 1000;
@@ -1467,7 +1494,25 @@ async function adminListPOSSales(body, env) {
       }
     }
   }
-  return json({ success: true, sales, summary, limit });
+  return json({ success: true, sales, summary, limit, offset, hasMore });
+}
+
+async function adminGetPOSSaleInvoice(body, env) {
+  if (!env.POS_SUPABASE_URL || !env.POS_SUPABASE_SERVICE_ROLE_KEY) {
+    return fail("قاعدة POS غير مهيأة.", 503);
+  }
+  const id = String(body?.id || "").trim();
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) {
+    return fail("معرّف الفاتورة غير صالح.", 400);
+  }
+  const params = new URLSearchParams({
+    select: "id,invoice_no,customer_name,customer_phone,customer_address,subtotal,discount,total,payment_method,paid_amount,created_at,store_name,store_phone,store_address,pos_sale_items(id,product_id,product_name,quantity,unit_price,unit_cost,line_total,is_pack,pack_snapshot)",
+    id: "eq." + id,
+    limit: "1"
+  });
+  const rows = await posDbRequest(env, "pos_sales?" + params.toString());
+  if (!Array.isArray(rows) || !rows.length) return fail("الفاتورة غير موجودة.", 404);
+  return json({ success: true, sale: rows[0] });
 }
 
 async function adminRecoverPendingStoreSales(body, env) {
@@ -1830,6 +1875,7 @@ async function handleRequest(request, env) {
         case "adminNotifyCustomerProductAvailable":
         case "adminCreateStoreSale":
         case "adminListPOSSales":
+        case "adminGetPOSSaleInvoice":
         case "adminRecoverPendingStoreSales":
         case "adminDeleteOrder":
         case "adminEditOrder":
@@ -1842,6 +1888,7 @@ async function handleRequest(request, env) {
           if (action === "adminNotifyCustomerProductAvailable") return await adminNotifyCustomerProductAvailable(body, env);
           if (action === "adminCreateStoreSale") return await adminCreateStoreSale(body, env, request);
           if (action === "adminListPOSSales") return await adminListPOSSales(body, env);
+          if (action === "adminGetPOSSaleInvoice") return await adminGetPOSSaleInvoice(body, env);
           if (action === "adminRecoverPendingStoreSales") return await adminRecoverPendingStoreSales(body, env);
           if (action === "adminDeleteOrder") return await adminDeleteOrder(body, env);
           if (action === "adminEditOrder") return await adminEditOrder(body, env);
