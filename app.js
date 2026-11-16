@@ -2839,13 +2839,31 @@ async function submitPOSSale(){
 async function recoverPendingPOSSales(){
  const button=document.querySelector('#sec-pos button[onclick="recoverPendingPOSSales()"]');
  if(button){button.disabled=true;button.textContent='جارٍ فحص واستعادة الفواتير...';}
+ let cursor=null,totalRecovered=0,blocked=false,finished=false;
  try{
-  const result=await callAdminWorker('adminRecoverPendingStoreSales');
-  const count=Array.isArray(result.recovered)?result.recovered.length:0;
-  const pending=Number(result.pending||0);
-  toast('تمت استعادة '+count+' فاتورة'+(pending?'، وبقيت '+pending+' عملية تحتاج إعادة محاولة':''),pending?'error':'success');
+  try{cursor=JSON.parse(localStorage.getItem('td_pos_recovery_cursor')||'null');}catch(_){cursor=null;}
+  for(let page=0;page<1000;page++){
+   const result=await callAdminWorker('adminRecoverPendingStoreSales',{cursor});
+   totalRecovered+=(Array.isArray(result.recovered)?result.recovered.length:0);
+   if(result.done===true){
+    localStorage.removeItem('td_pos_recovery_cursor');
+    cursor=null;finished=true;
+    break;
+   }
+   if(result.blocked===true||!result.nextCursor){
+    blocked=true;
+    if(result.nextCursor)localStorage.setItem('td_pos_recovery_cursor',JSON.stringify(result.nextCursor));
+    break;
+   }
+   cursor=result.nextCursor;
+   localStorage.setItem('td_pos_recovery_cursor',JSON.stringify(cursor));
+   if(button)button.textContent='تمت استعادة '+totalRecovered+' فاتورة...';
+  }
+  const incomplete=blocked||(!finished&&Boolean(cursor));
+  toast('تمت استعادة '+totalRecovered+' فاتورة'+(incomplete?'، توجد عمليات متبقية؛ اضغط الاستعادة مجدداً لإكمالها':''),incomplete?'error':'success');
  }catch(error){
-  toast('تعذرت استعادة الفواتير: '+(error.message||''),'error');
+  if(cursor)localStorage.setItem('td_pos_recovery_cursor',JSON.stringify(cursor));
+  toast('تعذرت استعادة الفواتير: '+(error.message||'')+' — أعد المحاولة لاستكمالها دون تكرار خصم المخزون.','error');
  }finally{
   if(button){button.disabled=false;button.innerHTML='<i class="fas fa-sync-alt"></i> استعادة الفواتير المعلّقة';}
  }
