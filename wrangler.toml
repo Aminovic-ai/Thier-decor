@@ -4,6 +4,18 @@ compatibility_date = "2026-11-02"
 compatibility_flags = ["nodejs_compat"]
 workers_dev = true
 
-# Keep secrets and environment-specific values in the Cloudflare dashboard.
-# Required production binding: IMAGES_BUCKET -> R2 bucket "thier-decor-images".
-# Required variables/secrets are configured on the existing production Worker.
+# Production, non-secret Worker settings.
+[vars]
+SUPABASE_URL = "https://xdsbnmtthvqgdlytwpes.supabase.co"
+POS_SUPABASE_URL = "https://obxjemvuympyddckghom.supabase.co"
+ALLOWED_ORIGINS = "https://thier-decor-v3.pages.dev,https://thierdecor.com,https://www.thierdecor.com"
+
+# Preserve the production R2 binding used by /images/upload and image migration.
+[[r2_buckets]]
+binding = "IMAGES_BUCKET"
+bucket_name = "thier-decor-images"
+
+# Keep all secret values in the existing Cloudflare Worker settings.
+# Required secrets include ADMIN_UID, SUPABASE_SERVICE_ROLE_KEY,
+# POS_SUPABASE_SERVICE_ROLE_KEY, FIREBASE_API_KEY, CUSTOMER_SESSION_SECRET,
+# AUTH_RATE_SECRET, and VISIT_RATE_SECRET.
