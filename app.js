@@ -2756,9 +2756,9 @@ function renderPOSProducts() {
 function posSelectCategory(category){posSelectedCategory=category||'all';renderPOSProducts();}
 window.posSelectCategory=posSelectCategory;
 window.renderPOSProducts=renderPOSProducts;
-function posAddProduct(id){const p=(state.products||[]).find(x=>Number(x.id)===Number(id));if(!p||Number(p.qty)<=0)return toast('المنتج غير متوفر.','error');const line=posCart.find(x=>Number(x.id)===Number(id));if(line)line.qty=Math.min(Number(p.qty),line.qty+1);else posCart.push({id:Number(p.id),qty:1});renderPOSCart();}
+function posAddProduct(id){if(posPendingSalePayload)return toast('يوجد بيع معلّق. أكمل تسجيله أولاً قبل بدء بيع جديد.','error');const p=(state.products||[]).find(x=>Number(x.id)===Number(id));if(!p||Number(p.qty)<=0)return toast('المنتج غير متوفر.','error');const line=posCart.find(x=>Number(x.id)===Number(id));if(line)line.qty=Math.min(Number(p.qty),line.qty+1);else posCart.push({id:Number(p.id),qty:1});renderPOSCart();}
 window.posAddProduct=posAddProduct;
-function posChangeQty(id,delta){const line=posCart.find(x=>Number(x.id)===Number(id));const p=(state.products||[]).find(x=>Number(x.id)===Number(id));if(!line||!p)return;line.qty=Math.max(0,Math.min(Number(p.qty),line.qty+delta));if(!line.qty)posCart=posCart.filter(x=>Number(x.id)!==Number(id));renderPOSCart();}
+function posChangeQty(id,delta){if(posPendingSalePayload)return toast('يوجد بيع معلّق. أكمل تسجيله أولاً قبل تعديل السلة.','error');const line=posCart.find(x=>Number(x.id)===Number(id));const p=(state.products||[]).find(x=>Number(x.id)===Number(id));if(!line||!p)return;line.qty=Math.max(0,Math.min(Number(p.qty),line.qty+delta));if(!line.qty)posCart=posCart.filter(x=>Number(x.id)!==Number(id));renderPOSCart();}
 window.posChangeQty=posChangeQty;
 function renderPOSCart(){
  const target=document.getElementById('pos-cart');if(!target)return;let subtotal=0;
@@ -2822,8 +2822,12 @@ async function submitPOSSale(){
   posCart=[];
   const d=document.getElementById('pos-discount');if(d)d.value='0';
   ['pos-customer-name','pos-customer-phone','pos-customer-address'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
-  await loadOrdersListener({forceProducts:true,forceWait:true});
-  renderPOSProducts();renderPOSCart();
+  try{
+   await loadOrdersListener({forceProducts:true,forceWait:true});
+   renderPOSProducts();renderPOSCart();
+  }catch(refreshError){
+   console.warn('POS sale saved, but product refresh failed:',refreshError);
+  }
   toast('تم تسجيل البيع بنجاح: '+result.sale.invoice_no);
  }catch(e){
   if(invoiceWindow&&!invoiceWindow.closed)invoiceWindow.close();
