@@ -2061,3 +2061,45 @@ a { text-underline-offset: 3px; }
     display: none !important;
   }
 }
+
+/* POS — professional responsive point-of-sale layout */
+#screen-admin #sec-pos.pos-admin-section { max-width: 1500px; margin-inline: auto; }
+#screen-admin .pos-page-heading { display:flex; align-items:center; gap:15px; margin:0 0 20px; padding:19px 21px; border:1px solid #dbeafe; border-radius:17px; background:linear-gradient(115deg,#fff 0%,#f0f9ff 100%); }
+#screen-admin .pos-heading-icon { width:52px; height:52px; flex:0 0 52px; display:grid; place-items:center; border-radius:15px; background:#dbeafe; color:#0369a1; font-size:1.35rem; }
+#screen-admin .pos-eyebrow { display:block; margin-bottom:4px; color:#0284c7; font-size:.68rem; font-weight:900; letter-spacing:1.1px; }
+#screen-admin .pos-page-heading h2 { margin:0; color:#0f172a; font-size:1.22rem; font-weight:900; }
+#screen-admin .pos-page-heading p { margin:5px 0 0; color:#64748b; font-size:.82rem; }
+#screen-admin .pos-layout { display:grid; grid-template-columns:minmax(0,1.65fr) minmax(310px,.9fr); grid-template-areas:"products cart"; gap:18px; align-items:start; direction:rtl; }
+#screen-admin .pos-products-panel { grid-area:products; min-width:0; padding:20px; }
+#screen-admin .pos-cart-panel { grid-area:cart; min-width:0; padding:20px; position:sticky; top:92px; }
+#screen-admin .pos-panel-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:15px; padding-bottom:13px; border-bottom:1px solid #eaf2f8; }
+#screen-admin .pos-panel-heading h3 { margin:0; color:#0f172a; font-size:1.02rem; font-weight:900; }
+#screen-admin .pos-panel-heading p { margin:4px 0 0; color:#64748b; font-size:.77rem; }
+#screen-admin .pos-panel-icon { width:39px; height:39px; flex:0 0 39px; display:grid; place-items:center; border-radius:12px; background:#eff8ff; color:#0284c7; }
+#screen-admin .pos-search-wrap { display:flex; align-items:center; gap:10px; min-height:46px; margin-bottom:14px; padding:0 13px; border:1px solid #dbeafe; border-radius:11px; background:#f8fcff; color:#64748b; }
+#screen-admin .pos-search-wrap:focus-within { border-color:#38bdf8; box-shadow:0 0 0 3px rgba(56,189,248,.12); }
+#screen-admin .pos-search-wrap input { width:100%; min-width:0; min-height:42px; padding:8px 0; border:0; outline:0; box-shadow:none; background:transparent; }
+#screen-admin .pos-search-wrap input:focus { border:0; outline:0; box-shadow:none; }
+#screen-admin .pos-products-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(145px,1fr)); gap:12px; }
+#screen-admin .pos-cart-content { min-height:75px; }
+#screen-admin .pos-checkout-fields { display:grid; grid-template-columns:1fr; gap:7px; margin-top:15px; padding-top:14px; border-top:1px solid #eaf2f8; }
+#screen-admin .pos-checkout-fields label { color:#475569; font-size:.82rem; font-weight:800; }
+#screen-admin .pos-checkout-fields input, #screen-admin .pos-checkout-fields select { width:100%; min-height:43px; padding:9px 11px; border:1px solid #dbeafe; border-radius:10px; background:#fff; }
+#screen-admin .pos-total { margin:16px 0 13px; padding:14px; border:1px solid #bfdbfe; border-radius:12px; background:#eff8ff; color:#075985; font-size:1.12rem; font-weight:900; text-align:center; }
+#screen-admin .pos-submit-button { width:100%; min-height:48px; display:flex; align-items:center; justify-content:center; gap:9px; border-radius:11px; font-weight:900; }
+#screen-admin .pos-stock-note { display:flex; align-items:center; justify-content:center; gap:7px; margin:11px 0 0; color:#64748b; font-size:.75rem; text-align:center; }
+@media(max-width:900px) {
+  #screen-admin .pos-layout { grid-template-columns:minmax(0,1.35fr) minmax(275px,.9fr); gap:12px; }
+  #screen-admin .pos-products-panel, #screen-admin .pos-cart-panel { padding:15px; }
+}
+@media(max-width:700px) {
+  #screen-admin .pos-page-heading { padding:15px; margin-bottom:13px; }
+  #screen-admin .pos-layout { grid-template-columns:minmax(0,1fr); grid-template-areas:"products" "cart"; gap:13px; }
+  #screen-admin .pos-products-panel, #screen-admin .pos-cart-panel { position:static; padding:14px; }
+  #screen-admin .pos-products-grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:9px; }
+  #screen-admin .pos-panel-heading { margin-bottom:12px; }
+  #screen-admin .pos-page-heading p { line-height:1.5; }
+}
+@media(max-width:360px) {
+  #screen-admin .pos-products-grid { grid-template-columns:minmax(0,1fr); }
+}
