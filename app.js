@@ -2761,7 +2761,7 @@ const posTranslations = {
   invoice:'الفاتورة', customer:'العميل', date:'التاريخ', paymentMethod:'الدفع', amount:'الإجمالي',
   noInvoices:'لا توجد فواتير مبيعات بعد.', loadInvoices:'اضغط تحديث لعرض آخر الفواتير.',
   loading:'جارٍ تحميل الفواتير...', loadError:'تعذر تحميل الفواتير:',
-  cashCustomer:'زبون نقدي', dayInvoice:'فاتورة', categoryAll:'كل الأصناف',
+  cashCustomer:'زبون نقدي', dayInvoice:'فاتورة', categoryAll:'كل الأصناف', invoiceSearch:'ابحث برقم الفاتورة أو اسم الزبون أو الهاتف', searchInvoices:'بحث', showAllInvoices:'عرض الكل', loadMoreInvoices:'تحميل المزيد', loadedInvoices:'فاتورة محملة',
   pendingExists:'يوجد بيع معلّق. أكمل تسجيله أولاً قبل بدء بيع جديد.',
   pendingEdit:'يوجد بيع معلّق. أكمل تسجيله أولاً قبل تعديل السلة.',
   unavailable:'المنتج غير متوفر.', emptySale:'السلة فارغة.', discountError:'التخفيض أكبر من المجموع.',
@@ -2792,7 +2792,7 @@ const posTranslations = {
   date:'Date', paymentMethod:'Paiement', amount:'Total', noInvoices:'Aucune facture pour le moment.',
   loadInvoices:'Cliquez sur Actualiser pour afficher les dernières factures.',
   loading:'Chargement des factures...', loadError:'Impossible de charger les factures :',
-  cashCustomer:'Client comptant', dayInvoice:'facture', categoryAll:'Toutes les catégories',
+  cashCustomer:'Client comptant', dayInvoice:'facture', categoryAll:'Toutes les catégories', invoiceSearch:'Rechercher par numéro, nom du client ou téléphone', searchInvoices:'Rechercher', showAllInvoices:'Tout afficher', loadMoreInvoices:'Charger plus', loadedInvoices:'factures chargées',
   pendingExists:'Une vente est en attente. Terminez-la avant de commencer une nouvelle vente.',
   pendingEdit:'Une vente est en attente. Terminez-la avant de modifier le panier.',
   unavailable:'Produit indisponible.', emptySale:'Le panier est vide.',
@@ -2815,6 +2815,11 @@ function applyPOSTranslations() {
  root.querySelectorAll('[data-pos-i18n]').forEach(el=>{const key=el.getAttribute('data-pos-i18n');if(posTranslations[lang][key])el.textContent=posTranslations[lang][key];});
  root.querySelectorAll('[data-pos-placeholder]').forEach(el=>{const key=el.getAttribute('data-pos-placeholder');if(posTranslations[lang][key])el.setAttribute('placeholder',posTranslations[lang][key]);});
  const search=root.querySelector('#pos-search');if(search)search.setAttribute('aria-label',posText('searchPlaceholder'));
+ const invoiceSearch=root.querySelector('#pos-invoice-search');if(invoiceSearch)invoiceSearch.setAttribute('placeholder',posText('invoiceSearch'));
+ const searchButton=root.querySelector('#pos-invoice-search-button');if(searchButton)searchButton.innerHTML='<i class="fas fa-search"></i> '+posText('searchInvoices');
+ const clearButton=root.querySelector('#pos-invoice-clear-button');if(clearButton)clearButton.innerHTML='<i class="fas fa-times"></i> '+posText('showAllInvoices');
+ const moreButton=root.querySelector('#pos-load-more');if(moreButton)moreButton.innerHTML='<i class="fas fa-chevron-down"></i> '+posText('loadMoreInvoices');
+ const loadedCount=root.querySelector('#pos-sales-count');if(loadedCount&&loadedCount.textContent)loadedCount.textContent=loadedCount.textContent.split(' ')[0]+' '+posText('loadedInvoices');
 }
 
 function renderPOSProducts() {
