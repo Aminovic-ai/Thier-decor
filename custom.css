@@ -2103,3 +2103,15 @@ a { text-underline-offset: 3px; }
 @media(max-width:360px) {
   #screen-admin .pos-products-grid { grid-template-columns:minmax(0,1fr); }
 }
+
+
+/* POS customer details on invoice */
+#screen-admin .pos-customer-fields { display:grid; grid-template-columns:1fr; gap:7px; margin:12px 0 16px; padding:13px; border:1px solid #dbeafe; border-radius:12px; background:#f8fcff; }
+#screen-admin .pos-customer-fields-heading { display:grid; grid-template-columns:auto 1fr; align-items:center; column-gap:8px; margin-bottom:4px; color:#075985; }
+#screen-admin .pos-customer-fields-heading i { grid-row:span 2; font-size:1.15rem; }
+#screen-admin .pos-customer-fields-heading strong { font-size:.86rem; }
+#screen-admin .pos-customer-fields-heading small { color:#64748b; font-size:.7rem; }
+#screen-admin .pos-customer-fields label { margin-top:3px; color:#475569; font-size:.78rem; font-weight:800; }
+#screen-admin .pos-customer-fields input, #screen-admin .pos-customer-fields textarea { width:100%; min-width:0; padding:10px 11px; border:1px solid #dbeafe; border-radius:9px; background:#fff; font:inherit; font-size:.84rem; }
+#screen-admin .pos-customer-fields textarea { resize:vertical; min-height:58px; }
+#screen-admin .pos-customer-fields input:focus, #screen-admin .pos-customer-fields textarea:focus { border-color:#38bdf8; outline:0; box-shadow:0 0 0 3px rgba(56,189,248,.12); }
