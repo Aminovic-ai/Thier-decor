@@ -2832,6 +2832,21 @@ async function submitPOSSale(){
   if(button){button.disabled=false;button.innerHTML=posPendingSalePayload?'<i class="fas fa-sync-alt"></i> استكمال البيع المعلّق وطباعة الفاتورة':'<i class="fas fa-check-circle"></i> تأكيد البيع وطباعة الفاتورة';}
  }
 }
+async function recoverPendingPOSSales(){
+ const button=document.querySelector('#sec-pos button[onclick="recoverPendingPOSSales()"]');
+ if(button){button.disabled=true;button.textContent='جارٍ فحص واستعادة الفواتير...';}
+ try{
+  const result=await callAdminWorker('adminRecoverPendingStoreSales');
+  const count=Array.isArray(result.recovered)?result.recovered.length:0;
+  const pending=Number(result.pending||0);
+  toast('تمت استعادة '+count+' فاتورة'+(pending?'، وبقيت '+pending+' عملية تحتاج إعادة محاولة':''),pending?'error':'success');
+ }catch(error){
+  toast('تعذرت استعادة الفواتير: '+(error.message||''),'error');
+ }finally{
+  if(button){button.disabled=false;button.innerHTML='<i class="fas fa-sync-alt"></i> استعادة الفواتير المعلّقة';}
+ }
+}
+window.recoverPendingPOSSales=recoverPendingPOSSales;
 window.submitPOSSale=submitPOSSale;
 function adminGo(sec, btnElement) {
     document.querySelectorAll('.admin-section').forEach(s => s.style.display = 'none'); document.getElementById('sec-' + sec).style.display = 'block';
