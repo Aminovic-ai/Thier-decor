@@ -172,6 +172,9 @@ begin
           raise exception 'Invalid component definition in pack %', v_product_id;
         end if;
         v_component_id := (v_component->>'id')::bigint;
+        if v_component_id = v_product_id then
+          raise exception 'A pack cannot contain itself';
+        end if;
         v_component_qty := (v_component->>'qty')::numeric * v_qty;
         if v_component_qty <= 0 then
           raise exception 'Invalid component quantity in pack %', v_product_id;
@@ -209,6 +212,10 @@ begin
     for update;
     if not found then
       raise exception 'Required component % not found', v_key;
+    end if;
+    -- Nested packs are unsupported; otherwise component expansion would be incomplete.
+    if not (v_product_snapshots ? v_key) and coalesce(v_product."isPack", false) then
+      raise exception 'Nested packs are not supported (component %)', v_key;
     end if;
     v_stock := v_product.qty;
 
