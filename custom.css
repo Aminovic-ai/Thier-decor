@@ -2279,3 +2279,15 @@ a { text-underline-offset: 3px; }
  #screen-admin .pos-workspace-actions { gap:5px; }
  #screen-admin .pos-workspace-actions button { min-height:36px; padding:7px 9px; font-size:.72rem; }
 }
+
+
+/* POS workspace navigation tabs */
+#screen-admin .pos-workspace-actions { flex-wrap:wrap; }
+#screen-admin .pos-workspace-actions .pos-view-tab { background:#f5faff; border-color:#d7e8f5; color:#41627a; }
+#screen-admin .pos-workspace-actions .pos-view-tab.active { background:#087fbd; border-color:#087fbd; color:#fff; box-shadow:0 4px 12px rgba(8,127,189,.18); }
+#screen-admin .pos-workspace-actions .pos-view-tab i { font-size:.85rem; }
+#screen-admin #pos-reports-view { width:100%; }
+@media(max-width:700px) {
+ #screen-admin .pos-workspace-actions { justify-content:flex-end; }
+ #screen-admin .pos-workspace-actions .pos-view-tab { flex:1 1 auto; }
+}
