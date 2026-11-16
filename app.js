@@ -1410,6 +1410,7 @@ async function loadOrdersListener(options = {}) {
             if (posSection && posSection.style.display !== 'none') {
                 renderPOSProducts();
                 renderPOSCart();
+                refreshPOSSales();
             }
         }
 
@@ -2836,6 +2837,36 @@ async function submitPOSSale(){
   if(button){button.disabled=false;button.innerHTML=posPendingSalePayload?'<i class="fas fa-sync-alt"></i> استكمال البيع المعلّق وطباعة الفاتورة':'<i class="fas fa-check-circle"></i> تأكيد البيع وطباعة الفاتورة';}
  }
 }
+async function refreshPOSSales(){
+ const target=document.getElementById('pos-sales-history');
+ if(target)target.innerHTML='<p style="text-align:center;padding:18px;">جارٍ تحميل فواتير المحل...</p>';
+ try{
+  const result=await callAdminWorker('adminListPOSSales',{limit:50});
+  const summary=result.summary||{};
+  const money=value=>fmtMoney(Number(value||0))+' دج';
+  for(const [period,label] of [['today','day'],['week','week'],['month','month']]){
+   const row=summary[period]||{};
+   const sales=document.getElementById('pos-'+label+'-sales');
+   const profit=document.getElementById('pos-'+label+'-profit');
+   if(sales)sales.textContent=money(row.sales);
+   if(profit)profit.textContent='الربح التقديري: '+money(row.profit)+' · '+Number(row.count||0)+' فاتورة';
+  }
+  const rows=Array.isArray(result.sales)?result.sales:[];
+  if(!target)return;
+  if(!rows.length){target.innerHTML='<p style="text-align:center;color:var(--text-mid);padding:18px;">لا توجد فواتير مبيعات محل بعد.</p>';return;}
+  target.innerHTML='<div style="overflow-x:auto;"><table class="admin-table" style="width:100%;min-width:620px;"><thead><tr><th>الفاتورة</th><th>العميل</th><th>التاريخ</th><th>الدفع</th><th>الإجمالي</th><th>الربح</th></tr></thead><tbody>'+rows.map(sale=>{
+   const items=Array.isArray(sale.pos_sale_items)?sale.pos_sale_items:[];
+   const margin=items.reduce((sum,item)=>sum+((Number(item.unit_price)||0)-(Number(item.unit_cost)||0))*(Number(item.quantity)||0),0);
+   const profit=margin-(Number(sale.discount)||0);
+   const date=new Date(sale.created_at);
+   return '<tr><td><strong>'+esc(sale.invoice_no||'—')+'</strong></td><td>'+esc(sale.customer_name||'زبون نقدي')+'<br><small>'+esc(sale.customer_phone||'')+'</small></td><td>'+date.toLocaleString('ar-DZ')+'</td><td>'+esc(({cash:'نقداً',transfer:'تحويل',card:'بطاقة',other:'أخرى'})[sale.payment_method]||sale.payment_method||'—')+'</td><td>'+money(sale.total)+'</td><td>'+money(profit)+'</td></tr>';
+  }).join('')+'</tbody></table></div>';
+ }catch(error){
+  if(target)target.innerHTML='<p style="color:#b91c1c;padding:18px;">تعذر تحميل فواتير POS: '+esc(error.message||'')+'</p>';
+ }
+}
+window.refreshPOSSales=refreshPOSSales;
+
 async function recoverPendingPOSSales(){
  const button=document.querySelector('#sec-pos button[onclick="recoverPendingPOSSales()"]');
  if(button){button.disabled=true;button.textContent='جارٍ فحص واستعادة الفواتير...';}
