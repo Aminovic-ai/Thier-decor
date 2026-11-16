@@ -1481,12 +1481,9 @@ async function adminRecoverPendingStoreSales(env) {
       });
       if (result?.ok && result.invoice_no) {
         recovered.push({ invoice_no: result.invoice_no, operation_id: operation.operation_id });
-      } else {
-        pending++;
       }
     } catch (error) {
       console.error("POS pending invoice recovery failed:", operation.operation_id, error);
-      pending++;
     }
   }
 
