@@ -2936,7 +2936,7 @@ let posSalesLoading = false;
 function renderPOSSalesRows(rows, append = false) {
  const target=document.getElementById('pos-sales-history');
  if(!target)return;
- const money=value=>fmtMoney(Number(value||0))+(state.currentLang==='fr'?' DA':' دج');
+ const money=value=>fmtMoney(Number(value||0));
  const downloadLabel=state.currentLang==='fr'?'Télécharger A4':'تحميل A4';
  const htmlRows=rows.map(sale=>{
   const items=Array.isArray(sale.pos_sale_items)?sale.pos_sale_items:[];
@@ -2977,7 +2977,7 @@ async function refreshPOSSales(options={}){
  try{
   const result=await callAdminWorker('adminListPOSSales',{limit:50,offset:posSalesOffset,search:posSalesSearch});
   const summary=result.summary||{};
-  const money=value=>fmtMoney(Number(value||0))+(state.currentLang==='fr'?' DA':' دج');
+  const money=value=>fmtMoney(Number(value||0));
   for(const [period,label] of [['today','day'],['week','week'],['month','month']]){
    const row=summary[period]||{};
    const sales=document.getElementById('pos-'+label+'-sales');
