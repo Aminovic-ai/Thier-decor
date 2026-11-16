@@ -1346,14 +1346,26 @@ async function adminCreateStoreSale(body, env, request) {
   // idempotent by request_key and must persist its operation in the same
   // transaction as the stock decrement.
   let stockResult;
-  try {
-    stockResult = await dbRequest(env, "rpc/td_pos_commit_stock", {
-      method: "POST",
-      body: JSON.stringify({ p_sale: saleInput })
-    });
-  } catch (error) {
-    console.error("POS stock commit failed:", error);
-    return fail("تعذر تأكيد خصم المخزون. لم يتم تسجيل الفاتورة.", 409);
+  let stockError;
+  // A deadlock or network timeout may happen after the database committed.
+  // Retrying the identical request_key/payload is safe because the store ledger
+  // returns the original operation instead of deducting stock a second time.
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      stockResult = await dbRequest(env, "rpc/td_pos_commit_stock", {
+        method: "POST",
+        body: JSON.stringify({ p_sale: saleInput })
+      });
+      stockError = null;
+      break;
+    } catch (error) {
+      stockError = error;
+      console.error("POS stock commit attempt failed:", attempt + 1, error);
+      if (attempt < 2) await new Promise(resolve => setTimeout(resolve, 180 * (attempt + 1)));
+    }
+  }
+  if (stockError) {
+    return fail("تعذر تأكيد خصم المخزون بعد محاولات آمنة. أعد المحاولة بنفس عملية البيع.", 409);
   }
 
   if (!stockResult?.ok || !stockResult.operation_id ||
