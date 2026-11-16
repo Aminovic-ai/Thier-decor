@@ -318,7 +318,7 @@ async function posDbRequest(env, path, options = {}) {
   if (!env.POS_SUPABASE_URL || !env.POS_SUPABASE_SERVICE_ROLE_KEY) {
     throw new Error("POS database configuration is missing");
   }
-  const url = env.POS_SUPABASE_URL.replace(/\\/+$/, "") + "/rest/v1/" + path;
+  const url = new URL("/rest/v1/" + path, env.POS_SUPABASE_URL).toString();
   const response = await fetch(url, {
     ...options,
     headers: {
