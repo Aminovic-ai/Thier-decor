@@ -42,6 +42,8 @@ declare
   v_is_pack boolean;
   v_pack_items jsonb;
   v_required jsonb := '{}'::jsonb;
+  v_product_snapshots jsonb := '{}'::jsonb;
+  v_snapshot jsonb;
   v_canonical jsonb := '[]'::jsonb;
   v_key text;
   v_required_qty numeric;
@@ -89,14 +91,9 @@ begin
     );
   end if;
 
-  -- Serialize inventory writers before taking any row locks. Online order RPCs
-  -- update this same table and therefore wait at the table lock before holding
-  -- product row locks. EXCLUSIVE conflicts with both ROW SHARE (FOR UPDATE)
-  -- and ROW EXCLUSIVE (UPDATE), while ordinary SELECTs remain available.
-  -- Trade-off: stock writers/lockers are briefly serialized during POS commit.
-  lock table public.products in exclusive mode;
+  -- Read product definitions without locks first. All required stock rows are
+  -- then locked once, in the same ascending-id order used by web-order RPCs.
 
-  -- Read top-level products only after the inventory-writer barrier is acquired.
   for v_item in
     select value from jsonb_array_elements(p_sale->'items')
     order by (value->>'id')::bigint
@@ -130,6 +127,21 @@ begin
     if v_is_pack and (jsonb_typeof(v_pack_items) <> 'array' or jsonb_array_length(v_pack_items) = 0) then
       raise exception 'Pack % has no valid components', v_product_id;
     end if;
+
+    -- Remember the sellable product definition. After acquiring every stock
+    -- lock in global id order, verify it has not changed since this read.
+    v_product_snapshots := jsonb_set(
+      v_product_snapshots,
+      array[v_product_id::text],
+      jsonb_build_object(
+        'name', v_product.name,
+        'price', v_price,
+        'cost', v_cost,
+        'isPack', v_is_pack,
+        'packItems', v_pack_items
+      ),
+      true
+    );
 
     v_required := jsonb_set(
       v_required, array[v_product_id::text],
@@ -174,13 +186,27 @@ begin
     if v_required_qty <= 0 or v_required_qty <> trunc(v_required_qty) or v_required_qty > 2147483647 then
       raise exception 'Stock quantities must be positive integers';
     end if;
-    select qty into v_stock
+    select * into v_product
     from public.products
     where id = v_key::bigint
     for update;
     if not found then
       raise exception 'Required component % not found', v_key;
     end if;
+    v_stock := v_product.qty;
+
+    if v_product_snapshots ? v_key then
+      v_snapshot := v_product_snapshots->v_key;
+      if coalesce(v_product.name,'') is distinct from coalesce(v_snapshot->>'name','')
+         or coalesce(v_product.price,0) is distinct from coalesce((v_snapshot->>'price')::numeric,0)
+         or coalesce(v_product.cost,0) is distinct from coalesce((v_snapshot->>'cost')::numeric,0)
+         or coalesce(v_product."isPack",false) is distinct from coalesce((v_snapshot->>'isPack')::boolean,false)
+         or (case when coalesce(v_product."isPack",false) then coalesce(v_product."packItems",'[]'::jsonb) else '[]'::jsonb end)
+            is distinct from coalesce(v_snapshot->'packItems','[]'::jsonb) then
+        raise exception 'Product configuration changed during sale; retry same request';
+      end if;
+    end if;
+
     if v_stock < v_required_qty then
       raise exception 'Insufficient stock for product % (required %, available %)',
         v_key, v_required_qty, v_stock;
