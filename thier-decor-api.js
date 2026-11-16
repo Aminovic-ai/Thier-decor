@@ -1574,7 +1574,8 @@ async function handleRequest(request, env) {
           if (action === "listAdminData") return await listAdminData(env);
           if (action === "updateOrderStatus") return await updateOrderStatus(body, env);
           if (action === "adminNotifyCustomerProductAvailable") return await adminNotifyCustomerProductAvailable(body, env);
-          if (action === "adminCreateStoreSale") return await adminCreateStoreSale(body, env, request);\n          if (action === "adminDeleteOrder") return await adminDeleteOrder(body, env);
+          if (action === "adminCreateStoreSale") return await adminCreateStoreSale(body, env, request);
+          if (action === "adminDeleteOrder") return await adminDeleteOrder(body, env);
           if (action === "adminEditOrder") return await adminEditOrder(body, env);
           if (action === "adminVisitStats") return await adminVisitStats(env);
           if (action === "adminMigrateLegacyImages") return await adminMigrateLegacyImages(body, env);
