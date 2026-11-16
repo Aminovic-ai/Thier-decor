@@ -16,8 +16,22 @@ create table if not exists public.td_store_sales (
   payment_method text not null,
   paid_amount numeric(12,2) not null,
   created_at timestamptz not null default now(),
-  cashier_uid text
+  cashier_uid text,
+  customer_name text not null default '',
+  customer_phone text not null default '',
+  customer_address text not null default '',
+  store_name text not null default 'Thier Décor',
+  store_phone text not null default '',
+  store_address text not null default ''
 );
+
+alter table public.td_store_sales
+  add column if not exists customer_name text not null default '',
+  add column if not exists customer_phone text not null default '',
+  add column if not exists customer_address text not null default '',
+  add column if not exists store_name text not null default 'Thier Décor',
+  add column if not exists store_phone text not null default '',
+  add column if not exists store_address text not null default '';
 
 alter table public.td_store_sales enable row level security;
 revoke all on public.td_store_sales from public, anon, authenticated;
@@ -68,6 +82,14 @@ begin
       'sale_id', existing_sale.id,
       'invoice_no', existing_sale.invoice_no,
       'total', existing_sale.total,
+      'items', existing_sale.items,
+      'customer_name', existing_sale.customer_name,
+      'customer_phone', existing_sale.customer_phone,
+      'customer_address', existing_sale.customer_address,
+      'store_name', existing_sale.store_name,
+      'store_phone', existing_sale.store_phone,
+      'store_address', existing_sale.store_address,
+      'created_at', existing_sale.created_at,
       'already_created', true
     );
   end if;
@@ -113,10 +135,18 @@ begin
 
   insert into public.td_store_sales (
     request_key, items, items_total, discount, total,
-    payment_method, paid_amount, cashier_uid
+    payment_method, paid_amount, cashier_uid,
+    customer_name, customer_phone, customer_address,
+    store_name, store_phone, store_address
   ) values (
     v_request_key, canonical_items, subtotal, discount_amount, total_amount,
-    payment, paid, nullif(cashier,'')
+    payment, paid, nullif(cashier,''),
+    left(trim(coalesce(p_sale->>'customer_name','')),120),
+    left(trim(coalesce(p_sale->>'customer_phone','')),40),
+    left(trim(coalesce(p_sale->>'customer_address','')),300),
+    left(coalesce(nullif(trim(p_sale->>'store_name'),''),'Thier Décor'),120),
+    left(trim(coalesce(p_sale->>'store_phone','')),40),
+    left(trim(coalesce(p_sale->>'store_address','')),300)
   ) returning id into sale_id;
 
   invoice := 'TD-' || to_char(now(), 'YYYYMMDD') || '-' || lpad(sale_id::text, 6, '0');
@@ -139,6 +169,13 @@ begin
     'total', total_amount,
     'paid_amount', paid,
     'items', canonical_items,
+    'customer_name', left(trim(coalesce(p_sale->>'customer_name','')),120),
+    'customer_phone', left(trim(coalesce(p_sale->>'customer_phone','')),40),
+    'customer_address', left(trim(coalesce(p_sale->>'customer_address','')),300),
+    'store_name', left(coalesce(nullif(trim(p_sale->>'store_name'),''),'Thier Décor'),120),
+    'store_phone', left(trim(coalesce(p_sale->>'store_phone','')),40),
+    'store_address', left(trim(coalesce(p_sale->>'store_address','')),300),
+    'created_at', now(),
     'already_created', false
   );
 end;
