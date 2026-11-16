@@ -1429,26 +1429,27 @@ async function adminListPOSSales(body, env) {
   }
   const requestedLimit = Number(body?.limit || 50);
   const limit = Number.isInteger(requestedLimit) ? Math.min(100, Math.max(1, requestedLimit)) : 50;
+  const monthStart = new Date();
+  monthStart.setDate(1);
+  monthStart.setHours(0, 0, 0, 0);
   const rows = await posDbRequest(
     env,
-    "pos_sales?select=id,invoice_no,customer_name,customer_phone,customer_address,subtotal,discount,total,payment_method,paid_amount,created_at,store_name,store_phone,store_address,pos_sale_items(id,product_id,product_name,quantity,unit_price,unit_cost,line_total,is_pack,pack_snapshot)&order=created_at.desc&limit=" + limit
+    "pos_sales?select=id,invoice_no,customer_name,customer_phone,customer_address,subtotal,discount,total,payment_method,paid_amount,created_at,store_name,store_phone,store_address,pos_sale_items(id,product_id,product_name,quantity,unit_price,unit_cost,line_total,is_pack,pack_snapshot)&created_at=gte." + encodeURIComponent(monthStart.toISOString()) + "&order=created_at.desc&limit=1000"
   );
-  const sales = Array.isArray(rows) ? rows : [];
+  const allSales = Array.isArray(rows) ? rows : [];
+  const sales = allSales.slice(0, limit);
   const now = Date.now();
   const dayStart = new Date();
   dayStart.setHours(0, 0, 0, 0);
   const dayMs = dayStart.getTime();
   const weekMs = now - 7 * 24 * 60 * 60 * 1000;
-  const monthStart = new Date();
-  monthStart.setDate(1);
-  monthStart.setHours(0, 0, 0, 0);
   const monthMs = monthStart.getTime();
   const summary = {
     today: { count: 0, sales: 0, profit: 0 },
     week: { count: 0, sales: 0, profit: 0 },
     month: { count: 0, sales: 0, profit: 0 }
   };
-  for (const sale of sales) {
+  for (const sale of allSales) {
     const stamp = Date.parse(sale.created_at || "");
     if (!Number.isFinite(stamp)) continue;
     const saleTotal = Number(sale.total) || 0;
