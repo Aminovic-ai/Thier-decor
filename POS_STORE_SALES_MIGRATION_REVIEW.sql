@@ -138,6 +138,7 @@ begin
     'discount', discount_amount,
     'total', total_amount,
     'paid_amount', paid,
+    'items', canonical_items,
     'already_created', false
   );
 end;
