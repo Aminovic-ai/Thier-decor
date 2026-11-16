@@ -2982,6 +2982,8 @@ async function recoverPendingPOSSales(){
 window.recoverPendingPOSSales=recoverPendingPOSSales;
 window.submitPOSSale=submitPOSSale;
 function adminGo(sec, btnElement) {
+    const adminLayout = document.querySelector('#screen-admin .admin-layout');
+    if (adminLayout) adminLayout.classList.toggle('pos-workspace-mode', sec === 'pos');
     document.querySelectorAll('.admin-section').forEach(s => s.style.display = 'none'); document.getElementById('sec-' + sec).style.display = 'block';
     document.querySelectorAll('.admin-nav a').forEach(a => a.classList.remove('active')); if (btnElement) btnElement.classList.add('active');
     const titleKey = sec === 'dashboard' ? 'admin_home' : 'admin_' + sec; document.getElementById('admin-page-title').textContent = sec === 'pos' ? (state.currentLang === 'fr' ? 'Vente' : 'البيع من المحل') : (i18n[state.currentLang][titleKey] || sec);
