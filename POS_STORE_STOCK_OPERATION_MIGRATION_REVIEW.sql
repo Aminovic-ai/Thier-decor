@@ -45,6 +45,7 @@ declare
   v_pack_items jsonb;
   v_required jsonb := '{}'::jsonb;
   v_product_snapshots jsonb := '{}'::jsonb;
+  v_pack_component_ids jsonb := '{}'::jsonb;
   v_snapshot jsonb;
   v_canonical jsonb := '[]'::jsonb;
   v_key text;
@@ -172,6 +173,7 @@ begin
           raise exception 'Invalid component definition in pack %', v_product_id;
         end if;
         v_component_id := (v_component->>'id')::bigint;
+        v_pack_component_ids := jsonb_set(v_pack_component_ids, array[v_component_id::text], 'true'::jsonb, true);
         if v_component_id = v_product_id then
           raise exception 'A pack cannot contain itself';
         end if;
@@ -214,7 +216,7 @@ begin
       raise exception 'Required component % not found', v_key;
     end if;
     -- Nested packs are unsupported; otherwise component expansion would be incomplete.
-    if not (v_product_snapshots ? v_key) and coalesce(v_product."isPack", false) then
+    if (v_pack_component_ids ? v_key) and coalesce(v_product."isPack", false) then
       raise exception 'Nested packs are not supported (component %)', v_key;
     end if;
     v_stock := v_product.qty;
