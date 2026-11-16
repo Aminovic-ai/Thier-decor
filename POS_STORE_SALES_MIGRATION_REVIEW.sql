@@ -1,3 +1,10 @@
+-- SUPERSEDED — DO NOT EXECUTE.
+-- This earlier single-database td_store_sales draft is obsolete.
+-- The approved design uses POS_DATABASE_MIGRATION_REVIEW.sql in the POS project
+-- and POS_STORE_STOCK_OPERATION_MIGRATION_REVIEW.sql in the existing store project.
+-- Do not create td_store_sales or use td_admin_create_store_sale.
+-- Store expenses remain in the original store database.
+
 -- Thier Decor POS: store-sale migration draft
 -- REVIEW ONLY. Do not run on production until the live schema and prerequisite RPC helpers are verified.
 -- Intended to run only after td_build_order_items(jsonb) and td_order_stock_requirements(jsonb)
