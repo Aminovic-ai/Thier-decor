@@ -937,10 +937,50 @@ function privateCatalogJson(payload) {
   });
 }
 
+// Public settings must expose only values used by the storefront. In particular,
+// do not pass arbitrary future admin-only keys nested inside customPrices through
+// either the cached GET endpoint or the legacy POST action.
+function sanitizePublicCustomPrices(value) {
+  const source = value && typeof value === "object" && !Array.isArray(value) ? value : {};
+  const result = {};
+  const categoryOrder = Array.isArray(source.__categoryOrder)
+    ? source.__categoryOrder.filter(item => typeof item === "string").map(item => item.slice(0, 100)).slice(0, 100)
+    : [];
+  const featuredIds = Array.isArray(source.__featuredProductIds)
+    ? [...new Set(source.__featuredProductIds.map(String).filter(item => /^\\d{1,18}$/.test(item)))].slice(0, 100)
+    : [];
+  if (categoryOrder.length) result.__categoryOrder = categoryOrder;
+  if (featuredIds.length) result.__featuredProductIds = featuredIds;
+
+  for (const [wilaya, config] of Object.entries(source)) {
+    if (!/^\\d{1,2}$/.test(wilaya) || !config || typeof config !== "object" || Array.isArray(config)) continue;
+    const publicRates = {};
+    for (const courier of ["yalidine", "noest"]) {
+      const rates = config[courier];
+      if (!rates || typeof rates !== "object" || Array.isArray(rates)) continue;
+      const cleanRates = {};
+      for (const kind of ["home", "desk"]) {
+        if (rates[kind] === null || rates[kind] === undefined || rates[kind] === "") continue;
+        const amount = Number(rates[kind]);
+        if (Number.isFinite(amount) && amount >= 0 && amount <= 1000000) cleanRates[kind] = amount;
+      }
+      if (Object.keys(cleanRates).length) publicRates[courier] = cleanRates;
+    }
+    if (Object.keys(publicRates).length) result[wilaya] = publicRates;
+  }
+  return result;
+}
+
+function sanitizePublicSettings(settings) {
+  const clean = settings && typeof settings === "object" && !Array.isArray(settings) ? { ...settings } : {};
+  clean.customPrices = sanitizePublicCustomPrices(clean.customPrices);
+  return clean;
+}
+
 // Keep the existing POST action for older clients; it remains no-store.
 async function publicSettings(env) {
   const rows = await dbRequest(env, "settings?select=id,shopName,shopPhone,shopAddress,logoUrl,promoText,promoActive,adActive,adImages,adText,adEndTime,customPrices&limit=1");
-  return json({ success: true, settings: rows?.[0] || {} });
+  return json({ success: true, settings: sanitizePublicSettings(rows?.[0] || {}) });
 }
 
 async function cachedPublicSettings(request, env) {
@@ -949,7 +989,7 @@ async function cachedPublicSettings(request, env) {
   // a response whose content is independent of query parameters.
   if (requestUrl.searchParams.size) return fail("Invalid public settings query.", 400);
   const rows = await dbRequest(env, "settings?select=id,shopName,shopPhone,shopAddress,logoUrl,promoText,promoActive,adActive,adImages,adText,adEndTime,customPrices&limit=1");
-  return publicCacheJson({ success: true, settings: rows?.[0] || {} });
+  return publicCacheJson({ success: true, settings: sanitizePublicSettings(rows?.[0] || {}) });
 }
 
 async function cachedPublicCatalog(request, env) {
