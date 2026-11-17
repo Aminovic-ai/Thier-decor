@@ -90,7 +90,7 @@ test("isolated customer checkout rebuilds trusted price and totals from Store DB
     }
     if (url.pathname.endsWith("/rpc/td_compute_delivery_price")) return jsonResponse(100);
     if (url.pathname.endsWith("/orders") && url.search.includes("id=eq.12345")) {
-      if (init.method === "GET" && calls.filter(x => x.path.endsWith("/orders")).length === 1) {
+      if ((!init.method || init.method === "GET") && calls.filter(x => x.path.endsWith("/orders")).length === 1) {
         return jsonResponse([]);
       }
       return jsonResponse([savedOrder]);
