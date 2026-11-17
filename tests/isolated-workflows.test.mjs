@@ -208,6 +208,7 @@ test("isolated POS sale commits stock in Store DB before recording invoice in PO
 
 test("storefront frontend does not require or query the browser Supabase client", async () => {
   const appSource = await readFile(new URL("../app.js", import.meta.url), "utf8");
+  const analyticsSource = await readFile(new URL("../analytics-notifications.js", import.meta.url), "utf8");
   assert.doesNotMatch(appSource, /window\\.supabaseClient/);
   assert.doesNotMatch(appSource, /supabase(?:Client)?\\s*\\.\\s*from\\s*\\(/i);
   assert.doesNotMatch(appSource, /supabase(?:Client)?\\s*\\.\\s*rpc\\s*\\(/i);
@@ -215,4 +216,6 @@ test("storefront frontend does not require or query the browser Supabase client"
   assert.match(appSource, /fetchPublicCatalogViaWorker/);
   assert.match(appSource, /fetchAdminOrdersViaWorker/);
   assert.match(appSource, /fetchCustomerDataViaWorker/);
+  assert.match(analyticsSource, /lastVisitStatsFetchAt/);
+  assert.match(analyticsSource, /now-lastVisitStatsFetchAt<120000/);
 });
