@@ -28,18 +28,15 @@ test("Worker runs locally with isolated config and fails closed without credenti
   ], {
     cwd: new URL(repoRoot).pathname,
     env: { ...process.env, CI: "1", NO_UPDATE_NOTIFIER: "1" },
-    stdio: ["ignore", "pipe", "pipe"]
+    detached: true,
+    stdio: "ignore"
   });
-
-  let logs = "";
-  child.stdout.on("data", chunk => { logs += chunk.toString(); });
-  child.stderr.on("data", chunk => { logs += chunk.toString(); });
 
   try {
     let health;
     for (let attempt = 0; attempt < 60; attempt++) {
       if (child.exitCode !== null) {
-        throw new Error(`Wrangler exited early (${child.exitCode}):\n${logs}`);
+        throw new Error(`Wrangler exited early (${child.exitCode}). Check the Wrangler runtime compatibility and local configuration.`);
       }
       try {
         health = await fetch(origin + "/", {
@@ -53,7 +50,7 @@ test("Worker runs locally with isolated config and fails closed without credenti
       }
     }
 
-    assert.ok(health, `Local Worker did not start. Wrangler output:\n${logs}`);
+    assert.ok(health, "Local Worker did not start within 30 seconds.");
     assert.equal(health.status, 200);
     assert.equal(health.headers.get("Access-Control-Allow-Origin"), origin);
     assert.match(health.headers.get("Cache-Control") || "", /no-store/);
@@ -89,11 +86,11 @@ test("Worker runs locally with isolated config and fails closed without credenti
     assert.equal(preflight.status, 204);
     assert.equal(preflight.headers.get("Access-Control-Allow-Origin"), origin);
   } finally {
-    child.kill("SIGTERM");
+    try { process.kill(-child.pid, "SIGTERM"); } catch { child.kill("SIGTERM"); }
     await Promise.race([
       new Promise(resolve => child.once("exit", resolve)),
-      delay(5000)
+      delay(3000)
     ]);
-    if (child.exitCode === null) child.kill("SIGKILL");
+    try { process.kill(-child.pid, "SIGKILL"); } catch { /* process group already exited */ }
   }
 });
