@@ -12,7 +12,9 @@ const env = {
   SUPABASE_URL: "https://store.example",
   SUPABASE_SERVICE_ROLE_KEY: "test-service-role",
   CUSTOMER_SESSION_SECRET: "test-customer-secret",
-  ALLOWED_ORIGINS: origin
+  FIREBASE_API_KEY: "test-firebase-key",
+  ADMIN_UID: "admin-uid",
+  ALLOWED_ORIGINS: "https://thier-decor-v3.pages.dev,https://thierdecor.com,https://www.thierdecor.com"
 };
 
 async function withFetch(mock, run) {
@@ -193,6 +195,64 @@ test("admin product endpoint rejects requests without Firebase admin authenticat
     }), env);
     assert.equal(response.status, 401);
     assert.match(response.headers.get("Cache-Control") || "", /no-store/);
+  });
+});
+
+
+test("public settings CORS is restricted to each configured production origin", async () => {
+  await withFetch(async () => new Response(JSON.stringify([{
+    shopName: "Thier Décor",
+    customPrices: {}
+  }]), { status: 200 }), async () => {
+    for (const allowedOrigin of [
+      "https://thier-decor-v3.pages.dev",
+      "https://thierdecor.com",
+      "https://www.thierdecor.com"
+    ]) {
+      const response = await worker.fetch(new Request("https://api.example/public/settings", {
+        headers: { Origin: allowedOrigin }
+      }), env);
+      assert.equal(response.status, 200);
+      assert.equal(response.headers.get("Access-Control-Allow-Origin"), allowedOrigin);
+      assert.equal(response.headers.get("Vary"), "Origin");
+    }
+  });
+});
+
+test("adminListProducts returns private cost only after Firebase admin verification", async () => {
+  const calls = [];
+  await withFetch(async (input, init = {}) => {
+    const url = new URL(String(input));
+    calls.push({ url, init });
+    if (url.hostname === "identitytoolkit.googleapis.com") {
+      return new Response(JSON.stringify({
+        users: [{ localId: "admin-uid", disabled: false }]
+      }), { status: 200 });
+    }
+    if (url.pathname.endsWith("/rest/v1/products")) {
+      return new Response(JSON.stringify([{
+        id: 11, name: "Moule", price: 500, cost: 200, qty: 2, image_urls: []
+      }]), { status: 200 });
+    }
+    throw new Error("Unexpected request: " + url);
+  }, async () => {
+    const response = await worker.fetch(new Request("https://api.example/", {
+      method: "POST",
+      headers: {
+        Origin: origin,
+        Authorization: "Bearer firebase-admin-test-token",
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ action: "adminListProducts" })
+    }), env);
+    assert.equal(response.status, 200);
+    assert.match(response.headers.get("Cache-Control") || "", /no-store/);
+    const body = await response.json();
+    assert.equal(body.products[0].cost, 200);
+    const productsCall = calls.find(call => call.url.pathname.endsWith("/rest/v1/products"));
+    assert.ok(productsCall);
+    assert.ok(productsCall.url.searchParams.get("select").split(",").includes("cost"));
+    assert.ok(!productsCall.url.searchParams.get("select").split(",").includes("images"));
   });
 });
 
