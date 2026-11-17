@@ -108,7 +108,7 @@ async function fetchAdminDataViaWorker() {
 
 async function fetchPublicSettingsViaWorker() {
     ensureApiConfigured();
-    const endpoint = TD_ADMIN_API_URL.replace(/\\/+$/, '') + '/public/settings';
+    const endpoint = TD_ADMIN_API_URL.replace(/\/+$/, '') + '/public/settings';
     const response = await fetch(endpoint, {
         method: 'GET',
         headers: { 'Accept': 'application/json' },
@@ -124,10 +124,10 @@ async function fetchPublicSettingsViaWorker() {
 }
 
 async function fetchPublicFeaturedProductsViaWorker(ids) {
-    const selectedIds = [...new Set((Array.isArray(ids) ? ids : []).map(String).filter(id => /^\\d{1,18}$/.test(id)))].slice(0, 30);
+    const selectedIds = [...new Set((Array.isArray(ids) ? ids : []).map(String).filter(id => /^\d{1,18}$/.test(id)))].slice(0, 30);
     if (!selectedIds.length) return [];
     ensureApiConfigured();
-    const endpoint = new URL(TD_ADMIN_API_URL.replace(/\\/+$/, '') + '/public/catalog');
+    const endpoint = new URL(TD_ADMIN_API_URL.replace(/\/+$/, '') + '/public/catalog');
     endpoint.searchParams.set('ids', selectedIds.join(','));
     const response = await fetch(endpoint.toString(), {
         method: 'GET',
