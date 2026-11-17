@@ -43,8 +43,12 @@ function withCors(response, request, env) {
   const origin = request.headers.get("Origin");
   if (origin && isAllowedOrigin(request, env)) {
     headers.set("Access-Control-Allow-Origin", origin);
-    headers.set("Vary", "Origin");
   }
+  // Always vary on Origin, including requests without an Origin header, so an
+  // origin-less cache fill can never be reused for a browser CORS response.
+  const vary = new Set((headers.get("Vary") || "").split(",").map(value => value.trim()).filter(Boolean));
+  vary.add("Origin");
+  headers.set("Vary", [...vary].join(", "));
   return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
 }
 
@@ -934,12 +938,10 @@ async function cachedPublicSettings(request, env) {
 
 async function cachedPublicCatalog(request, env) {
   const requestUrl = new URL(request.url);
-  const rawIds = String(requestUrl.searchParams.get("ids") || "");
   const allProducts = requestUrl.searchParams.get("all") === "1";
-  const parts = rawIds ? rawIds.split(",") : [];
-  if ((allProducts && rawIds) || parts.length > 100 || parts.some(id => !/^\d{1,18}$/.test(id))) {
-    return fail("Invalid public catalog selection.", 400);
-  }
+  // A fixed featured-catalog URL avoids attacker-controlled cache-key fan-out
+  // from arbitrary product ID combinations. Featured IDs are read server-side.
+  if (requestUrl.searchParams.has("ids")) return fail("Invalid public catalog selection.", 400);
 
   // Only fields required by the public storefront; never send cost or legacy
   // Base64 image data to visitors. Product images come from the R2 image_urls.
@@ -949,7 +951,11 @@ async function cachedPublicCatalog(request, env) {
     return publicCacheJson({ success: true, products: Array.isArray(products) ? products : [] });
   }
 
-  const ids = [...new Set(parts)];
+  const settings = await dbRequest(env, "settings?select=customPrices&limit=1");
+  const configuredIds = settings?.[0]?.customPrices?.__featuredProductIds;
+  const ids = Array.isArray(configuredIds)
+    ? [...new Set(configuredIds.map(value => String(value)).filter(value => /^\d{1,18}$/.test(value)))].slice(0, 100)
+    : [];
   if (!ids.length) return publicCacheJson({ success: true, products: [] });
   const query = "products?select=" + columns + "&id=in.(" + ids.join(",") + ")&qty=gt.0";
   const products = await dbRequest(env, query);
@@ -965,6 +971,15 @@ async function listOrders(env) {
     success: true,
     orders: orders || []
   });
+}
+
+/* ---------------- ADMIN PRODUCT CATALOG ---------------- */
+async function listAdminProducts(env) {
+  // Admin-only read via the service-role Worker. The browser no longer needs
+  // direct SELECT privileges on products, so private cost cannot leak publicly.
+  const columns = "id,name,price,cost,qty,category,desc,image_urls,isPack,isSpecial,reviews,packItems,promoPrice,promoStart,promoEnd,createdAt";
+  const products = await dbRequestPaged(env, "products?select=" + columns + "&order=id.asc", 500, 50000);
+  return json({ success: true, products: products || [] });
 }
 
 /* ---------------- ADMIN DATA ---------------- */
@@ -1917,6 +1932,7 @@ async function handleRequest(request, env) {
           return await recordVisit(request, body, env);
 
         case "listOrders":
+        case "adminListProducts":
         case "listAdminData":
         case "updateOrderStatus":
         case "adminUpsertProduct":
@@ -1946,6 +1962,7 @@ async function handleRequest(request, env) {
           const isAdmin = await verifyFirebaseAdmin(request, env);
           if (!isAdmin) return fail("غير مصرح لك بتنفيذ هذا الإجراء.", 401);
           if (action === "listOrders") return await listOrders(env);
+          if (action === "adminListProducts") return await listAdminProducts(env);
           if (action === "listAdminData") return await listAdminData(env);
           if (action === "updateOrderStatus") return await updateOrderStatus(body, env);
           if (action === "adminNotifyCustomerProductAvailable") return await adminNotifyCustomerProductAvailable(body, env);
