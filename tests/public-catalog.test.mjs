@@ -142,3 +142,31 @@ test("full catalog requires a valid customer session and is always private no-st
     assert.equal(calls, 1);
   });
 });
+
+
+test("admin product endpoint rejects requests without Firebase admin authentication", async () => {
+  await withFetch(async () => {
+    throw new Error("Supabase must not be called for unauthenticated admin requests");
+  }, async () => {
+    const response = await worker.fetch(new Request("https://api.example/", {
+      method: "POST",
+      headers: { Origin: origin, "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "adminListProducts" })
+    }), env);
+    assert.equal(response.status, 401);
+    assert.match(response.headers.get("Cache-Control") || "", /no-store/);
+  });
+});
+
+test("disallowed browser origins are rejected before database access", async () => {
+  await withFetch(async () => {
+    throw new Error("Supabase must not be called for a disallowed origin");
+  }, async () => {
+    const response = await worker.fetch(new Request("https://api.example/public/catalog", {
+      headers: { Origin: "https://attacker.example" }
+    }), env);
+    assert.equal(response.status, 403);
+    assert.match(response.headers.get("Cache-Control") || "", /no-store/);
+    assert.equal(response.headers.get("Access-Control-Allow-Origin"), null);
+  });
+});
