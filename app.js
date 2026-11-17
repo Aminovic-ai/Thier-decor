@@ -106,9 +106,13 @@ async function fetchAdminDataViaWorker() {
     return result.data;
 }
 
-async function fetchPublicSettingsViaWorker() {
+let pendingFeaturedCatalogFromStorefront = null;
+
+async function fetchPublicSettingsViaWorker({ includeFeaturedCatalog = false } = {}) {
     ensureApiConfigured();
-    const endpoint = TD_ADMIN_API_URL.replace(/\/+$/, '') + '/public/settings';
+    pendingFeaturedCatalogFromStorefront = null;
+    const route = includeFeaturedCatalog ? '/public/storefront' : '/public/settings';
+    const endpoint = TD_ADMIN_API_URL.replace(/\/+$/, '') + route;
     const response = await fetch(endpoint, {
         method: 'GET',
         headers: { 'Accept': 'application/json' },
@@ -119,6 +123,10 @@ async function fetchPublicSettingsViaWorker() {
     catch (_) { throw new Error(state.currentLang === 'fr' ? 'Réponse des paramètres invalide.' : 'ردّ إعدادات المتجر غير صالح.'); }
     if (!response.ok || result?.success !== true || !result.settings || typeof result.settings !== 'object') {
         throw new Error(result?.error || (state.currentLang === 'fr' ? 'Impossible de charger les paramètres.' : 'تعذر جلب إعدادات المتجر.'));
+    }
+    if (includeFeaturedCatalog) {
+        if (!Array.isArray(result.products)) throw new Error(state.currentLang === 'fr' ? 'Catalogue vedette invalide.' : 'قائمة المنتجات المميزة غير صالحة.');
+        pendingFeaturedCatalogFromStorefront = result.products;
     }
     return result.settings;
 }
@@ -148,6 +156,11 @@ async function fetchPublicCatalogViaWorker({ all = false } = {}) {
 }
 
 function fetchPublicFeaturedProductsViaWorker() {
+    if (Array.isArray(pendingFeaturedCatalogFromStorefront)) {
+        const products = pendingFeaturedCatalogFromStorefront;
+        pendingFeaturedCatalogFromStorefront = null;
+        return Promise.resolve(products);
+    }
     return fetchPublicCatalogViaWorker();
 }
 
@@ -1404,7 +1417,7 @@ async function loadOrdersListener(options = {}) {
         const settingsTask = (async () => {
             if (!shouldFetchSettings) return true;
             try {
-                const settings = await fetchPublicSettingsViaWorker();
+                const settings = await fetchPublicSettingsViaWorker({ includeFeaturedCatalog: catalogMode === 'featured' });
                 state.settings = settings;
                 save(K.settings, settings);
                 lastSettingsFetchAt = Date.now();
