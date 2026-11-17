@@ -972,7 +972,16 @@ function sanitizePublicCustomPrices(value) {
 }
 
 function sanitizePublicSettings(settings) {
-  const clean = settings && typeof settings === "object" && !Array.isArray(settings) ? { ...settings } : {};
+  const source = settings && typeof settings === "object" && !Array.isArray(settings) ? settings : {};
+  const allowedFields = [
+    "id", "shopName", "shopPhone", "shopAddress", "logoUrl",
+    "promoText", "promoActive", "adActive", "adImages", "adText",
+    "adEndTime", "customPrices"
+  ];
+  const clean = {};
+  for (const field of allowedFields) {
+    if (Object.prototype.hasOwnProperty.call(source, field)) clean[field] = source[field];
+  }
   clean.customPrices = sanitizePublicCustomPrices(clean.customPrices);
   return clean;
 }
