@@ -62,9 +62,26 @@ jobs:
               Path("THIER_DECOR_CUSTOMER_PHONE_UNIQUE_REVIEW.sql"),
               Path("THIER_DECOR_FINAL_SECURITY_AND_ORDER_MUTATIONS_REVIEW.sql"),
               Path("SCHEMA_AUDIT_READONLY.sql"),
+              Path("SECURE_PUBLIC_TABLE_ACCESS_REVIEW.sql"),
               Path("supabase/migrations/20261113_add_product_image_urls.sql"),
           ]
           for path in files:
               parse_sql(path.read_text(encoding="utf-8"))
               print(f"SQL statements parsed: {path}")
+          security_sql = Path("SECURE_PUBLIC_TABLE_ACCESS_REVIEW.sql").read_text(encoding="utf-8").lower()
+          for table in ("public.products", "public.settings"):
+              expected = f"revoke all privileges on table {table} from public, anon, authenticated;"
+              assert expected in security_sql, f"Missing PUBLIC/anon/authenticated revoke for {table}"
+          for function in (
+              "td_check_promo(text, text)",
+              "td_compute_delivery_price(integer, text, text)",
+              "td_consume_promo(text, text, text)",
+              "td_create_order(jsonb)",
+              "td_get_visit_stats()",
+              "td_promo_usage_stats()",
+              "td_record_visit(text)",
+          ):
+              expected = f"revoke execute on function public.{function} from public, anon, authenticated;"
+              assert expected in security_sql, f"Missing browser-role EXECUTE revoke for {function}"
+          print("Security review SQL contains all required PUBLIC and browser-role revocations.")
           PY

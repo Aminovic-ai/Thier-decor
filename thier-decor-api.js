@@ -15,7 +15,7 @@
  */
 
 const CORS_HEADERS = {
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
   "Access-Control-Allow-Headers": "Authorization, Content-Type",
   "Cache-Control": "no-store"
 };
@@ -35,12 +35,20 @@ function isAllowedOrigin(request, env) {
 
 function withCors(response, request, env) {
   const headers = new Headers(response.headers);
-  for (const [key, value] of Object.entries(CORS_HEADERS)) headers.set(key, value);
+  for (const [key, value] of Object.entries(CORS_HEADERS)) {
+    // Preserve explicit public-cache headers on the two anonymous GET endpoints.
+    if (key === "Cache-Control" && headers.has("Cache-Control")) continue;
+    headers.set(key, value);
+  }
   const origin = request.headers.get("Origin");
   if (origin && isAllowedOrigin(request, env)) {
     headers.set("Access-Control-Allow-Origin", origin);
-    headers.set("Vary", "Origin");
   }
+  // Always vary on Origin, including requests without an Origin header, so an
+  // origin-less cache fill can never be reused for a browser CORS response.
+  const vary = new Set((headers.get("Vary") || "").split(",").map(value => value.trim()).filter(Boolean));
+  vary.add("Origin");
+  headers.set("Vary", [...vary].join(", "));
   return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
 }
 
@@ -902,11 +910,175 @@ async function customerCheckPromo(request, body, env) {
   return json({ success: true, promo: promo || { valid: false, reason: "not_found" } });
 }
 
-/* ---------------- PUBLIC STOREFRONT SETTINGS ---------------- */
-// Never expose the private coupons array or admin-only sales adjustments to anonymous browsers.
+/* ---------------- PUBLIC STOREFRONT SETTINGS + EDGE CATALOG ---------------- */
+// Workers Cache (enabled in wrangler.toml) caches only these anonymous GET
+// responses at Cloudflare's edge. Private/admin/customer routes stay no-store.
+// Keep product stock/prices reasonably fresh while avoiding a Supabase read
+// for every visitor. Store settings change less often, so they can be cached longer.
+const PUBLIC_CATALOG_CACHE_CONTROL = "public, max-age=60, stale-while-revalidate=300";
+const PUBLIC_CATALOG_CDN_CACHE_CONTROL = "public, max-age=120, stale-while-revalidate=300";
+const PUBLIC_SETTINGS_CACHE_CONTROL = "public, max-age=120, stale-while-revalidate=300";
+const PUBLIC_SETTINGS_CDN_CACHE_CONTROL = "public, max-age=300, stale-while-revalidate=600";
+
+function publicCacheJson(payload, cacheControl, cdnCacheControl) {
+  return new Response(JSON.stringify(payload), {
+    status: 200,
+    headers: {
+      "Content-Type": "application/json; charset=utf-8",
+      "Cache-Control": cacheControl,
+      "Cloudflare-CDN-Cache-Control": cdnCacheControl
+    }
+  });
+}
+
+function privateCatalogJson(payload) {
+  return new Response(JSON.stringify(payload), {
+    status: 200,
+    headers: {
+      "Content-Type": "application/json; charset=utf-8",
+      "Cache-Control": "private, no-store"
+    }
+  });
+}
+
+// Public settings must expose only values used by the storefront. In particular,
+// do not pass arbitrary future admin-only keys nested inside customPrices through
+// either the cached GET endpoint or the legacy POST action.
+function sanitizePublicCustomPrices(value) {
+  const source = value && typeof value === "object" && !Array.isArray(value) ? value : {};
+  const result = {};
+  const categoryOrder = Array.isArray(source.__categoryOrder)
+    ? source.__categoryOrder.filter(item => typeof item === "string").map(item => item.slice(0, 100)).slice(0, 100)
+    : [];
+  const featuredIds = Array.isArray(source.__featuredProductIds)
+    ? [...new Set(source.__featuredProductIds.map(String).filter(item => /^\d{1,18}$/.test(item)))].slice(0, 100)
+    : [];
+  if (categoryOrder.length) result.__categoryOrder = categoryOrder;
+  if (featuredIds.length) result.__featuredProductIds = featuredIds;
+
+  for (const [wilaya, config] of Object.entries(source)) {
+    if (!/^\d{1,2}$/.test(wilaya) || !config || typeof config !== "object" || Array.isArray(config)) continue;
+    const publicRates = {};
+    for (const courier of ["yalidine", "noest"]) {
+      const rates = config[courier];
+      if (!rates || typeof rates !== "object" || Array.isArray(rates)) continue;
+      const cleanRates = {};
+      for (const kind of ["home", "desk"]) {
+        if (rates[kind] === null || rates[kind] === undefined || rates[kind] === "") continue;
+        const amount = Number(rates[kind]);
+        if (Number.isFinite(amount) && amount >= 0 && amount <= 1000000) cleanRates[kind] = amount;
+      }
+      if (Object.keys(cleanRates).length) publicRates[courier] = cleanRates;
+    }
+    if (Object.keys(publicRates).length) result[wilaya] = publicRates;
+  }
+  return result;
+}
+
+function sanitizePublicSettings(settings) {
+  const source = settings && typeof settings === "object" && !Array.isArray(settings) ? settings : {};
+  const allowedFields = [
+    "id", "shopName", "shopPhone", "shopAddress", "logoUrl",
+    "promoText", "promoActive", "adActive", "adImages", "adText",
+    "adEndTime", "customPrices"
+  ];
+  const clean = {};
+  for (const field of allowedFields) {
+    if (Object.prototype.hasOwnProperty.call(source, field)) clean[field] = source[field];
+  }
+  clean.customPrices = sanitizePublicCustomPrices(clean.customPrices);
+  return clean;
+}
+
+// Keep the existing POST action for older clients; it remains no-store.
 async function publicSettings(env) {
   const rows = await dbRequest(env, "settings?select=id,shopName,shopPhone,shopAddress,logoUrl,promoText,promoActive,adActive,adImages,adText,adEndTime,customPrices&limit=1");
-  return json({ success: true, settings: rows?.[0] || {} });
+  return json({ success: true, settings: sanitizePublicSettings(rows?.[0] || {}) });
+}
+
+async function cachedPublicSettings(request, env) {
+  const requestUrl = new URL(request.url);
+  // Do not let arbitrary query strings create unbounded cache-key variants for
+  // a response whose content is independent of query parameters.
+  if (requestUrl.searchParams.size) return fail("Invalid public settings query.", 400);
+  const rows = await dbRequest(env, "settings?select=id,shopName,shopPhone,shopAddress,logoUrl,promoText,promoActive,adActive,adImages,adText,adEndTime,customPrices&limit=1");
+  return publicCacheJson(
+    { success: true, settings: sanitizePublicSettings(rows?.[0] || {}) },
+    PUBLIC_SETTINGS_CACHE_CONTROL,
+    PUBLIC_SETTINGS_CDN_CACHE_CONTROL
+  );
+}
+
+// Guest landing pages need both settings and featured products. Fetch the
+// settings row once and return both datasets in one cacheable response.
+async function cachedPublicStorefront(request, env) {
+  const requestUrl = new URL(request.url);
+  if (requestUrl.searchParams.size) return fail("Invalid public storefront query.", 400);
+
+  const rows = await dbRequest(env, "settings?select=id,shopName,shopPhone,shopAddress,logoUrl,promoText,promoActive,adActive,adImages,adText,adEndTime,customPrices&limit=1");
+  const settings = rows?.[0] || {};
+  const configuredIds = settings.customPrices?.__featuredProductIds;
+  const ids = Array.isArray(configuredIds)
+    ? [...new Set(configuredIds.map(value => String(value)).filter(value => /^\d{1,18}$/.test(value)))].slice(0, 100)
+    : [];
+  const columns = "id,name,price,qty,category,desc,image_urls,isPack,isSpecial,reviews,packItems,promoPrice,promoStart,promoEnd,createdAt";
+  const products = ids.length
+    ? await dbRequest(env, "products?select=" + columns + "&id=in.(" + ids.join(",") + ")&qty=gt.0")
+    : [];
+
+  return publicCacheJson(
+    {
+      success: true,
+      settings: sanitizePublicSettings(settings),
+      products: Array.isArray(products) ? products : []
+    },
+    PUBLIC_CATALOG_CACHE_CONTROL,
+    PUBLIC_CATALOG_CDN_CACHE_CONTROL
+  );
+}
+
+async function cachedPublicCatalog(request, env) {
+  const requestUrl = new URL(request.url);
+  const allowedParams = [...requestUrl.searchParams.keys()];
+  if (requestUrl.searchParams.size > 1 ||
+      allowedParams.some(key => key !== "all") ||
+      (requestUrl.searchParams.has("all") && requestUrl.searchParams.get("all") !== "1")) {
+    return fail("Invalid public catalog query.", 400);
+  }
+  const allProducts = requestUrl.searchParams.get("all") === "1";
+  // The only cacheable catalog URLs are the fixed featured URL and the
+  // authenticated all=1 URL. Featured IDs are read server-side, never from
+  // browser-controlled query parameters.
+
+  // Only fields required by the public storefront; never send cost or legacy
+  // Base64 image data to visitors. Product images come from the R2 image_urls.
+  const columns = "id,name,price,qty,category,desc,image_urls,isPack,isSpecial,reviews,packItems,promoPrice,promoStart,promoEnd,createdAt";
+  if (allProducts) {
+    // Full catalog is for signed-in customers only. Authorization also makes
+    // Workers Cache bypass this request; never share one customer's response.
+    const session = await requireCustomer(request, env);
+    if (!session) return fail("يرجى تسجيل الدخول لعرض كامل المنتجات.", 401);
+    const products = await dbRequestPaged(env, "products?select=" + columns + "&qty=gt.0&order=id.asc", 500, 50000);
+    return privateCatalogJson({ success: true, products: Array.isArray(products) ? products : [] });
+  }
+
+  const settings = await dbRequest(env, "settings?select=customPrices&limit=1");
+  const configuredIds = settings?.[0]?.customPrices?.__featuredProductIds;
+  const ids = Array.isArray(configuredIds)
+    ? [...new Set(configuredIds.map(value => String(value)).filter(value => /^\d{1,18}$/.test(value)))].slice(0, 100)
+    : [];
+  if (!ids.length) return publicCacheJson(
+    { success: true, products: [] },
+    PUBLIC_CATALOG_CACHE_CONTROL,
+    PUBLIC_CATALOG_CDN_CACHE_CONTROL
+  );
+  const query = "products?select=" + columns + "&id=in.(" + ids.join(",") + ")&qty=gt.0";
+  const products = await dbRequest(env, query);
+  return publicCacheJson(
+    { success: true, products: Array.isArray(products) ? products : [] },
+    PUBLIC_CATALOG_CACHE_CONTROL,
+    PUBLIC_CATALOG_CDN_CACHE_CONTROL
+  );
 }
 
 /* ---------------- ADMIN ORDERS ---------------- */
@@ -918,6 +1090,15 @@ async function listOrders(env) {
     success: true,
     orders: orders || []
   });
+}
+
+/* ---------------- ADMIN PRODUCT CATALOG ---------------- */
+async function listAdminProducts(env) {
+  // Admin-only read via the service-role Worker. The browser no longer needs
+  // direct SELECT privileges on products, so private cost cannot leak publicly.
+  const columns = "id,name,price,cost,qty,category,desc,image_urls,isPack,isSpecial,reviews,packItems,promoPrice,promoStart,promoEnd,createdAt";
+  const products = await dbRequestPaged(env, "products?select=" + columns + "&order=id.asc", 500, 50000);
+  return json({ success: true, products: products || [] });
 }
 
 /* ---------------- ADMIN DATA ---------------- */
@@ -1792,6 +1973,30 @@ async function handleRequest(request, env) {
       return await handleProductImageUpload(request, env);
     }
 
+    if (request.method === "GET" && requestUrl.pathname === "/public/settings") {
+      try { return await cachedPublicSettings(request, env); }
+      catch (error) {
+        console.error("Public settings read failed:", error);
+        return fail("تعذر جلب إعدادات المتجر حالياً.", 503);
+      }
+    }
+
+    if (request.method === "GET" && requestUrl.pathname === "/public/storefront") {
+      try { return await cachedPublicStorefront(request, env); }
+      catch (error) {
+        console.error("Public storefront read failed:", error);
+        return fail("تعذر جلب واجهة المتجر حالياً.", 503);
+      }
+    }
+
+    if (request.method === "GET" && requestUrl.pathname === "/public/catalog") {
+      try { return await cachedPublicCatalog(request, env); }
+      catch (error) {
+        console.error("Public catalog read failed:", error);
+        return fail("تعذر جلب المنتجات المميزة حالياً.", 503);
+      }
+    }
+
     if (request.method !== "POST") {
       return fail("Method not allowed.", 405);
     }
@@ -1854,6 +2059,7 @@ async function handleRequest(request, env) {
           return await recordVisit(request, body, env);
 
         case "listOrders":
+        case "adminListProducts":
         case "listAdminData":
         case "updateOrderStatus":
         case "adminUpsertProduct":
@@ -1883,6 +2089,7 @@ async function handleRequest(request, env) {
           const isAdmin = await verifyFirebaseAdmin(request, env);
           if (!isAdmin) return fail("غير مصرح لك بتنفيذ هذا الإجراء.", 401);
           if (action === "listOrders") return await listOrders(env);
+          if (action === "adminListProducts") return await listAdminProducts(env);
           if (action === "listAdminData") return await listAdminData(env);
           if (action === "updateOrderStatus") return await updateOrderStatus(body, env);
           if (action === "adminNotifyCustomerProductAvailable") return await adminNotifyCustomerProductAvailable(body, env);

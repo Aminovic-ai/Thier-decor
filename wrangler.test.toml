@@ -1,0 +1,15 @@
+# Isolated local-only Worker smoke-test configuration.
+# Never use this file for deployment. All upstream hosts are reserved .invalid domains.
+name = "thier-decor-api-local-test"
+main = "thier-decor-api.js"
+compatibility_date = "2026-09-25"
+compatibility_flags = ["nodejs_compat"]
+workers_dev = false
+preview_urls = false
+
+[vars]
+SUPABASE_URL = "https://store.invalid"
+POS_SUPABASE_URL = "https://pos.invalid"
+ALLOWED_ORIGINS = "http://127.0.0.1:8791"
+FIREBASE_API_KEY = "local-test-no-project"
+ADMIN_UID = "local-test-admin"

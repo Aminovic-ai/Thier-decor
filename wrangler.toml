@@ -4,6 +4,10 @@ compatibility_date = "2026-11-02"
 compatibility_flags = ["nodejs_compat"]
 workers_dev = true
 
+# Cache only cacheable GET/HEAD responses; private Worker routes remain no-store.
+[cache]
+enabled = true
+
 # Production, non-secret Worker settings.
 [vars]
 SUPABASE_URL = "https://xdsbnmtthvqgdlytwpes.supabase.co"

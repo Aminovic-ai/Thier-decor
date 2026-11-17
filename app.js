@@ -106,13 +106,17 @@ async function fetchAdminDataViaWorker() {
     return result.data;
 }
 
-async function fetchPublicSettingsViaWorker() {
+let pendingFeaturedCatalogFromStorefront = null;
+
+async function fetchPublicSettingsViaWorker({ includeFeaturedCatalog = false } = {}) {
     ensureApiConfigured();
-    const response = await fetch(TD_ADMIN_API_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'publicSettings' }),
-        cache: 'no-store'
+    pendingFeaturedCatalogFromStorefront = null;
+    const route = includeFeaturedCatalog ? '/public/storefront' : '/public/settings';
+    const endpoint = TD_ADMIN_API_URL.replace(/\/+$/, '') + route;
+    const response = await fetch(endpoint, {
+        method: 'GET',
+        headers: { 'Accept': 'application/json' },
+        cache: 'default'
     });
     let result;
     try { result = await response.json(); }
@@ -120,7 +124,61 @@ async function fetchPublicSettingsViaWorker() {
     if (!response.ok || result?.success !== true || !result.settings || typeof result.settings !== 'object') {
         throw new Error(result?.error || (state.currentLang === 'fr' ? 'Impossible de charger les paramètres.' : 'تعذر جلب إعدادات المتجر.'));
     }
+    if (includeFeaturedCatalog) {
+        if (!Array.isArray(result.products)) throw new Error(state.currentLang === 'fr' ? 'Catalogue vedette invalide.' : 'قائمة المنتجات المميزة غير صالحة.');
+        pendingFeaturedCatalogFromStorefront = result.products;
+    }
     return result.settings;
+}
+
+async function fetchPublicCatalogViaWorker({ all = false } = {}) {
+    ensureApiConfigured();
+    const endpoint = new URL(TD_ADMIN_API_URL.replace(/\/+$/, '') + '/public/catalog');
+    if (all) endpoint.searchParams.set('all', '1');
+    const headers = { 'Accept': 'application/json' };
+    if (all) {
+        const token = state.session?.role === 'customer' ? state.session.customerToken : null;
+        if (!token) throw new Error(state.currentLang === 'fr' ? 'Connectez-vous pour consulter tout le catalogue.' : 'يرجى تسجيل الدخول لعرض كامل المنتجات.');
+        headers.Authorization = 'Bearer ' + token;
+    }
+    const response = await fetch(endpoint.toString(), {
+        method: 'GET',
+        headers,
+        cache: all ? 'no-store' : 'default'
+    });
+    let result;
+    try { result = await response.json(); }
+    catch (_) { throw new Error(state.currentLang === 'fr' ? 'Réponse du catalogue invalide.' : 'ردّ قائمة المنتجات غير صالح.'); }
+    if (!response.ok || result?.success !== true || !Array.isArray(result.products)) {
+        throw new Error(result?.error || (state.currentLang === 'fr' ? 'Impossible de charger le catalogue.' : 'تعذر جلب قائمة المنتجات.'));
+    }
+    return result.products;
+}
+
+function fetchPublicFeaturedProductsViaWorker() {
+    if (Array.isArray(pendingFeaturedCatalogFromStorefront)) {
+        const products = pendingFeaturedCatalogFromStorefront;
+        pendingFeaturedCatalogFromStorefront = null;
+        return Promise.resolve(products);
+    }
+    return fetchPublicCatalogViaWorker();
+}
+
+async function fetchAdminProductsViaWorker() {
+    const result = await callAdminWorker('adminListProducts');
+    if (!Array.isArray(result.products)) throw new Error(state.currentLang === 'fr' ? 'Réponse des produits administrateur invalide.' : 'بيانات منتجات الإدارة غير صالحة.');
+    return result.products;
+}
+
+function fetchPublicCustomerCatalogViaWorker() {
+    return fetchPublicCatalogViaWorker({ all: true });
+}
+
+function sanitizePublicCatalogFallback(products) {
+    return (Array.isArray(products) ? products : []).map(product => {
+        const { cost, images, ...publicProduct } = product || {};
+        return publicProduct;
+    });
 }
 
 let state = { products: [], orders: [], expenses: [], customers: [], messages: [], requests: [], session: null, cart: [], wishlist: [], currentLang: 'ar', settings: { shopName: 'Thier Décor', shopPhone: '', promoText: '', promoActive: false, customPrices: {}, manualSalesAdjustment: 0, adActive: false, adImages: [], adText: '', adEndTime: '', coupons: [] } };
@@ -1330,15 +1388,16 @@ window.updateProductRequestButton = updateProductRequestButton;
 const PRODUCT_CACHE_TTL_MS = 3 * 60 * 1000;
 const SETTINGS_CACHE_TTL_MS = 5 * 60 * 1000;
 // Admin-only tables change less often than orders; avoid re-reading every table on each refresh.
-const ADMIN_DATA_CACHE_TTL_MS = 2 * 60 * 1000;
+const ADMIN_DATA_CACHE_TTL_MS = 5 * 60 * 1000;
 let lastAdminDataFetchAt = 0;
 let lastProductsFetchAt = 0;
+let lastCatalogMode = null;
 let lastSettingsFetchAt = 0;
 let catalogLoading = true;
 let loadRefreshInProgress = false;
 
 async function loadOrdersListener(options = {}) {
-    if (!window.supabaseClient) throw new Error('Supabase client is unavailable');
+    // All storefront and private-data reads are routed through the authenticated Worker.
     // A manual refresh may wait for the current refresh instead of silently doing nothing.
     if (loadRefreshInProgress) {
         if (!options.forceWait) return;
@@ -1347,49 +1406,67 @@ async function loadOrdersListener(options = {}) {
     loadRefreshInProgress = true;
     try {
         const now = Date.now();
-        // Fetch the public catalog and public storefront settings concurrently.
-        // The guest featured-product selection depends on fresh settings, so render
-        // only after both requests have settled; do not paint the stale full catalog.
-        const shouldFetchProducts = options.forceProducts || !state.products.length || (now - lastProductsFetchAt) >= PRODUCT_CACHE_TTL_MS;
+        const currentFirebaseUser = Boolean(window.firebaseReady && typeof firebase !== 'undefined' && firebase.auth && firebase.auth().currentUser);
+        const isFirebaseAdmin = currentFirebaseUser && firebase.auth().currentUser.uid === TD_ADMIN_UID;
+        const isAdminCatalogUser = isFirebaseAdmin || (state.session && state.session.role === 'admin');
+        const isCustomerCatalogUser = Boolean(state.session && state.session.role === 'customer' && !isFirebaseAdmin);
+        const catalogMode = isAdminCatalogUser ? 'admin' : (isCustomerCatalogUser ? 'customer' : 'featured');
+        const shouldFetchProducts = options.forceProducts || lastCatalogMode !== catalogMode || !state.products.length || (now - lastProductsFetchAt) >= PRODUCT_CACHE_TTL_MS;
         const shouldFetchSettings = options.forceSettings || !state.settings || (now - lastSettingsFetchAt) >= SETTINGS_CACHE_TTL_MS;
 
-        const productsTask = (async () => {
-            if (!shouldFetchProducts) return;
-            try {
-                const { data: products, error: productsError } = await window.supabaseClient.from('products').select('*');
-                if (!productsError && Array.isArray(products)) {
-                    state.products = products;
-                    save(K.products, products);
-                    lastProductsFetchAt = Date.now();
-                    catalogLoading = false;
-                } else if (productsError) {
-                    console.error('Supabase products read failed:', productsError.message);
-                    if (catalogLoading) {
-                        // Use the saved catalog only as an offline fallback, never before the live request.
-                        state.products = load(K.products, []);
-                        catalogLoading = false;
-                    }
-                }
-            } catch (productsFetchError) {
-                console.error('Supabase products request failed:', productsFetchError.message || productsFetchError);
-                if (catalogLoading) {
-                    state.products = load(K.products, []);
-                    catalogLoading = false;
-                }
-            }
-        })();
-
         const settingsTask = (async () => {
-            if (!shouldFetchSettings) return;
+            if (!shouldFetchSettings) return true;
             try {
-                const settings = await fetchPublicSettingsViaWorker();
+                const settings = await fetchPublicSettingsViaWorker({ includeFeaturedCatalog: catalogMode === 'featured' && shouldFetchProducts });
                 state.settings = settings;
                 save(K.settings, settings);
                 lastSettingsFetchAt = Date.now();
                 renderPromoBanner();
                 updateStoreBranding();
+                return true;
             } catch (settingsError) {
                 console.error('Public settings Worker read failed:', settingsError.message || settingsError);
+                return false;
+            }
+        })();
+
+        const productsTask = (async () => {
+            if (!shouldFetchProducts) return;
+            try {
+                let products;
+                if (isAdminCatalogUser) {
+                    // Product management and POS still need the private cost field.
+                    products = await fetchAdminProductsViaWorker();
+                } else if (isCustomerCatalogUser) {
+                    // Customers still browse the full catalog, but through the same
+                    // public edge-cached projection (without private cost/Base64 fields).
+                    products = await fetchPublicCustomerCatalogViaWorker();
+                } else {
+                    // Guests receive only the server-selected featured catalog, not the full catalog.
+                    await settingsTask;
+                    products = await fetchPublicFeaturedProductsViaWorker();
+                }
+                if (Array.isArray(products)) {
+                    state.products = products;
+                    save(K.products, products);
+                    lastProductsFetchAt = Date.now();
+                    lastCatalogMode = catalogMode;
+                    catalogLoading = false;
+                } else {
+                    throw new Error('Invalid catalog response');
+                }
+            } catch (productsFetchError) {
+                console.error('Catalog request failed:', productsFetchError.message || productsFetchError);
+                if (catalogLoading || lastCatalogMode !== catalogMode) {
+                    const fallback = load(K.products, []);
+                    const featuredIds = new Set(getFeaturedProductIds());
+                    state.products = isAdminCatalogUser
+                        ? fallback
+                        : sanitizePublicCatalogFallback(isCustomerCatalogUser
+                            ? fallback
+                            : fallback.filter(product => featuredIds.has(String(product.id))));
+                    catalogLoading = false;
+                }
             }
         })();
 
@@ -1420,8 +1497,6 @@ async function loadOrdersListener(options = {}) {
         // Settings can finish afterwards; their own task updates the banner and branding.
         await settingsTask;
         
-        const currentFirebaseUser = Boolean(window.firebaseReady && typeof firebase !== 'undefined' && firebase.auth && firebase.auth().currentUser);
-        const isFirebaseAdmin = currentFirebaseUser && firebase.auth().currentUser.uid === TD_ADMIN_UID;
         if (state.session && state.session.role === 'customer' && !isFirebaseAdmin) {
             // Customer-private orders/messages are fetched only through the signed-session Worker.
             try {
@@ -1502,18 +1577,12 @@ async function loadOrdersListener(options = {}) {
     return true;
 }
 window.loadOrdersListener = loadOrdersListener;
-let realtimeChannel = null;
 let adminLiveRefreshTimer = null;
 
 function setupRealtimeListeners() {
     if (adminLiveRefreshTimer) {
         clearInterval(adminLiveRefreshTimer);
         adminLiveRefreshTimer = null;
-    }
-    if (!window.supabaseClient) return;
-    if (realtimeChannel) {
-        window.supabaseClient.removeChannel(realtimeChannel);
-        realtimeChannel = null;
     }
     
     // هذا السطر هو التعديل: يسمح للمدير بالاتصال حتى لو لم يكن Firebase نشطاً
@@ -1534,17 +1603,17 @@ function setupRealtimeListeners() {
             adminLiveRefreshTimer = null;
             return;
         }
-        // Refresh orders regularly, but let the 2-minute admin-data cache
-        // prevent downloading customers/messages/requests/expenses on every poll.
+        const now = Date.now();
+        // Both refresh paths share this gate so orders are downloaded at most
+        // once every two minutes unless the administrator refreshes manually.
+        if (now - lastAdminPollAt < 120000) return;
+        lastAdminPollAt = now;
         loadOrdersListener()
             .catch(error => console.warn('Live admin refresh failed:', error.message || error));
-    }, 30000);
+    }, 60000);
 
-    // Only the public product catalog is subscribed to from the browser.
-    // Private orders/messages are refreshed through the Firebase-verified Worker poll above.
-    realtimeChannel = window.supabaseClient.channel('public-products-channel')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, () => { lastProductsFetchAt = 0; loadOrdersListener({ forceProducts: true }); })
-      .subscribe();
+    // Product rows are no longer exposed through the browser's Supabase role.
+    // The role-aware Worker loader refreshes the catalog on its normal TTL instead.
 }
 window.setupRealtimeListeners = setupRealtimeListeners;
 
@@ -1552,8 +1621,8 @@ window.setupRealtimeListeners = setupRealtimeListeners;
 let adminRefreshRunning = false;
 async function adminRefreshAll() {
     if (adminRefreshRunning) return;
-    if (!window.supabaseClient) {
-        toast(state.currentLang === 'fr' ? 'Connexion à la base de données indisponible.' : 'الاتصال بقاعدة البيانات غير متاح.', 'error');
+    if (!TD_ADMIN_API_URL) {
+        toast(state.currentLang === 'fr' ? 'Les services du magasin ne sont pas configurés.' : 'خدمات المتجر غير مهيأة.', 'error');
         return;
     }
     adminRefreshRunning = true;
@@ -1588,22 +1657,20 @@ let lastAdminPollAt = 0;
 function startCatalogFallbackRefresh() {
     if (catalogFallbackTimer) clearInterval(catalogFallbackTimer);
     catalogFallbackTimer = setInterval(async () => {
-        if (document.hidden || !window.supabaseClient || loadRefreshInProgress) return;
+        if (document.hidden || !TD_ADMIN_API_URL || loadRefreshInProgress) return;
         const now = Date.now();
         const firebaseAdmin = Boolean(window.firebaseReady && typeof firebase !== 'undefined' && firebase.auth && firebase.auth().currentUser && firebase.auth().currentUser.uid === TD_ADMIN_UID);
         const adminSession = firebaseAdmin || (state.session && state.session.role === 'admin');
-        if (adminSession && now - lastAdminPollAt >= 60 * 1000) {
+        if (adminSession && now - lastAdminPollAt >= 120000) {
             lastAdminPollAt = now;
             loadOrdersListener().catch(error => console.warn('Admin Worker refresh failed:', error.message || error));
         }
         if (now - lastProductsFetchAt < PRODUCT_CACHE_TTL_MS) return;
-        try {
-            const { data, error } = await window.supabaseClient.from('products').select('*');
-            if (error || !data) return;
-            state.products = data; save(K.products, data); lastProductsFetchAt = Date.now();
-            renderShop(); renderCategories(); renderPromoBanner(); renderNewProducts();
-        } catch (err) { console.warn('Catalog fallback refresh failed:', err); }
-    }, 30 * 1000);
+        // Reuse the same role-aware loader: guests must never fall back to a full
+        // products SELECT when Realtime is unavailable.
+        loadOrdersListener({ forceProducts: true })
+            .catch(err => console.warn('Catalog fallback refresh failed:', err));
+    }, 60000);
 }
 
 
@@ -1757,7 +1824,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     })();
 
-    if (window.supabaseClient) {
+    if (TD_ADMIN_API_URL) {
         loadOrdersListener();
         startCatalogFallbackRefresh();
     } else {
@@ -1786,7 +1853,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if (window.firebaseReady && typeof firebase !== 'undefined' && firebase.auth) {
         firebase.auth().onAuthStateChanged((user) => {
             if (!user && document.getElementById('screen-admin')?.classList.contains('active')) { goScreen('screen-shop'); }
-            if (typeof window.supabaseClient === 'undefined' || !window.supabaseClient) return;
             setupRealtimeListeners();
             Promise.resolve(loadOrdersListener()).catch((error) => console.error('loadOrdersListener failed after auth change:', error));
         });
@@ -2621,7 +2687,7 @@ window.getOrderRemainingDebt = getOrderRemainingDebt;
 function renderMyOrders() {
     const c = document.getElementById('s-orders-list'); if (!c) return;
     if (!state.session) { c.innerHTML = `<div style="text-align:center;padding:40px;">${i18n[state.currentLang].login_to_see_messages}<br><br><button class="btn-primary" onclick="openCustomerAuthModal()">${i18n[state.currentLang].login_btn}</button></div>`; return; }
-    const cust = state.customers.find(x => String(x.id) === String(state.session.id)); if (!cust) { c.innerHTML = `<div style="text-align:center;padding:40px;">⏳ جاري تحميل بياناتك... يرجى تحديث الصفحة</div>`; setTimeout(() => { if(window.supabaseClient) loadOrdersListener(); }, 1000); return; }
+    const cust = state.customers.find(x => String(x.id) === String(state.session.id)); if (!cust) { c.innerHTML = `<div style="text-align:center;padding:40px;">⏳ جاري تحميل بياناتك... يرجى تحديث الصفحة</div>`; setTimeout(() => { if(TD_ADMIN_API_URL) loadOrdersListener(); }, 1000); return; }
     const myOrders = state.orders.filter(o => String(o.customerPhone).trim() === String(cust.phone).trim());
     if (myOrders.length === 0) { c.innerHTML = `<div style="text-align:center;padding:40px;">${i18n[state.currentLang].no_orders}</div>`; return; }
     const statusMap = {
