@@ -170,3 +170,32 @@ test("disallowed browser origins are rejected before database access", async () 
     assert.equal(response.headers.get("Access-Control-Allow-Origin"), null);
   });
 });
+
+test("every admin and POS action rejects unauthenticated requests before database access", async () => {
+  const adminActions = [
+    "listOrders", "adminListProducts", "listAdminData", "updateOrderStatus",
+    "adminUpsertProduct", "adminDeleteProduct", "adminSetCustomerFlags",
+    "adminDeleteCustomer", "adminReplyMessage", "adminDeleteMessage",
+    "adminCreateExpense", "adminDeleteExpense", "adminUpdateSettings",
+    "adminUpdateOrderTracking", "adminSetOrderPaid", "adminSetOrderFreeDelivery",
+    "adminSetRequestStatus", "adminDeleteRequest", "adminCouponUsage",
+    "adminMigrateLegacyImages", "adminNotifyCustomerProductAvailable",
+    "adminCreateStoreSale", "adminListPOSSales", "adminGetPOSSaleInvoice",
+    "adminRecoverPendingStoreSales", "adminDeleteOrder", "adminEditOrder",
+    "adminVisitStats"
+  ];
+
+  await withFetch(async () => {
+    throw new Error("Supabase must not be called for unauthenticated admin actions");
+  }, async () => {
+    for (const action of adminActions) {
+      const response = await worker.fetch(new Request("https://api.example/", {
+        method: "POST",
+        headers: { Origin: origin, "Content-Type": "application/json" },
+        body: JSON.stringify({ action })
+      }), env);
+      assert.equal(response.status, 401, action);
+      assert.match(response.headers.get("Cache-Control") || "", /no-store/, action);
+    }
+  });
+});
