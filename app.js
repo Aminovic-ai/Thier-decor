@@ -1397,7 +1397,7 @@ let catalogLoading = true;
 let loadRefreshInProgress = false;
 
 async function loadOrdersListener(options = {}) {
-    if (!window.supabaseClient) throw new Error('Supabase client is unavailable');
+    // All storefront and private-data reads are routed through the authenticated Worker.
     // A manual refresh may wait for the current refresh instead of silently doing nothing.
     if (loadRefreshInProgress) {
         if (!options.forceWait) return;
@@ -1577,18 +1577,12 @@ async function loadOrdersListener(options = {}) {
     return true;
 }
 window.loadOrdersListener = loadOrdersListener;
-let realtimeChannel = null;
 let adminLiveRefreshTimer = null;
 
 function setupRealtimeListeners() {
     if (adminLiveRefreshTimer) {
         clearInterval(adminLiveRefreshTimer);
         adminLiveRefreshTimer = null;
-    }
-    if (!window.supabaseClient) return;
-    if (realtimeChannel) {
-        window.supabaseClient.removeChannel(realtimeChannel);
-        realtimeChannel = null;
     }
     
     // هذا السطر هو التعديل: يسمح للمدير بالاتصال حتى لو لم يكن Firebase نشطاً
@@ -1627,8 +1621,8 @@ window.setupRealtimeListeners = setupRealtimeListeners;
 let adminRefreshRunning = false;
 async function adminRefreshAll() {
     if (adminRefreshRunning) return;
-    if (!window.supabaseClient) {
-        toast(state.currentLang === 'fr' ? 'Connexion à la base de données indisponible.' : 'الاتصال بقاعدة البيانات غير متاح.', 'error');
+    if (!TD_ADMIN_API_URL) {
+        toast(state.currentLang === 'fr' ? 'Les services du magasin ne sont pas configurés.' : 'خدمات المتجر غير مهيأة.', 'error');
         return;
     }
     adminRefreshRunning = true;
@@ -1663,7 +1657,7 @@ let lastAdminPollAt = 0;
 function startCatalogFallbackRefresh() {
     if (catalogFallbackTimer) clearInterval(catalogFallbackTimer);
     catalogFallbackTimer = setInterval(async () => {
-        if (document.hidden || !window.supabaseClient || loadRefreshInProgress) return;
+        if (document.hidden || !TD_ADMIN_API_URL || loadRefreshInProgress) return;
         const now = Date.now();
         const firebaseAdmin = Boolean(window.firebaseReady && typeof firebase !== 'undefined' && firebase.auth && firebase.auth().currentUser && firebase.auth().currentUser.uid === TD_ADMIN_UID);
         const adminSession = firebaseAdmin || (state.session && state.session.role === 'admin');
@@ -1830,7 +1824,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     })();
 
-    if (window.supabaseClient) {
+    if (TD_ADMIN_API_URL) {
         loadOrdersListener();
         startCatalogFallbackRefresh();
     } else {
@@ -1859,7 +1853,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if (window.firebaseReady && typeof firebase !== 'undefined' && firebase.auth) {
         firebase.auth().onAuthStateChanged((user) => {
             if (!user && document.getElementById('screen-admin')?.classList.contains('active')) { goScreen('screen-shop'); }
-            if (typeof window.supabaseClient === 'undefined' || !window.supabaseClient) return;
             setupRealtimeListeners();
             Promise.resolve(loadOrdersListener()).catch((error) => console.error('loadOrdersListener failed after auth change:', error));
         });
@@ -2694,7 +2687,7 @@ window.getOrderRemainingDebt = getOrderRemainingDebt;
 function renderMyOrders() {
     const c = document.getElementById('s-orders-list'); if (!c) return;
     if (!state.session) { c.innerHTML = `<div style="text-align:center;padding:40px;">${i18n[state.currentLang].login_to_see_messages}<br><br><button class="btn-primary" onclick="openCustomerAuthModal()">${i18n[state.currentLang].login_btn}</button></div>`; return; }
-    const cust = state.customers.find(x => String(x.id) === String(state.session.id)); if (!cust) { c.innerHTML = `<div style="text-align:center;padding:40px;">⏳ جاري تحميل بياناتك... يرجى تحديث الصفحة</div>`; setTimeout(() => { if(window.supabaseClient) loadOrdersListener(); }, 1000); return; }
+    const cust = state.customers.find(x => String(x.id) === String(state.session.id)); if (!cust) { c.innerHTML = `<div style="text-align:center;padding:40px;">⏳ جاري تحميل بياناتك... يرجى تحديث الصفحة</div>`; setTimeout(() => { if(TD_ADMIN_API_URL) loadOrdersListener(); }, 1000); return; }
     const myOrders = state.orders.filter(o => String(o.customerPhone).trim() === String(cust.phone).trim());
     if (myOrders.length === 0) { c.innerHTML = `<div style="text-align:center;padding:40px;">${i18n[state.currentLang].no_orders}</div>`; return; }
     const statusMap = {
