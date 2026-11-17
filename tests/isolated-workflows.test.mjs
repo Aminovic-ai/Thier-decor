@@ -134,7 +134,7 @@ test("isolated customer checkout rebuilds trusted price and totals from Store DB
     assert.equal(body.order.id, 12345);
     assert.equal("password" in body.customer, false);
     assert.equal("recoveryPin" in body.customer, false);
-    assert.ok(calls.some(call => call.path.endsWith("/rpc/td_create_order")));
+    assert.ok(calls.some(call => call.path.endsWith("/rpc/td_create_order")), JSON.stringify({ body, calls: calls.map(call => ({ path: call.path, query: call.query })) }));
   });
 });
 
