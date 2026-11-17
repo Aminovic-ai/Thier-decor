@@ -955,7 +955,8 @@ async function cachedPublicSettings(request, env) {
 async function cachedPublicCatalog(request, env) {
   const requestUrl = new URL(request.url);
   const allowedParams = [...requestUrl.searchParams.keys()];
-  if (allowedParams.some(key => key !== "all") ||
+  if (requestUrl.searchParams.size > 1 ||
+      allowedParams.some(key => key !== "all") ||
       (requestUrl.searchParams.has("all") && requestUrl.searchParams.get("all") !== "1")) {
     return fail("Invalid public catalog query.", 400);
   }
