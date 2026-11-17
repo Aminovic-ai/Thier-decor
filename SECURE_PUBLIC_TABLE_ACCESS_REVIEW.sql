@@ -59,13 +59,11 @@ select
   has_function_privilege('anon', 'public.td_check_promo(text,text)', 'EXECUTE') as anon_check_promo_exec,
   has_function_privilege('service_role', 'public.td_check_promo(text,text)', 'EXECUTE') as service_role_check_promo_exec;
 
--- Emergency rollback only if reverting the frontend/Worker to the old direct-read
--- architecture. This restores broad public access, including product cost and
--- private settings columns; it is NOT recommended for normal operation.
---
--- begin;
--- grant select on table public.products to anon, authenticated;
--- grant select on table public.settings to anon, authenticated;
--- create policy "Public can read products" on public.products for select to anon, authenticated using (true);
--- create policy "Public can read settings" on public.settings for select to anon, authenticated using (true);
--- commit;
+-- Rollback warning:
+-- Do not restore table-wide SELECT to anon/authenticated. That would expose
+-- products.cost and private settings columns again. If a rollback is required,
+-- first revert the frontend/Worker together, then design explicit column-level
+-- grants for public product/settings fields and re-test the legacy client.
+-- Existing privileged routines td_find_customer_by_phone,
+-- td_admin_update_order_status, td_pos_commit_stock, and td_record_visit_safe
+-- were already denied to anon/authenticated and are intentionally unchanged.
