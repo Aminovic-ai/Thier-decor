@@ -12,8 +12,8 @@
 
 begin;
 
-revoke all privileges on table public.products from anon, authenticated;
-revoke all privileges on table public.settings from anon, authenticated;
+revoke all privileges on table public.products from public, anon, authenticated;
+revoke all privileges on table public.settings from public, anon, authenticated;
 
 -- Remove the permissive public SELECT policies as defense in depth. If a table
 -- grant is accidentally restored later, anonymous/authenticated SELECT remains
@@ -43,7 +43,7 @@ grant execute on function public.td_record_visit(text) to service_role;
 
 commit;
 
--- Verification: every browser-role table privilege must be false; service_role access must remain true.
+-- Verification: PUBLIC, anon, and authenticated table privileges must be false; service_role access must remain true.
 select
   has_table_privilege('anon', 'public.products', 'SELECT') as anon_products_select,
   has_table_privilege('anon', 'public.products', 'INSERT') as anon_products_insert,
