@@ -1,26 +1,24 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import { spawn } from "node:child_process";
-import net from "node:net";
 import { setTimeout as delay } from "node:timers/promises";
 import { test } from "node:test";
 
 const config = new URL("../wrangler.test.toml", import.meta.url);
 const repoRoot = new URL("../", import.meta.url);
+const port = 8791;
+const origin = `http://127.0.0.1:${port}`;
 
-async function freePort() {
-  const server = net.createServer();
-  await new Promise((resolve, reject) => {
-    server.once("error", reject);
-    server.listen(0, "127.0.0.1", resolve);
-  });
-  const { port } = server.address();
-  await new Promise(resolve => server.close(resolve));
-  return port;
-}
+test("test config is isolated from production resources", async () => {
+  const source = await readFile(config, "utf8");
+  assert.match(source, /name = "thier-decor-api-local-test"/);
+  assert.match(source, /https:\/\/store\.invalid/);
+  assert.match(source, /https:\/\/pos\.invalid/);
+  assert.doesNotMatch(source, /xdsbnmtthvqgdlytwpes|obxjemvuympyddckghom|thier-decor-api\.amindrody\.workers\.dev|thier-decor-images/);
+  assert.doesNotMatch(source, /SUPABASE_SERVICE_ROLE_KEY|CUSTOMER_SESSION_SECRET|AUTH_RATE_SECRET/);
+});
 
 test("Worker runs locally with isolated config and fails closed without credentials", async () => {
-  const port = await freePort();
-  const origin = `http://127.0.0.1:${port}`;
   const child = spawn("npx", [
     "--yes", "wrangler@4.135.0", "dev",
     "--config", config.pathname,
