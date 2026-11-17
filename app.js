@@ -1423,9 +1423,9 @@ async function loadOrdersListener(options = {}) {
                     // public edge-cached projection (without private cost/Base64 fields).
                     products = await fetchPublicCustomerCatalogViaWorker();
                 } else {
-                    // Guests receive only selected featured IDs, not the full catalog.
+                    // Guests receive only the server-selected featured catalog, not the full catalog.
                     await settingsTask;
-                    products = await fetchPublicFeaturedProductsViaWorker(getFeaturedProductIds());
+                    products = await fetchPublicFeaturedProductsViaWorker();
                 }
                 if (Array.isArray(products)) {
                     state.products = products;
