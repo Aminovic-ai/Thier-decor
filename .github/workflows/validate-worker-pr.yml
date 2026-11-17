@@ -8,6 +8,7 @@ on:
       - "thier-decor-api.js"
       - "app.js"
       - "wrangler.toml"
+      - "tests/**"
       - ".github/workflows/validate-worker-pr.yml"
   workflow_dispatch:
 
