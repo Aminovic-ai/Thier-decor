@@ -59,16 +59,35 @@
     ].map(([label,value])=>`<div class="stat-card"><span>${esc(label)}</span><h3>${typeof value==='number'?value.toLocaleString(lang()==='ar'?'ar-DZ':'fr-FR'):esc(value)}</h3></div>`).join('');
     const note=$('td-analytics-note');if(note)note.textContent=tr('الزيارات تُحسب حسب الجلسات المسجلة. قد لا تتوفر الإحصائيات قبل تشغيل ملف SQL المرفق في Supabase.','Les visites sont comptées par session enregistrée. Les statistiques de visites nécessitent l’exécution du fichier SQL fourni dans Supabase.');
   }
-  window.refreshStoreAnalytics=async function(){
-    let visits={today:null,total:null};
-    if(window.callAdminWorker){
-      try {
-        const result=await window.callAdminWorker('adminVisitStats');
-        const data=result.visits||{};
-        visits={today:Number(data.today_visits||0),total:Number(data.total_visits||0)};
-      } catch(e){console.warn('Admin visit statistics unavailable:',e.message||e);}
+  // The dashboard and navigation wrappers can call this repeatedly. Cache the
+  // low-volume visit aggregate for two minutes and coalesce concurrent requests.
+  let cachedVisitStats={today:null,total:null};
+  let lastVisitStatsFetchAt=0;
+  let visitStatsRequest=null;
+  window.refreshStoreAnalytics=async function(force=false){
+    const now=Date.now();
+    if(!force && visitStatsRequest){
+      await visitStatsRequest;
+      fillAnalytics(cachedVisitStats);
+      return;
     }
-    fillAnalytics(visits);
+    if(!force && now-lastVisitStatsFetchAt<120000){
+      fillAnalytics(cachedVisitStats);
+      return;
+    }
+    if(window.callAdminWorker){
+      visitStatsRequest=(async()=>{
+        try {
+          const result=await window.callAdminWorker('adminVisitStats');
+          const data=result.visits||{};
+          cachedVisitStats={today:Number(data.today_visits||0),total:Number(data.total_visits||0)};
+        } catch(e){console.warn('Admin visit statistics unavailable:',e.message||e);}
+        finally { lastVisitStatsFetchAt=Date.now(); }
+      })();
+      await visitStatsRequest;
+      visitStatsRequest=null;
+    }
+    fillAnalytics(cachedVisitStats);
   };
   const originalAdminGo=window.adminGo;
   window.adminGo=function(sec,btn){if(sec==='analytics'){document.querySelectorAll('.admin-section').forEach(s=>s.style.display='none');const el=$('sec-analytics');if(el)el.style.display='block';document.querySelectorAll('.admin-nav a').forEach(a=>a.classList.remove('active'));if(btn)btn.classList.add('active');const title=$('admin-page-title');if(title)title.textContent=tr('إحصائيات المتجر','Statistiques du magasin');window.refreshStoreAnalytics();return;} if(originalAdminGo)originalAdminGo(sec,btn);};
