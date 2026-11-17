@@ -123,13 +123,10 @@ async function fetchPublicSettingsViaWorker() {
     return result.settings;
 }
 
-async function fetchPublicCatalogViaWorker({ ids = [], all = false } = {}) {
-    const selectedIds = [...new Set((Array.isArray(ids) ? ids : []).map(String).filter(id => /^\d{1,18}$/.test(id)))].slice(0, 100);
-    if (!all && !selectedIds.length) return [];
+async function fetchPublicCatalogViaWorker({ all = false } = {}) {
     ensureApiConfigured();
     const endpoint = new URL(TD_ADMIN_API_URL.replace(/\/+$/, '') + '/public/catalog');
     if (all) endpoint.searchParams.set('all', '1');
-    else endpoint.searchParams.set('ids', selectedIds.join(','));
     const response = await fetch(endpoint.toString(), {
         method: 'GET',
         headers: { 'Accept': 'application/json' },
@@ -144,8 +141,14 @@ async function fetchPublicCatalogViaWorker({ ids = [], all = false } = {}) {
     return result.products;
 }
 
-function fetchPublicFeaturedProductsViaWorker(ids) {
-    return fetchPublicCatalogViaWorker({ ids });
+function fetchPublicFeaturedProductsViaWorker() {
+    return fetchPublicCatalogViaWorker();
+}
+
+async function fetchAdminProductsViaWorker() {
+    const result = await callAdminWorker('adminListProducts');
+    if (!Array.isArray(result.products)) throw new Error(state.currentLang === 'fr' ? 'Réponse des produits administrateur invalide.' : 'بيانات منتجات الإدارة غير صالحة.');
+    return result.products;
 }
 
 function fetchPublicCustomerCatalogViaWorker() {
@@ -1414,9 +1417,7 @@ async function loadOrdersListener(options = {}) {
                 let products;
                 if (isAdminCatalogUser) {
                     // Product management and POS still need the private cost field.
-                    const { data, error } = await window.supabaseClient.from('products').select('*');
-                    if (error) throw error;
-                    products = data;
+                    products = await fetchAdminProductsViaWorker();
                 } else if (isCustomerCatalogUser) {
                     // Customers still browse the full catalog, but through the same
                     // public edge-cached projection (without private cost/Base64 fields).
@@ -1598,11 +1599,8 @@ function setupRealtimeListeners() {
             .catch(error => console.warn('Live admin refresh failed:', error.message || error));
     }, 60000);
 
-    // Only the public product catalog is subscribed to from the browser.
-    // Private orders/messages are refreshed through the Firebase-verified Worker poll above.
-    realtimeChannel = window.supabaseClient.channel('public-products-channel')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, () => { lastProductsFetchAt = 0; loadOrdersListener({ forceProducts: true }); })
-      .subscribe();
+    // Product rows are no longer exposed through the browser's Supabase role.
+    // The role-aware Worker loader refreshes the catalog on its normal TTL instead.
 }
 window.setupRealtimeListeners = setupRealtimeListeners;
 
