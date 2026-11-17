@@ -21,6 +21,26 @@ revoke all privileges on table public.settings from anon, authenticated;
 drop policy if exists "Public can read products" on public.products;
 drop policy if exists "Public can read settings" on public.settings;
 
+-- These SECURITY DEFINER routines are intended to be called by the Worker
+-- using service_role, not directly by browser roles. In particular, direct
+-- anon execution of td_create_order could bypass the Firebase/customer-session
+-- checks in the Worker and create orders while decrementing shared stock.
+revoke execute on function public.td_check_promo(text, text) from public, anon, authenticated;
+revoke execute on function public.td_compute_delivery_price(integer, text, text) from public, anon, authenticated;
+revoke execute on function public.td_consume_promo(text, text, text) from public, anon, authenticated;
+revoke execute on function public.td_create_order(jsonb) from public, anon, authenticated;
+revoke execute on function public.td_get_visit_stats() from public, anon, authenticated;
+revoke execute on function public.td_promo_usage_stats() from public, anon, authenticated;
+revoke execute on function public.td_record_visit(text) from public, anon, authenticated;
+
+grant execute on function public.td_check_promo(text, text) to service_role;
+grant execute on function public.td_compute_delivery_price(integer, text, text) to service_role;
+grant execute on function public.td_consume_promo(text, text, text) to service_role;
+grant execute on function public.td_create_order(jsonb) to service_role;
+grant execute on function public.td_get_visit_stats() to service_role;
+grant execute on function public.td_promo_usage_stats() to service_role;
+grant execute on function public.td_record_visit(text) to service_role;
+
 commit;
 
 -- Verification: expected false for anon/authenticated; service_role must remain true.
@@ -31,6 +51,13 @@ select
   has_table_privilege('authenticated', 'public.settings', 'SELECT') as authenticated_settings_select,
   has_table_privilege('service_role', 'public.products', 'SELECT') as service_role_products_select,
   has_table_privilege('service_role', 'public.settings', 'SELECT') as service_role_settings_select;
+
+select
+  has_function_privilege('anon', 'public.td_create_order(jsonb)', 'EXECUTE') as anon_create_order_exec,
+  has_function_privilege('authenticated', 'public.td_create_order(jsonb)', 'EXECUTE') as authenticated_create_order_exec,
+  has_function_privilege('service_role', 'public.td_create_order(jsonb)', 'EXECUTE') as service_role_create_order_exec,
+  has_function_privilege('anon', 'public.td_check_promo(text,text)', 'EXECUTE') as anon_check_promo_exec,
+  has_function_privilege('service_role', 'public.td_check_promo(text,text)', 'EXECUTE') as service_role_check_promo_exec;
 
 -- Emergency rollback only if reverting the frontend/Worker to the old direct-read
 -- architecture. This restores broad public access, including product cost and
