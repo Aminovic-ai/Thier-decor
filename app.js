@@ -108,11 +108,11 @@ async function fetchAdminDataViaWorker() {
 
 async function fetchPublicSettingsViaWorker() {
     ensureApiConfigured();
-    const response = await fetch(TD_ADMIN_API_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'publicSettings' }),
-        cache: 'no-store'
+    const endpoint = TD_ADMIN_API_URL.replace(/\\/+$/, '') + '/public/settings';
+    const response = await fetch(endpoint, {
+        method: 'GET',
+        headers: { 'Accept': 'application/json' },
+        cache: 'default'
     });
     let result;
     try { result = await response.json(); }
@@ -121,6 +121,26 @@ async function fetchPublicSettingsViaWorker() {
         throw new Error(result?.error || (state.currentLang === 'fr' ? 'Impossible de charger les paramètres.' : 'تعذر جلب إعدادات المتجر.'));
     }
     return result.settings;
+}
+
+async function fetchPublicFeaturedProductsViaWorker(ids) {
+    const selectedIds = [...new Set((Array.isArray(ids) ? ids : []).map(String).filter(id => /^\\d{1,18}$/.test(id)))].slice(0, 30);
+    if (!selectedIds.length) return [];
+    ensureApiConfigured();
+    const endpoint = new URL(TD_ADMIN_API_URL.replace(/\\/+$/, '') + '/public/catalog');
+    endpoint.searchParams.set('ids', selectedIds.join(','));
+    const response = await fetch(endpoint.toString(), {
+        method: 'GET',
+        headers: { 'Accept': 'application/json' },
+        cache: 'default'
+    });
+    let result;
+    try { result = await response.json(); }
+    catch (_) { throw new Error(state.currentLang === 'fr' ? 'Réponse du catalogue invalide.' : 'ردّ قائمة المنتجات غير صالح.'); }
+    if (!response.ok || result?.success !== true || !Array.isArray(result.products)) {
+        throw new Error(result?.error || (state.currentLang === 'fr' ? 'Impossible de charger les produits vedettes.' : 'تعذر جلب المنتجات المميزة.'));
+    }
+    return result.products;
 }
 
 let state = { products: [], orders: [], expenses: [], customers: [], messages: [], requests: [], session: null, cart: [], wishlist: [], currentLang: 'ar', settings: { shopName: 'Thier Décor', shopPhone: '', promoText: '', promoActive: false, customPrices: {}, manualSalesAdjustment: 0, adActive: false, adImages: [], adText: '', adEndTime: '', coupons: [] } };
@@ -1330,9 +1350,10 @@ window.updateProductRequestButton = updateProductRequestButton;
 const PRODUCT_CACHE_TTL_MS = 3 * 60 * 1000;
 const SETTINGS_CACHE_TTL_MS = 5 * 60 * 1000;
 // Admin-only tables change less often than orders; avoid re-reading every table on each refresh.
-const ADMIN_DATA_CACHE_TTL_MS = 2 * 60 * 1000;
+const ADMIN_DATA_CACHE_TTL_MS = 5 * 60 * 1000;
 let lastAdminDataFetchAt = 0;
 let lastProductsFetchAt = 0;
+let lastCatalogMode = null;
 let lastSettingsFetchAt = 0;
 let catalogLoading = true;
 let loadRefreshInProgress = false;
@@ -1347,40 +1368,15 @@ async function loadOrdersListener(options = {}) {
     loadRefreshInProgress = true;
     try {
         const now = Date.now();
-        // Fetch the public catalog and public storefront settings concurrently.
-        // The guest featured-product selection depends on fresh settings, so render
-        // only after both requests have settled; do not paint the stale full catalog.
-        const shouldFetchProducts = options.forceProducts || !state.products.length || (now - lastProductsFetchAt) >= PRODUCT_CACHE_TTL_MS;
+        const currentFirebaseUser = Boolean(window.firebaseReady && typeof firebase !== 'undefined' && firebase.auth && firebase.auth().currentUser);
+        const isFirebaseAdmin = currentFirebaseUser && firebase.auth().currentUser.uid === TD_ADMIN_UID;
+        const isFullCatalogUser = isFirebaseAdmin || (state.session && (state.session.role === 'admin' || state.session.role === 'customer'));
+        const catalogMode = isFullCatalogUser ? 'full' : 'featured';
+        const shouldFetchProducts = options.forceProducts || lastCatalogMode !== catalogMode || !state.products.length || (now - lastProductsFetchAt) >= PRODUCT_CACHE_TTL_MS;
         const shouldFetchSettings = options.forceSettings || !state.settings || (now - lastSettingsFetchAt) >= SETTINGS_CACHE_TTL_MS;
 
-        const productsTask = (async () => {
-            if (!shouldFetchProducts) return;
-            try {
-                const { data: products, error: productsError } = await window.supabaseClient.from('products').select('*');
-                if (!productsError && Array.isArray(products)) {
-                    state.products = products;
-                    save(K.products, products);
-                    lastProductsFetchAt = Date.now();
-                    catalogLoading = false;
-                } else if (productsError) {
-                    console.error('Supabase products read failed:', productsError.message);
-                    if (catalogLoading) {
-                        // Use the saved catalog only as an offline fallback, never before the live request.
-                        state.products = load(K.products, []);
-                        catalogLoading = false;
-                    }
-                }
-            } catch (productsFetchError) {
-                console.error('Supabase products request failed:', productsFetchError.message || productsFetchError);
-                if (catalogLoading) {
-                    state.products = load(K.products, []);
-                    catalogLoading = false;
-                }
-            }
-        })();
-
         const settingsTask = (async () => {
-            if (!shouldFetchSettings) return;
+            if (!shouldFetchSettings) return true;
             try {
                 const settings = await fetchPublicSettingsViaWorker();
                 state.settings = settings;
@@ -1388,8 +1384,44 @@ async function loadOrdersListener(options = {}) {
                 lastSettingsFetchAt = Date.now();
                 renderPromoBanner();
                 updateStoreBranding();
+                return true;
             } catch (settingsError) {
                 console.error('Public settings Worker read failed:', settingsError.message || settingsError);
+                return false;
+            }
+        })();
+
+        const productsTask = (async () => {
+            if (!shouldFetchProducts) return;
+            try {
+                let products;
+                if (isFullCatalogUser) {
+                    const { data, error } = await window.supabaseClient.from('products').select('*');
+                    if (error) throw error;
+                    products = data;
+                } else {
+                    // Wait for the selected featured IDs, then retrieve only those
+                    // public columns through Cloudflare's short-lived edge cache.
+                    await settingsTask;
+                    products = await fetchPublicFeaturedProductsViaWorker(getFeaturedProductIds());
+                }
+                if (Array.isArray(products)) {
+                    state.products = products;
+                    save(K.products, products);
+                    lastProductsFetchAt = Date.now();
+                    lastCatalogMode = catalogMode;
+                    catalogLoading = false;
+                } else {
+                    throw new Error('Invalid catalog response');
+                }
+            } catch (productsFetchError) {
+                console.error('Catalog request failed:', productsFetchError.message || productsFetchError);
+                if (catalogLoading || lastCatalogMode !== catalogMode) {
+                    const fallback = load(K.products, []);
+                    const featuredIds = new Set(getFeaturedProductIds());
+                    state.products = isFullCatalogUser ? fallback : fallback.filter(product => featuredIds.has(String(product.id)));
+                    catalogLoading = false;
+                }
             }
         })();
 
@@ -1420,8 +1452,6 @@ async function loadOrdersListener(options = {}) {
         // Settings can finish afterwards; their own task updates the banner and branding.
         await settingsTask;
         
-        const currentFirebaseUser = Boolean(window.firebaseReady && typeof firebase !== 'undefined' && firebase.auth && firebase.auth().currentUser);
-        const isFirebaseAdmin = currentFirebaseUser && firebase.auth().currentUser.uid === TD_ADMIN_UID;
         if (state.session && state.session.role === 'customer' && !isFirebaseAdmin) {
             // Customer-private orders/messages are fetched only through the signed-session Worker.
             try {
@@ -1534,11 +1564,14 @@ function setupRealtimeListeners() {
             adminLiveRefreshTimer = null;
             return;
         }
-        // Refresh orders regularly, but let the 2-minute admin-data cache
-        // prevent downloading customers/messages/requests/expenses on every poll.
+        const now = Date.now();
+        // Both refresh paths share this gate so orders are downloaded at most
+        // once every two minutes unless the administrator refreshes manually.
+        if (now - lastAdminPollAt < 120000) return;
+        lastAdminPollAt = now;
         loadOrdersListener()
             .catch(error => console.warn('Live admin refresh failed:', error.message || error));
-    }, 30000);
+    }, 60000);
 
     // Only the public product catalog is subscribed to from the browser.
     // Private orders/messages are refreshed through the Firebase-verified Worker poll above.
@@ -1592,18 +1625,16 @@ function startCatalogFallbackRefresh() {
         const now = Date.now();
         const firebaseAdmin = Boolean(window.firebaseReady && typeof firebase !== 'undefined' && firebase.auth && firebase.auth().currentUser && firebase.auth().currentUser.uid === TD_ADMIN_UID);
         const adminSession = firebaseAdmin || (state.session && state.session.role === 'admin');
-        if (adminSession && now - lastAdminPollAt >= 60 * 1000) {
+        if (adminSession && now - lastAdminPollAt >= 120000) {
             lastAdminPollAt = now;
             loadOrdersListener().catch(error => console.warn('Admin Worker refresh failed:', error.message || error));
         }
         if (now - lastProductsFetchAt < PRODUCT_CACHE_TTL_MS) return;
-        try {
-            const { data, error } = await window.supabaseClient.from('products').select('*');
-            if (error || !data) return;
-            state.products = data; save(K.products, data); lastProductsFetchAt = Date.now();
-            renderShop(); renderCategories(); renderPromoBanner(); renderNewProducts();
-        } catch (err) { console.warn('Catalog fallback refresh failed:', err); }
-    }, 30 * 1000);
+        // Reuse the same role-aware loader: guests must never fall back to a full
+        // products SELECT when Realtime is unavailable.
+        loadOrdersListener({ forceProducts: true })
+            .catch(err => console.warn('Catalog fallback refresh failed:', err));
+    }, 60000);
 }
 
 
