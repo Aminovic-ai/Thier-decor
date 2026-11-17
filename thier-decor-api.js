@@ -947,13 +947,13 @@ function sanitizePublicCustomPrices(value) {
     ? source.__categoryOrder.filter(item => typeof item === "string").map(item => item.slice(0, 100)).slice(0, 100)
     : [];
   const featuredIds = Array.isArray(source.__featuredProductIds)
-    ? [...new Set(source.__featuredProductIds.map(String).filter(item => /^\\d{1,18}$/.test(item)))].slice(0, 100)
+    ? [...new Set(source.__featuredProductIds.map(String).filter(item => /^\d{1,18}$/.test(item)))].slice(0, 100)
     : [];
   if (categoryOrder.length) result.__categoryOrder = categoryOrder;
   if (featuredIds.length) result.__featuredProductIds = featuredIds;
 
   for (const [wilaya, config] of Object.entries(source)) {
-    if (!/^\\d{1,2}$/.test(wilaya) || !config || typeof config !== "object" || Array.isArray(config)) continue;
+    if (!/^\d{1,2}$/.test(wilaya) || !config || typeof config !== "object" || Array.isArray(config)) continue;
     const publicRates = {};
     for (const courier of ["yalidine", "noest"]) {
       const rates = config[courier];
