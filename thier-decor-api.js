@@ -1019,7 +1019,7 @@ async function cachedPublicStorefront(request, env) {
   const settings = rows?.[0] || {};
   const configuredIds = settings.customPrices?.__featuredProductIds;
   const ids = Array.isArray(configuredIds)
-    ? [...new Set(configuredIds.map(value => String(value)).filter(value => /^\\d{1,18}$/.test(value)))].slice(0, 100)
+    ? [...new Set(configuredIds.map(value => String(value)).filter(value => /^\d{1,18}$/.test(value)))].slice(0, 100)
     : [];
   const columns = "id,name,price,qty,category,desc,image_urls,isPack,isSpecial,reviews,packItems,promoPrice,promoStart,promoEnd,createdAt";
   const products = ids.length
