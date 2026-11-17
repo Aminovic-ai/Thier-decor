@@ -935,16 +935,22 @@ async function cachedPublicSettings(request, env) {
 async function cachedPublicCatalog(request, env) {
   const requestUrl = new URL(request.url);
   const rawIds = String(requestUrl.searchParams.get("ids") || "");
+  const allProducts = requestUrl.searchParams.get("all") === "1";
   const parts = rawIds ? rawIds.split(",") : [];
-  if (parts.length > 100 || parts.some(id => !/^\d{1,18}$/.test(id))) {
+  if ((allProducts && rawIds) || parts.length > 100 || parts.some(id => !/^\d{1,18}$/.test(id))) {
     return fail("Invalid public catalog selection.", 400);
   }
-  const ids = [...new Set(parts)];
-  if (!ids.length) return publicCacheJson({ success: true, products: [] });
 
   // Only fields required by the public storefront; never send cost or legacy
   // Base64 image data to visitors. Product images come from the R2 image_urls.
   const columns = "id,name,price,qty,category,desc,image_urls,isPack,isSpecial,reviews,packItems,promoPrice,promoStart,promoEnd,createdAt";
+  if (allProducts) {
+    const products = await dbRequestPaged(env, "products?select=" + columns + "&qty=gt.0&order=id.asc", 500, 50000);
+    return publicCacheJson({ success: true, products: Array.isArray(products) ? products : [] });
+  }
+
+  const ids = [...new Set(parts)];
+  if (!ids.length) return publicCacheJson({ success: true, products: [] });
   const query = "products?select=" + columns + "&id=in.(" + ids.join(",") + ")&qty=gt.0";
   const products = await dbRequest(env, query);
   return publicCacheJson({ success: true, products: Array.isArray(products) ? products : [] });
