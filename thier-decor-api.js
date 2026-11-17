@@ -1009,6 +1009,34 @@ async function cachedPublicSettings(request, env) {
   );
 }
 
+// Guest landing pages need both settings and featured products. Fetch the
+// settings row once and return both datasets in one cacheable response.
+async function cachedPublicStorefront(request, env) {
+  const requestUrl = new URL(request.url);
+  if (requestUrl.searchParams.size) return fail("Invalid public storefront query.", 400);
+
+  const rows = await dbRequest(env, "settings?select=id,shopName,shopPhone,shopAddress,logoUrl,promoText,promoActive,adActive,adImages,adText,adEndTime,customPrices&limit=1");
+  const settings = rows?.[0] || {};
+  const configuredIds = settings.customPrices?.__featuredProductIds;
+  const ids = Array.isArray(configuredIds)
+    ? [...new Set(configuredIds.map(value => String(value)).filter(value => /^\\d{1,18}$/.test(value)))].slice(0, 100)
+    : [];
+  const columns = "id,name,price,qty,category,desc,image_urls,isPack,isSpecial,reviews,packItems,promoPrice,promoStart,promoEnd,createdAt";
+  const products = ids.length
+    ? await dbRequest(env, "products?select=" + columns + "&id=in.(" + ids.join(",") + ")&qty=gt.0")
+    : [];
+
+  return publicCacheJson(
+    {
+      success: true,
+      settings: sanitizePublicSettings(settings),
+      products: Array.isArray(products) ? products : []
+    },
+    PUBLIC_CATALOG_CACHE_CONTROL,
+    PUBLIC_CATALOG_CDN_CACHE_CONTROL
+  );
+}
+
 async function cachedPublicCatalog(request, env) {
   const requestUrl = new URL(request.url);
   const allowedParams = [...requestUrl.searchParams.keys()];
@@ -1950,6 +1978,14 @@ async function handleRequest(request, env) {
       catch (error) {
         console.error("Public settings read failed:", error);
         return fail("تعذر جلب إعدادات المتجر حالياً.", 503);
+      }
+    }
+
+    if (request.method === "GET" && requestUrl.pathname === "/public/storefront") {
+      try { return await cachedPublicStorefront(request, env); }
+      catch (error) {
+        console.error("Public storefront read failed:", error);
+        return fail("تعذر جلب واجهة المتجر حالياً.", 503);
       }
     }
 
