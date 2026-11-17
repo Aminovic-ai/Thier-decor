@@ -43,21 +43,53 @@ grant execute on function public.td_record_visit(text) to service_role;
 
 commit;
 
--- Verification: expected false for anon/authenticated; service_role must remain true.
+-- Verification: every browser-role table privilege must be false; service_role access must remain true.
 select
   has_table_privilege('anon', 'public.products', 'SELECT') as anon_products_select,
+  has_table_privilege('anon', 'public.products', 'INSERT') as anon_products_insert,
+  has_table_privilege('anon', 'public.products', 'UPDATE') as anon_products_update,
+  has_table_privilege('anon', 'public.products', 'DELETE') as anon_products_delete,
   has_table_privilege('authenticated', 'public.products', 'SELECT') as authenticated_products_select,
+  has_table_privilege('authenticated', 'public.products', 'INSERT') as authenticated_products_insert,
+  has_table_privilege('authenticated', 'public.products', 'UPDATE') as authenticated_products_update,
+  has_table_privilege('authenticated', 'public.products', 'DELETE') as authenticated_products_delete,
   has_table_privilege('anon', 'public.settings', 'SELECT') as anon_settings_select,
+  has_table_privilege('anon', 'public.settings', 'INSERT') as anon_settings_insert,
+  has_table_privilege('anon', 'public.settings', 'UPDATE') as anon_settings_update,
+  has_table_privilege('anon', 'public.settings', 'DELETE') as anon_settings_delete,
   has_table_privilege('authenticated', 'public.settings', 'SELECT') as authenticated_settings_select,
+  has_table_privilege('authenticated', 'public.settings', 'INSERT') as authenticated_settings_insert,
+  has_table_privilege('authenticated', 'public.settings', 'UPDATE') as authenticated_settings_update,
+  has_table_privilege('authenticated', 'public.settings', 'DELETE') as authenticated_settings_delete,
   has_table_privilege('service_role', 'public.products', 'SELECT') as service_role_products_select,
-  has_table_privilege('service_role', 'public.settings', 'SELECT') as service_role_settings_select;
+  has_table_privilege('service_role', 'public.products', 'UPDATE') as service_role_products_update,
+  has_table_privilege('service_role', 'public.settings', 'SELECT') as service_role_settings_select,
+  has_table_privilege('service_role', 'public.settings', 'UPDATE') as service_role_settings_update;
 
+-- Every browser role must be denied all seven SECURITY DEFINER RPCs.
+-- service_role must retain EXECUTE on each one.
 select
+  has_function_privilege('anon', 'public.td_check_promo(text,text)', 'EXECUTE') as anon_check_promo_exec,
+  has_function_privilege('authenticated', 'public.td_check_promo(text,text)', 'EXECUTE') as authenticated_check_promo_exec,
+  has_function_privilege('service_role', 'public.td_check_promo(text,text)', 'EXECUTE') as service_check_promo_exec,
+  has_function_privilege('anon', 'public.td_compute_delivery_price(integer,text,text)', 'EXECUTE') as anon_delivery_exec,
+  has_function_privilege('authenticated', 'public.td_compute_delivery_price(integer,text,text)', 'EXECUTE') as authenticated_delivery_exec,
+  has_function_privilege('service_role', 'public.td_compute_delivery_price(integer,text,text)', 'EXECUTE') as service_delivery_exec,
+  has_function_privilege('anon', 'public.td_consume_promo(text,text,text)', 'EXECUTE') as anon_consume_promo_exec,
+  has_function_privilege('authenticated', 'public.td_consume_promo(text,text,text)', 'EXECUTE') as authenticated_consume_promo_exec,
+  has_function_privilege('service_role', 'public.td_consume_promo(text,text,text)', 'EXECUTE') as service_consume_promo_exec,
   has_function_privilege('anon', 'public.td_create_order(jsonb)', 'EXECUTE') as anon_create_order_exec,
   has_function_privilege('authenticated', 'public.td_create_order(jsonb)', 'EXECUTE') as authenticated_create_order_exec,
-  has_function_privilege('service_role', 'public.td_create_order(jsonb)', 'EXECUTE') as service_role_create_order_exec,
-  has_function_privilege('anon', 'public.td_check_promo(text,text)', 'EXECUTE') as anon_check_promo_exec,
-  has_function_privilege('service_role', 'public.td_check_promo(text,text)', 'EXECUTE') as service_role_check_promo_exec;
+  has_function_privilege('service_role', 'public.td_create_order(jsonb)', 'EXECUTE') as service_create_order_exec,
+  has_function_privilege('anon', 'public.td_get_visit_stats()', 'EXECUTE') as anon_visit_stats_exec,
+  has_function_privilege('authenticated', 'public.td_get_visit_stats()', 'EXECUTE') as authenticated_visit_stats_exec,
+  has_function_privilege('service_role', 'public.td_get_visit_stats()', 'EXECUTE') as service_visit_stats_exec,
+  has_function_privilege('anon', 'public.td_promo_usage_stats()', 'EXECUTE') as anon_promo_stats_exec,
+  has_function_privilege('authenticated', 'public.td_promo_usage_stats()', 'EXECUTE') as authenticated_promo_stats_exec,
+  has_function_privilege('service_role', 'public.td_promo_usage_stats()', 'EXECUTE') as service_promo_stats_exec,
+  has_function_privilege('anon', 'public.td_record_visit(text)', 'EXECUTE') as anon_record_visit_exec,
+  has_function_privilege('authenticated', 'public.td_record_visit(text)', 'EXECUTE') as authenticated_record_visit_exec,
+  has_function_privilege('service_role', 'public.td_record_visit(text)', 'EXECUTE') as service_record_visit_exec;
 
 -- Rollback warning:
 -- Do not restore table-wide SELECT to anon/authenticated. That would expose
