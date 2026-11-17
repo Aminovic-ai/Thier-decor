@@ -15,7 +15,7 @@
  */
 
 const CORS_HEADERS = {
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
   "Access-Control-Allow-Headers": "Authorization, Content-Type",
   "Cache-Control": "no-store"
 };
@@ -35,7 +35,11 @@ function isAllowedOrigin(request, env) {
 
 function withCors(response, request, env) {
   const headers = new Headers(response.headers);
-  for (const [key, value] of Object.entries(CORS_HEADERS)) headers.set(key, value);
+  for (const [key, value] of Object.entries(CORS_HEADERS)) {
+    // Preserve explicit public-cache headers on the two anonymous GET endpoints.
+    if (key === "Cache-Control" && headers.has("Cache-Control")) continue;
+    headers.set(key, value);
+  }
   const origin = request.headers.get("Origin");
   if (origin && isAllowedOrigin(request, env)) {
     headers.set("Access-Control-Allow-Origin", origin);
@@ -902,11 +906,79 @@ async function customerCheckPromo(request, body, env) {
   return json({ success: true, promo: promo || { valid: false, reason: "not_found" } });
 }
 
-/* ---------------- PUBLIC STOREFRONT SETTINGS ---------------- */
+/* ---------------- PUBLIC STOREFRONT SETTINGS + EDGE CATALOG ---------------- */
+// These endpoints contain public storefront data only. Authenticated and admin
+// routes remain no-store. Cache keys are canonicalized and data expires quickly
+// so product/price changes propagate without requiring manual cache purges.
+const PUBLIC_EDGE_CACHE_CONTROL = "public, max-age=30, s-maxage=60, stale-while-revalidate=300";
+
+async function cachedPublicJson(request, cacheKeyUrl, loadPayload) {
+  const edgeCache = typeof caches !== "undefined" ? caches.default : null;
+  const cacheKey = new Request(cacheKeyUrl, { method: "GET" });
+
+  if (edgeCache) {
+    try {
+      const cached = await edgeCache.match(cacheKey);
+      if (cached) {
+        const headers = new Headers(cached.headers);
+        headers.set("X-Thier-Cache", "HIT");
+        return new Response(cached.body, { status: cached.status, headers });
+      }
+    } catch (cacheError) {
+      console.warn("Public edge cache read failed:", cacheError?.message || cacheError);
+    }
+  }
+
+  const payload = await loadPayload();
+  const response = new Response(JSON.stringify(payload), {
+    status: 200,
+    headers: {
+      "Content-Type": "application/json; charset=utf-8",
+      "Cache-Control": PUBLIC_EDGE_CACHE_CONTROL,
+      "X-Thier-Cache": "MISS"
+    }
+  });
+
+  if (edgeCache) {
+    try { await edgeCache.put(cacheKey, response.clone()); }
+    catch (cacheError) { console.warn("Public edge cache write failed:", cacheError?.message || cacheError); }
+  }
+  return response;
+}
+
 // Never expose the private coupons array or admin-only sales adjustments to anonymous browsers.
 async function publicSettings(env) {
   const rows = await dbRequest(env, "settings?select=id,shopName,shopPhone,shopAddress,logoUrl,promoText,promoActive,adActive,adImages,adText,adEndTime,customPrices&limit=1");
   return json({ success: true, settings: rows?.[0] || {} });
+}
+
+async function cachedPublicSettings(request, env) {
+  const url = new URL("/public/settings", request.url);
+  return cachedPublicJson(request, url.toString(), async () => {
+    const rows = await dbRequest(env, "settings?select=id,shopName,shopPhone,shopAddress,logoUrl,promoText,promoActive,adActive,adImages,adText,adEndTime,customPrices&limit=1");
+    return { success: true, settings: rows?.[0] || {} };
+  });
+}
+
+async function cachedPublicCatalog(request, env) {
+  const requestUrl = new URL(request.url);
+  const rawIds = String(requestUrl.searchParams.get("ids") || "");
+  const parts = rawIds ? rawIds.split(",") : [];
+  if (parts.length > 30 || parts.some(id => !/^\\d{1,18}$/.test(id))) {
+    return fail("Invalid public catalog selection.", 400);
+  }
+  const ids = [...new Set(parts)];
+  const canonicalIds = [...ids].sort((a, b) => Number(a) - Number(b));
+  const cacheUrl = new URL("/public/catalog", requestUrl.origin);
+  cacheUrl.searchParams.set("ids", canonicalIds.join(","));
+
+  return cachedPublicJson(request, cacheUrl.toString(), async () => {
+    if (!ids.length) return { success: true, products: [] };
+    const columns = "id,name,price,qty,category,desc,image_urls,isPack,isSpecial,reviews,packItems,promoPrice,promoStart,promoEnd,createdAt";
+    const query = "products?select=" + columns + "&id=in.(" + ids.join(",") + ")&qty=gt.0";
+    const products = await dbRequest(env, query);
+    return { success: true, products: Array.isArray(products) ? products : [] };
+  });
 }
 
 /* ---------------- ADMIN ORDERS ---------------- */
@@ -1790,6 +1862,22 @@ async function handleRequest(request, env) {
     const requestUrl = new URL(request.url);
     if (requestUrl.pathname === "/images/upload") {
       return await handleProductImageUpload(request, env);
+    }
+
+    if (request.method === "GET" && requestUrl.pathname === "/public/settings") {
+      try { return await cachedPublicSettings(request, env); }
+      catch (error) {
+        console.error("Public settings read failed:", error);
+        return fail("تعذر جلب إعدادات المتجر حالياً.", 503);
+      }
+    }
+
+    if (request.method === "GET" && requestUrl.pathname === "/public/catalog") {
+      try { return await cachedPublicCatalog(request, env); }
+      catch (error) {
+        console.error("Public catalog read failed:", error);
+        return fail("تعذر جلب المنتجات المميزة حالياً.", 503);
+      }
     }
 
     if (request.method !== "POST") {
