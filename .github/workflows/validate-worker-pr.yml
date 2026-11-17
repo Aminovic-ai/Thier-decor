@@ -8,6 +8,7 @@ on:
       - "thier-decor-api.js"
       - "app.js"
       - "wrangler.toml"
+      - "wrangler.test.toml"
       - "tests/**"
       - ".github/workflows/validate-worker-pr.yml"
   workflow_dispatch:
@@ -30,7 +31,8 @@ jobs:
           node --check app.js
           node --check thier-decor-api.js
           node --check tests/public-catalog.test.mjs
+          node --check tests/local-worker-smoke.test.mjs
       - name: Test isolated Worker workflows with mocked Store and POS databases
         run: node --test tests/*.test.mjs
-      - name: Validate Wrangler configuration and Worker bundle (dry run only)
+      - name: Validate production Worker config without deploying
         run: npx --yes wrangler@4.135.0 deploy --config wrangler.toml --dry-run
