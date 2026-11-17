@@ -124,7 +124,7 @@ async function fetchPublicSettingsViaWorker() {
 }
 
 async function fetchPublicFeaturedProductsViaWorker(ids) {
-    const selectedIds = [...new Set((Array.isArray(ids) ? ids : []).map(String).filter(id => /^\d{1,18}$/.test(id)))].slice(0, 30);
+    const selectedIds = [...new Set((Array.isArray(ids) ? ids : []).map(String).filter(id => /^\d{1,18}$/.test(id)))].slice(0, 100);
     if (!selectedIds.length) return [];
     ensureApiConfigured();
     const endpoint = new URL(TD_ADMIN_API_URL.replace(/\/+$/, '') + '/public/catalog');
