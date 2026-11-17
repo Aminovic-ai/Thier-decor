@@ -127,10 +127,16 @@ async function fetchPublicCatalogViaWorker({ all = false } = {}) {
     ensureApiConfigured();
     const endpoint = new URL(TD_ADMIN_API_URL.replace(/\/+$/, '') + '/public/catalog');
     if (all) endpoint.searchParams.set('all', '1');
+    const headers = { 'Accept': 'application/json' };
+    if (all) {
+        const token = state.session?.role === 'customer' ? state.session.customerToken : null;
+        if (!token) throw new Error(state.currentLang === 'fr' ? 'Connectez-vous pour consulter tout le catalogue.' : 'يرجى تسجيل الدخول لعرض كامل المنتجات.');
+        headers.Authorization = 'Bearer ' + token;
+    }
     const response = await fetch(endpoint.toString(), {
         method: 'GET',
-        headers: { 'Accept': 'application/json' },
-        cache: 'default'
+        headers,
+        cache: all ? 'no-store' : 'default'
     });
     let result;
     try { result = await response.json(); }
