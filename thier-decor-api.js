@@ -913,14 +913,26 @@ async function customerCheckPromo(request, body, env) {
 /* ---------------- PUBLIC STOREFRONT SETTINGS + EDGE CATALOG ---------------- */
 // Workers Cache (enabled in wrangler.toml) caches only these anonymous GET
 // responses at Cloudflare's edge. Private/admin/customer routes stay no-store.
-const PUBLIC_EDGE_CACHE_CONTROL = "public, max-age=30, s-maxage=60, stale-while-revalidate=300";
+const PUBLIC_EDGE_CACHE_CONTROL = "public, max-age=30, stale-while-revalidate=300";
+const PUBLIC_EDGE_CDN_CACHE_CONTROL = "public, max-age=60, stale-while-revalidate=300";
 
 function publicCacheJson(payload) {
   return new Response(JSON.stringify(payload), {
     status: 200,
     headers: {
       "Content-Type": "application/json; charset=utf-8",
-      "Cache-Control": PUBLIC_EDGE_CACHE_CONTROL
+      "Cache-Control": PUBLIC_EDGE_CACHE_CONTROL,
+      "Cloudflare-CDN-Cache-Control": PUBLIC_EDGE_CDN_CACHE_CONTROL
+    }
+  });
+}
+
+function privateCatalogJson(payload) {
+  return new Response(JSON.stringify(payload), {
+    status: 200,
+    headers: {
+      "Content-Type": "application/json; charset=utf-8",
+      "Cache-Control": "private, no-store"
     }
   });
 }
@@ -947,8 +959,12 @@ async function cachedPublicCatalog(request, env) {
   // Base64 image data to visitors. Product images come from the R2 image_urls.
   const columns = "id,name,price,qty,category,desc,image_urls,isPack,isSpecial,reviews,packItems,promoPrice,promoStart,promoEnd,createdAt";
   if (allProducts) {
+    // Full catalog is for signed-in customers only. Authorization also makes
+    // Workers Cache bypass this request; never share one customer's response.
+    const session = await requireCustomer(request, env);
+    if (!session) return fail("يرجى تسجيل الدخول لعرض كامل المنتجات.", 401);
     const products = await dbRequestPaged(env, "products?select=" + columns + "&qty=gt.0&order=id.asc", 500, 50000);
-    return publicCacheJson({ success: true, products: Array.isArray(products) ? products : [] });
+    return privateCatalogJson({ success: true, products: Array.isArray(products) ? products : [] });
   }
 
   const settings = await dbRequest(env, "settings?select=customPrices&limit=1");
