@@ -74,12 +74,49 @@ test("public settings expose only storefront-safe custom price fields and are ed
   });
 });
 
+test("guest storefront combines settings and featured products with one settings read", async () => {
+  const calls = [];
+  await withFetch(async input => {
+    const url = new URL(String(input));
+    calls.push(url);
+    if (url.pathname.endsWith("/settings")) {
+      return new Response(JSON.stringify([{
+        shopName: "Thier Décor",
+        customPrices: { __featuredProductIds: ["11", "22"] },
+        coupons: ["PRIVATE"],
+        manualSalesAdjustment: 123
+      }]), { status: 200 });
+    }
+    if (url.pathname.endsWith("/products")) {
+      return new Response(JSON.stringify([{ id: 11, name: "Moule", price: 500, qty: 2, image_urls: [] }]), { status: 200 });
+    }
+    throw new Error("Unexpected Supabase request: " + url);
+  }, async () => {
+    const response = await worker.fetch(new Request("https://api.example/public/storefront", {
+      headers: { Origin: origin }
+    }), env);
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get("Cache-Control"), "public, max-age=60, stale-while-revalidate=300");
+    assert.equal(response.headers.get("Cloudflare-CDN-Cache-Control"), "public, max-age=120, stale-while-revalidate=300");
+    const body = await response.json();
+    assert.equal(body.settings.shopName, "Thier Décor");
+    assert.equal("coupons" in body.settings, false);
+    assert.equal("manualSalesAdjustment" in body.settings, false);
+    assert.deepEqual(body.products.map(product => product.id), [11]);
+    assert.equal(calls.length, 2, "one settings query and one featured-products query");
+    const productCall = calls.find(url => url.pathname.endsWith("/products"));
+    assert.ok(productCall);
+    assert.ok(!productCall.searchParams.get("select").split(",").includes("cost"));
+  });
+});
+
 test("public endpoints reject arbitrary query variants without contacting Supabase", async () => {
   await withFetch(async () => {
     throw new Error("Supabase must not be called for invalid query strings");
   }, async () => {
     for (const url of [
       "https://api.example/public/settings?x=1",
+      "https://api.example/public/storefront?x=1",
       "https://api.example/public/catalog?ids=1,2",
       "https://api.example/public/catalog?x=1",
       "https://api.example/public/catalog?all=2",
