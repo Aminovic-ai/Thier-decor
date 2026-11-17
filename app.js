@@ -123,12 +123,13 @@ async function fetchPublicSettingsViaWorker() {
     return result.settings;
 }
 
-async function fetchPublicFeaturedProductsViaWorker(ids) {
+async function fetchPublicCatalogViaWorker({ ids = [], all = false } = {}) {
     const selectedIds = [...new Set((Array.isArray(ids) ? ids : []).map(String).filter(id => /^\d{1,18}$/.test(id)))].slice(0, 100);
-    if (!selectedIds.length) return [];
+    if (!all && !selectedIds.length) return [];
     ensureApiConfigured();
     const endpoint = new URL(TD_ADMIN_API_URL.replace(/\/+$/, '') + '/public/catalog');
-    endpoint.searchParams.set('ids', selectedIds.join(','));
+    if (all) endpoint.searchParams.set('all', '1');
+    else endpoint.searchParams.set('ids', selectedIds.join(','));
     const response = await fetch(endpoint.toString(), {
         method: 'GET',
         headers: { 'Accept': 'application/json' },
@@ -138,9 +139,24 @@ async function fetchPublicFeaturedProductsViaWorker(ids) {
     try { result = await response.json(); }
     catch (_) { throw new Error(state.currentLang === 'fr' ? 'Réponse du catalogue invalide.' : 'ردّ قائمة المنتجات غير صالح.'); }
     if (!response.ok || result?.success !== true || !Array.isArray(result.products)) {
-        throw new Error(result?.error || (state.currentLang === 'fr' ? 'Impossible de charger les produits vedettes.' : 'تعذر جلب المنتجات المميزة.'));
+        throw new Error(result?.error || (state.currentLang === 'fr' ? 'Impossible de charger le catalogue.' : 'تعذر جلب قائمة المنتجات.'));
     }
     return result.products;
+}
+
+function fetchPublicFeaturedProductsViaWorker(ids) {
+    return fetchPublicCatalogViaWorker({ ids });
+}
+
+function fetchPublicCustomerCatalogViaWorker() {
+    return fetchPublicCatalogViaWorker({ all: true });
+}
+
+function sanitizePublicCatalogFallback(products) {
+    return (Array.isArray(products) ? products : []).map(product => {
+        const { cost, images, ...publicProduct } = product || {};
+        return publicProduct;
+    });
 }
 
 let state = { products: [], orders: [], expenses: [], customers: [], messages: [], requests: [], session: null, cart: [], wishlist: [], currentLang: 'ar', settings: { shopName: 'Thier Décor', shopPhone: '', promoText: '', promoActive: false, customPrices: {}, manualSalesAdjustment: 0, adActive: false, adImages: [], adText: '', adEndTime: '', coupons: [] } };
@@ -1370,8 +1386,9 @@ async function loadOrdersListener(options = {}) {
         const now = Date.now();
         const currentFirebaseUser = Boolean(window.firebaseReady && typeof firebase !== 'undefined' && firebase.auth && firebase.auth().currentUser);
         const isFirebaseAdmin = currentFirebaseUser && firebase.auth().currentUser.uid === TD_ADMIN_UID;
-        const isFullCatalogUser = isFirebaseAdmin || (state.session && (state.session.role === 'admin' || state.session.role === 'customer'));
-        const catalogMode = isFullCatalogUser ? 'full' : 'featured';
+        const isAdminCatalogUser = isFirebaseAdmin || (state.session && state.session.role === 'admin');
+        const isCustomerCatalogUser = Boolean(state.session && state.session.role === 'customer' && !isFirebaseAdmin);
+        const catalogMode = isAdminCatalogUser ? 'admin' : (isCustomerCatalogUser ? 'customer' : 'featured');
         const shouldFetchProducts = options.forceProducts || lastCatalogMode !== catalogMode || !state.products.length || (now - lastProductsFetchAt) >= PRODUCT_CACHE_TTL_MS;
         const shouldFetchSettings = options.forceSettings || !state.settings || (now - lastSettingsFetchAt) >= SETTINGS_CACHE_TTL_MS;
 
@@ -1395,13 +1412,17 @@ async function loadOrdersListener(options = {}) {
             if (!shouldFetchProducts) return;
             try {
                 let products;
-                if (isFullCatalogUser) {
+                if (isAdminCatalogUser) {
+                    // Product management and POS still need the private cost field.
                     const { data, error } = await window.supabaseClient.from('products').select('*');
                     if (error) throw error;
                     products = data;
+                } else if (isCustomerCatalogUser) {
+                    // Customers still browse the full catalog, but through the same
+                    // public edge-cached projection (without private cost/Base64 fields).
+                    products = await fetchPublicCustomerCatalogViaWorker();
                 } else {
-                    // Wait for the selected featured IDs, then retrieve only those
-                    // public columns through Cloudflare's short-lived edge cache.
+                    // Guests receive only selected featured IDs, not the full catalog.
                     await settingsTask;
                     products = await fetchPublicFeaturedProductsViaWorker(getFeaturedProductIds());
                 }
@@ -1419,7 +1440,11 @@ async function loadOrdersListener(options = {}) {
                 if (catalogLoading || lastCatalogMode !== catalogMode) {
                     const fallback = load(K.products, []);
                     const featuredIds = new Set(getFeaturedProductIds());
-                    state.products = isFullCatalogUser ? fallback : fallback.filter(product => featuredIds.has(String(product.id)));
+                    state.products = isAdminCatalogUser
+                        ? fallback
+                        : sanitizePublicCatalogFallback(isCustomerCatalogUser
+                            ? fallback
+                            : fallback.filter(product => featuredIds.has(String(product.id))));
                     catalogLoading = false;
                 }
             }
