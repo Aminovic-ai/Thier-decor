@@ -59,8 +59,8 @@ test("public settings expose only storefront-safe custom price fields and are ed
       headers: { Origin: origin }
     }), env);
     assert.equal(response.status, 200);
-    assert.equal(response.headers.get("Cache-Control"), "public, max-age=30, stale-while-revalidate=300");
-    assert.equal(response.headers.get("Cloudflare-CDN-Cache-Control"), "public, max-age=60, stale-while-revalidate=300");
+    assert.equal(response.headers.get("Cache-Control"), "public, max-age=120, stale-while-revalidate=300");
+    assert.equal(response.headers.get("Cloudflare-CDN-Cache-Control"), "public, max-age=300, stale-while-revalidate=600");
     assert.equal(response.headers.get("Vary"), "Origin");
     assert.equal(response.headers.get("Access-Control-Allow-Origin"), origin);
     const body = await response.json();
@@ -115,7 +115,8 @@ test("guest catalog reads only the server-selected featured products and omits p
     assert.ok(productCall);
     assert.match(productCall.searchParams.get("id"), /in\.\(11,22\)/);
     assert.ok(!productCall.searchParams.get("select").split(",").includes("cost"));
-    assert.equal(response.headers.get("Cache-Control"), "public, max-age=30, stale-while-revalidate=300");
+    assert.equal(response.headers.get("Cache-Control"), "public, max-age=60, stale-while-revalidate=300");
+    assert.equal(response.headers.get("Cloudflare-CDN-Cache-Control"), "public, max-age=120, stale-while-revalidate=300");
   });
 });
 
