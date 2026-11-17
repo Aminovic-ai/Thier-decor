@@ -1417,7 +1417,7 @@ async function loadOrdersListener(options = {}) {
         const settingsTask = (async () => {
             if (!shouldFetchSettings) return true;
             try {
-                const settings = await fetchPublicSettingsViaWorker({ includeFeaturedCatalog: catalogMode === 'featured' });
+                const settings = await fetchPublicSettingsViaWorker({ includeFeaturedCatalog: catalogMode === 'featured' && shouldFetchProducts });
                 state.settings = settings;
                 save(K.settings, settings);
                 lastSettingsFetchAt = Date.now();
