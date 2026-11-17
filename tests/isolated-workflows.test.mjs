@@ -204,3 +204,15 @@ test("isolated POS sale commits stock in Store DB before recording invoice in PO
     assert.deepEqual(calls.map(call => call.host), ["store.example", "pos.example"]);
   });
 });
+
+
+test("storefront frontend does not require or query the browser Supabase client", async () => {
+  const appSource = await readFile(new URL("../app.js", import.meta.url), "utf8");
+  assert.doesNotMatch(appSource, /window\\.supabaseClient/);
+  assert.doesNotMatch(appSource, /\\.from\\s*\\(/);
+  assert.doesNotMatch(appSource, /\\.rpc\\s*\\(/);
+  assert.match(appSource, /fetchPublicSettingsViaWorker/);
+  assert.match(appSource, /fetchPublicCatalogViaWorker/);
+  assert.match(appSource, /fetchAdminOrdersViaWorker/);
+  assert.match(appSource, /fetchCustomerDataViaWorker/);
+});
