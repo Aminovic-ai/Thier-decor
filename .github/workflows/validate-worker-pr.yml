@@ -1,0 +1,32 @@
+name: Validate Thier Decor Worker PR
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "thier-decor-api.js"
+      - "app.js"
+      - "wrangler.toml"
+      - ".github/workflows/validate-worker-pr.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout pull request
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Check JavaScript syntax
+        run: |
+          node --check app.js
+          node --check thier-decor-api.js
+      - name: Validate Wrangler configuration and Worker bundle (dry run only)
+        run: npx --yes wrangler@4.135.0 deploy --config wrangler.toml --dry-run
