@@ -913,16 +913,20 @@ async function customerCheckPromo(request, body, env) {
 /* ---------------- PUBLIC STOREFRONT SETTINGS + EDGE CATALOG ---------------- */
 // Workers Cache (enabled in wrangler.toml) caches only these anonymous GET
 // responses at Cloudflare's edge. Private/admin/customer routes stay no-store.
-const PUBLIC_EDGE_CACHE_CONTROL = "public, max-age=30, stale-while-revalidate=300";
-const PUBLIC_EDGE_CDN_CACHE_CONTROL = "public, max-age=60, stale-while-revalidate=300";
+// Keep product stock/prices reasonably fresh while avoiding a Supabase read
+// for every visitor. Store settings change less often, so they can be cached longer.
+const PUBLIC_CATALOG_CACHE_CONTROL = "public, max-age=60, stale-while-revalidate=300";
+const PUBLIC_CATALOG_CDN_CACHE_CONTROL = "public, max-age=120, stale-while-revalidate=300";
+const PUBLIC_SETTINGS_CACHE_CONTROL = "public, max-age=120, stale-while-revalidate=300";
+const PUBLIC_SETTINGS_CDN_CACHE_CONTROL = "public, max-age=300, stale-while-revalidate=600";
 
-function publicCacheJson(payload) {
+function publicCacheJson(payload, cacheControl, cdnCacheControl) {
   return new Response(JSON.stringify(payload), {
     status: 200,
     headers: {
       "Content-Type": "application/json; charset=utf-8",
-      "Cache-Control": PUBLIC_EDGE_CACHE_CONTROL,
-      "Cloudflare-CDN-Cache-Control": PUBLIC_EDGE_CDN_CACHE_CONTROL
+      "Cache-Control": cacheControl,
+      "Cloudflare-CDN-Cache-Control": cdnCacheControl
     }
   });
 }
@@ -998,7 +1002,11 @@ async function cachedPublicSettings(request, env) {
   // a response whose content is independent of query parameters.
   if (requestUrl.searchParams.size) return fail("Invalid public settings query.", 400);
   const rows = await dbRequest(env, "settings?select=id,shopName,shopPhone,shopAddress,logoUrl,promoText,promoActive,adActive,adImages,adText,adEndTime,customPrices&limit=1");
-  return publicCacheJson({ success: true, settings: sanitizePublicSettings(rows?.[0] || {}) });
+  return publicCacheJson(
+    { success: true, settings: sanitizePublicSettings(rows?.[0] || {}) },
+    PUBLIC_SETTINGS_CACHE_CONTROL,
+    PUBLIC_SETTINGS_CDN_CACHE_CONTROL
+  );
 }
 
 async function cachedPublicCatalog(request, env) {
@@ -1031,10 +1039,18 @@ async function cachedPublicCatalog(request, env) {
   const ids = Array.isArray(configuredIds)
     ? [...new Set(configuredIds.map(value => String(value)).filter(value => /^\d{1,18}$/.test(value)))].slice(0, 100)
     : [];
-  if (!ids.length) return publicCacheJson({ success: true, products: [] });
+  if (!ids.length) return publicCacheJson(
+    { success: true, products: [] },
+    PUBLIC_CATALOG_CACHE_CONTROL,
+    PUBLIC_CATALOG_CDN_CACHE_CONTROL
+  );
   const query = "products?select=" + columns + "&id=in.(" + ids.join(",") + ")&qty=gt.0";
   const products = await dbRequest(env, query);
-  return publicCacheJson({ success: true, products: Array.isArray(products) ? products : [] });
+  return publicCacheJson(
+    { success: true, products: Array.isArray(products) ? products : [] },
+    PUBLIC_CATALOG_CACHE_CONTROL,
+    PUBLIC_CATALOG_CDN_CACHE_CONTROL
+  );
 }
 
 /* ---------------- ADMIN ORDERS ---------------- */
