@@ -936,7 +936,7 @@ async function cachedPublicCatalog(request, env) {
   const requestUrl = new URL(request.url);
   const rawIds = String(requestUrl.searchParams.get("ids") || "");
   const parts = rawIds ? rawIds.split(",") : [];
-  if (parts.length > 30 || parts.some(id => !/^\d{1,18}$/.test(id))) {
+  if (parts.length > 100 || parts.some(id => !/^\d{1,18}$/.test(id))) {
     return fail("Invalid public catalog selection.", 400);
   }
   const ids = [...new Set(parts)];
