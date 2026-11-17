@@ -944,16 +944,25 @@ async function publicSettings(env) {
 }
 
 async function cachedPublicSettings(request, env) {
+  const requestUrl = new URL(request.url);
+  // Do not let arbitrary query strings create unbounded cache-key variants for
+  // a response whose content is independent of query parameters.
+  if (requestUrl.searchParams.size) return fail("Invalid public settings query.", 400);
   const rows = await dbRequest(env, "settings?select=id,shopName,shopPhone,shopAddress,logoUrl,promoText,promoActive,adActive,adImages,adText,adEndTime,customPrices&limit=1");
   return publicCacheJson({ success: true, settings: rows?.[0] || {} });
 }
 
 async function cachedPublicCatalog(request, env) {
   const requestUrl = new URL(request.url);
+  const allowedParams = [...requestUrl.searchParams.keys()];
+  if (allowedParams.some(key => key !== "all") ||
+      (requestUrl.searchParams.has("all") && requestUrl.searchParams.get("all") !== "1")) {
+    return fail("Invalid public catalog query.", 400);
+  }
   const allProducts = requestUrl.searchParams.get("all") === "1";
-  // A fixed featured-catalog URL avoids attacker-controlled cache-key fan-out
-  // from arbitrary product ID combinations. Featured IDs are read server-side.
-  if (requestUrl.searchParams.has("ids")) return fail("Invalid public catalog selection.", 400);
+  // The only cacheable catalog URLs are the fixed featured URL and the
+  // authenticated all=1 URL. Featured IDs are read server-side, never from
+  // browser-controlled query parameters.
 
   // Only fields required by the public storefront; never send cost or legacy
   // Base64 image data to visitors. Product images come from the R2 image_urls.
