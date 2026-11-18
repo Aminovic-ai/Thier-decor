@@ -219,3 +219,48 @@ test("storefront frontend does not require or query the browser Supabase client"
   assert.match(analyticsSource, /lastVisitStatsFetchAt/);
   assert.match(analyticsSource, /now-lastVisitStatsFetchAt<120000/);
 });
+
+
+test("legacy adminSetOrderPaid records only the incremental difference in the payment ledger", async () => {
+  const calls = [];
+  await withFetch(async (input, init = {}) => {
+    const url = new URL(String(input));
+    if (url.hostname === "identitytoolkit.googleapis.com") return firebaseLookup(url, init);
+    assert.equal(url.hostname, "store.example");
+    calls.push({ path: url.pathname, query: url.search, init });
+    if (url.pathname.endsWith("/orders")) {
+      return jsonResponse([{ id: 77, total: 1000, paidAmount: 200, status: "new" }]);
+    }
+    if (url.pathname.endsWith("/rpc/td_record_order_payment")) {
+      const payload = JSON.parse(init.body);
+      assert.deepEqual(payload, { p_order_id: 77, p_amount: 300 });
+      return jsonResponse({ success: true, paymentId: 901, paidAmount: 500, remainingDebt: 500 });
+    }
+    throw new Error("Unexpected legacy-payment request: " + url);
+  }, async () => {
+    const response = await adminRequest("adminSetOrderPaid", { id: 77, paidAmount: 500 });
+    assert.equal(response.status, 200);
+    const body = await response.json();
+    assert.equal(body.paidAmount, 500);
+    assert.equal(calls.length, 2);
+    assert.match(calls[0].query, /select=id,total,paidAmount,status/);
+    assert.ok(calls[1].path.endsWith("/rpc/td_record_order_payment"));
+  });
+});
+
+test("legacy adminSetOrderPaid refuses to lower the cumulative amount and never bypasses the ledger", async () => {
+  let rpcCalled = false;
+  await withFetch(async (input, init = {}) => {
+    const url = new URL(String(input));
+    if (url.hostname === "identitytoolkit.googleapis.com") return firebaseLookup(url, init);
+    if (url.pathname.endsWith("/orders")) {
+      return jsonResponse([{ id: 77, total: 1000, paidAmount: 500, status: "new" }]);
+    }
+    if (url.pathname.endsWith("/rpc/td_record_order_payment")) rpcCalled = true;
+    throw new Error("Unexpected request: " + url);
+  }, async () => {
+    const response = await adminRequest("adminSetOrderPaid", { id: 77, paidAmount: 300 });
+    assert.equal(response.status, 409);
+    assert.equal(rpcCalled, false);
+  });
+});
