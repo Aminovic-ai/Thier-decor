@@ -1414,15 +1414,45 @@ async function adminMutation(action, body, env) {
       await patchRow(env, "orders", id, { trackingNumber });
       return json({ success: true });
     }
-    case "adminSetOrderPaid": {
+    case "adminRecordOrderPayment": {
       const id = positiveId(body.id, "معرّف الطلبية");
-      const rows = await dbRequest(env, "orders?select=id,total&id=eq." + encodeURIComponent(id) + "&limit=1");
+      const amount = Number(body.amount);
+      if (!Number.isFinite(amount) || amount <= 0) return fail("مبلغ الدفعة غير صالح.");
+      const result = await dbRequest(env, "rpc/td_record_order_payment", {
+        method: "POST",
+        body: JSON.stringify({ p_order_id: id, p_amount: amount })
+      });
+      const payment = Array.isArray(result) ? result[0] : result;
+      if (!payment || payment.success !== true) return fail("تعذر تسجيل الدفعة.", 409);
+      return json({ success: true, paidAmount: Number(payment.paidAmount), remainingDebt: Number(payment.remainingDebt), paymentId: payment.paymentId });
+    }
+    case "adminListOrderPayments": {
+      const id = positiveId(body.id, "معرّف الطلبية");
+      const rows = await dbRequest(env, "td_order_payments?select=id,amount,created_at,source&order_id=eq." + encodeURIComponent(id) + "&order=created_at.desc&limit=100");
+      return json({ success: true, payments: Array.isArray(rows) ? rows : [] });
+    }
+    case "adminSetOrderPaid": {
+      // Backward compatibility for cached v78 clients: translate their cumulative
+      // target into an incremental ledger payment. Never overwrite the ledger total.
+      const id = positiveId(body.id, "معرّف الطلبية");
+      const rows = await dbRequest(env, "orders?select=id,total,paidAmount,status&id=eq." + encodeURIComponent(id) + "&limit=1");
       const order = rows?.[0];
       if (!order) return fail("الطلبية غير موجودة.", 404);
-      const paidAmount = Number(body.paidAmount);
-      if (!Number.isFinite(paidAmount) || paidAmount < 0 || paidAmount > Number(order.total)) return fail("مبلغ الدفع خارج النطاق.");
-      await patchRow(env, "orders", id, { paidAmount });
-      return json({ success: true });
+      if (order.status === "cancelled") return fail("لا يمكن تسجيل دفعة لطلبية ملغاة.", 409);
+      const targetPaid = Number(body.paidAmount);
+      const currentPaid = Math.max(0, Number(order.paidAmount) || 0);
+      const total = Math.max(0, Number(order.total) || 0);
+      if (!Number.isFinite(targetPaid) || targetPaid < 0 || targetPaid > total) return fail("مبلغ الدفع خارج النطاق.");
+      if (targetPaid < currentPaid) return fail("لا يمكن تخفيض المدفوع بعد تسجيله؛ سجّل تسوية/استرجاع منفصل.", 409);
+      const amount = Math.round((targetPaid - currentPaid) * 100) / 100;
+      if (amount === 0) return json({ success: true, paidAmount: currentPaid, unchanged: true });
+      const result = await dbRequest(env, "rpc/td_record_order_payment", {
+        method: "POST",
+        body: JSON.stringify({ p_order_id: id, p_amount: amount })
+      });
+      const payment = Array.isArray(result) ? result[0] : result;
+      if (!payment || payment.success !== true) return fail("تعذر تسجيل الدفعة.", 409);
+      return json({ success: true, paidAmount: Number(payment.paidAmount), remainingDebt: Number(payment.remainingDebt), paymentId: payment.paymentId });
     }
     case "adminSetOrderFreeDelivery": {
       const id = positiveId(body.id, "معرّف الطلبية");
@@ -2073,6 +2103,8 @@ async function handleRequest(request, env) {
         case "adminUpdateSettings":
         case "adminUpdateOrderTracking":
         case "adminSetOrderPaid":
+        case "adminRecordOrderPayment":
+        case "adminListOrderPayments":
         case "adminSetOrderFreeDelivery":
         case "adminSetRequestStatus":
         case "adminDeleteRequest":
