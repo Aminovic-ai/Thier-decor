@@ -2670,11 +2670,12 @@ async function updateCustomerProfile() {
 }
 window.updateCustomerProfile = updateCustomerProfile;
 
-// Orders are considered paid by default until the admin explicitly records a partial payment.
+// A stored zero is an explicit unpaid balance; NULL remains legacy "not tracked".
 function getRecordedPaidAmount(order) {
     const total = Math.max(0, Number(order?.total) || 0);
-    const recorded = Number(order?.paidAmount);
-    if (order?.paidAmount === null || order?.paidAmount === undefined || !Number.isFinite(recorded) || recorded <= 0) return total;
+    if (order?.paidAmount === null || order?.paidAmount === undefined) return total;
+    const recorded = Number(order.paidAmount);
+    if (!Number.isFinite(recorded)) return total;
     return Math.min(total, Math.max(0, recorded));
 }
 function getOrderRemainingDebt(order) {
@@ -2698,7 +2699,7 @@ function renderMyOrders() {
         'cancelled': { text: i18n[state.currentLang].cancelled, color: '#b91c1c', bg: '#fef2f2', icon: 'fa-times-circle' }
     };
     c.innerHTML = myOrders.map(o => {
-        const status = statusMap[o.status] || statusMap['new']; const debt = getOrderRemainingDebt(o);
+        const status = statusMap[o.status] || statusMap['new']; const debt = cust.isVip ? getOrderRemainingDebt(o) : 0;
         let debtHtml = ''; if (debt > 0) { debtHtml = `<div style="background: #fee2e2; border: 1px solid #ef4444; padding: 10px; border-radius: 8px; margin-top: 10px; display: flex; justify-content: space-between; align-items: center;"><span style="font-weight: bold; color: #b91c1c;"><i class="fas fa-exclamation-triangle"></i> ${i18n[state.currentLang].debt_alert}</span><span style="font-family: monospace; font-size: 1.1rem; font-weight: 900; color: #b91c1c;">${fmtMoney(debt)}</span></div>`; }
         let confirmBtnHtml = ''; if (o.status === 'on_the_way' || o.status === 'out_for_delivery') { confirmBtnHtml = `<button onclick="customerConfirmReceipt(${o.id})" class="btn-primary" style="background:#10b981; margin-top:10px; width:100%; padding:10px;">${i18n[state.currentLang].confirm_receipt}</button>`; }
         const itemsList = o.items.map(i => { const components = i.isPack && Array.isArray(i.packItems) && i.packItems.length ? `<div style="font-size:0.78rem; margin:2px 0 5px 10px; color:var(--text-mid);">${i.packItems.map(comp => `${esc(state.products.find(p => String(p.id) === String(comp.id))?.name || comp.name || 'Produit')} × ${Number(comp.qty)||0}`).join(' · ')}</div>` : ''; return `<div style="display:flex; justify-content:space-between; font-size:0.85rem; color:var(--text-mid); margin-bottom:4px;"><span>${esc(i.name)} (x${i.qty})</span><span>${fmtMoney(i.price * i.qty)}</span></div>${components}`; }).join('');
@@ -3414,29 +3415,30 @@ function viewOrderDetails(orderId) {
         const components = i.isPack && Array.isArray(i.packItems) && i.packItems.length ? `<div style="font-size:0.8rem;color:var(--text-mid);margin-top:4px;">${i.packItems.map(comp => `${esc(state.products.find(p => String(p.id) === String(comp.id))?.name || comp.name || 'Produit')} × ${Number(comp.qty)||0}`).join(' · ')}</div>` : '';
         return `<div class="order-variant-row">${imageHtml}<div class="order-variant-info"><strong>${esc(i.name)}</strong><br><small style="color:var(--text-mid);">${i.qty} × ${fmtMoney(i.price)}</small>${components}</div><div style="font-weight:900;">${fmtMoney(i.price * i.qty)}</div></div>`;
     }).join('');
-    const paid = order.paidAmount ?? order.total; const debt = order.total - paid;
+    const paid = getRecordedPaidAmount(order); const debt = isVip ? getOrderRemainingDebt(order) : 0;
     let actionButtons = `<div style="margin-top:20px; border-top:2px dashed var(--border); padding-top:15px;"><h4 style="margin-bottom:10px; color:var(--primary);">Actions</h4><button onclick="makeDeliveryFree(${order.id})" class="btn-secondary" style="margin-bottom:10px; background:#10b981; color:white;"><i class="fas fa-truck"></i> ${i18n[state.currentLang].free_delivery}</button><button onclick="openEditOrder(${order.id})" class="btn-secondary" style="margin-bottom:10px; background:#f59e0b; color:white;"><i class="fas fa-edit"></i> ${i18n[state.currentLang].edit_order}</button>`;
-    const itemsOnly = order.itemsTotal ?? (order.total - (order.deliveryPrice || 0));
     const discounts = getOrderDiscountBreakdown(order);
     const crownAmount = discounts.crown;
     const promoAmount = discounts.promo;
     const legacyDiscountAmount = discounts.legacy;
-    actionButtons += `<div style="background:#f0fdf4; padding:10px; border-radius:8px; border:1px solid #86efac; margin-top:10px;">
-        <label style="font-weight:bold; color:#15803d; display:block; margin-bottom:5px;"><i class="fas fa-money-bill-wave"></i> تسجيل الدفع${isVip ? ' ⭐' : ''}</label>
-        <div style="display:flex; gap:5px; margin-bottom:10px; flex-wrap:wrap;">
-            <button type="button" onclick="document.getElementById('paid-amount-${order.id}').value=${order.total}; calcDebt(${order.id}, ${order.total})" style="flex:1; padding:6px; font-size:0.75rem; background:#d1fae5; color:#059669; border:1px solid #10b981; border-radius:6px; font-weight:bold;"><i class="fas fa-check-double"></i> دفع الكل (${fmtMoney(order.total)})</button>
-            <button type="button" onclick="document.getElementById('paid-amount-${order.id}').value=${itemsOnly}; calcDebt(${order.id}, ${order.total})" style="flex:1; padding:6px; font-size:0.75rem; background:#e0f2fe; color:#0284c7; border:1px solid #38bdf8; border-radius:6px; font-weight:bold;"><i class="fas fa-box-open"></i> دفع المنتجات فقط (${fmtMoney(itemsOnly)})</button>
-            <button type="button" onclick="document.getElementById('paid-amount-${order.id}').value=${order.deliveryPrice || 0}; calcDebt(${order.id}, ${order.total})" style="flex:1; padding:6px; font-size:0.75rem; background:#fef3c7; color:#b45309; border:1px solid #fcd34d; border-radius:6px; font-weight:bold;"><i class="fas fa-truck"></i> دفع التوصيل فقط (${fmtMoney(order.deliveryPrice || 0)})</button>
-        </div>
-        <div class="form-group"><label>${i18n[state.currentLang].paid_amount}</label><input type="number" id="paid-amount-${order.id}" value="${paid}" oninput="calcDebt(${order.id}, ${order.total})" style="padding:8px; border-radius:6px; border:1px solid #cbd5e1; width:100%;"></div>
-        <div style="display:flex; justify-content:space-between; font-weight:bold; margin-bottom:10px;"><span>${i18n[state.currentLang].remaining_debt}:</span><span id="debt-display-${order.id}" style="color:var(--danger);">${fmtMoney(debt)}</span></div>
-        <button onclick="saveOrderDebt(${order.id})" class="btn-primary" style="padding:8px; background:#10b981; width:100%;">${i18n[state.currentLang].save_debt}</button>
-    </div>`;
+    if (isVip) {
+        actionButtons += `<div style="background:#f0fdf4; padding:10px; border-radius:8px; border:1px solid #86efac; margin-top:10px;">
+            <label style="font-weight:bold; color:#15803d; display:block; margin-bottom:5px;"><i class="fas fa-money-bill-wave"></i> تسجيل دفعة جديدة ⭐</label>
+            <div style="display:flex; justify-content:space-between; margin:6px 0;"><span>المدفوع سابقاً:</span><strong>${fmtMoney(paid)}</strong></div>
+            <div style="display:flex; justify-content:space-between; margin:6px 0 12px;"><span>الدين المتبقي قبل الدفعة:</span><strong style="color:var(--danger);">${fmtMoney(debt)}</strong></div>
+            <div class="form-group"><label>مبلغ الدفعة الحالية (دج)</label><input type="number" min="0" max="${debt}" step="0.01" id="paid-amount-${order.id}" value="0" oninput="calcDebt(${order.id}, ${debt})" style="padding:8px; border-radius:6px; border:1px solid #cbd5e1; width:100%;"></div>
+            <div style="display:flex; justify-content:space-between; font-weight:bold; margin-bottom:10px;"><span>المتبقي بعد هذه الدفعة:</span><span id="debt-display-${order.id}" style="color:var(--danger);">${fmtMoney(debt)}</span></div>
+            <button type="button" onclick="document.getElementById('paid-amount-${order.id}').value=${debt}; calcDebt(${order.id}, ${debt})" class="btn-secondary" style="width:100%;margin-bottom:8px;">تسديد كامل المتبقي</button>
+            <button onclick="saveOrderDebt(${order.id})" class="btn-primary" style="padding:8px; background:#10b981; width:100%;">حفظ الدفعة</button>
+            <div id="order-payment-history-${order.id}" style="margin-top:12px;font-size:.9rem;">جاري تحميل سجل الدفعات...</div>
+        </div>`;
+    }
     actionButtons += `</div>`;
     
     document.getElementById('order-details-body').innerHTML = `<div style="margin-bottom:15px; background:var(--primary-light); padding:15px; border-radius:8px; border:1px solid var(--border);"><p><strong>${i18n[state.currentLang].full_name}:</strong> ${esc(order.customerName)} ${isVip ? '⭐' : ''}</p><p><strong>${i18n[state.currentLang].phone}:</strong> <a href="tel:${esc(order.customerPhone)}" style="color:green; font-weight:bold;">${esc(order.customerPhone)}</a></p><p><strong>${i18n[state.currentLang].address}:</strong> ${esc(order.wilaya)} - ${esc(order.commune)} - ${esc(order.address)}</p><p><strong>${i18n[state.currentLang].delivery_cost}</strong> ${esc(order.courier)} - <span style="color:${order.deliveryType === 'stopdesk' ? '#b45309' : '#15803d'}; font-weight:bold;">${order.deliveryType === 'stopdesk' ? '🏢 مكتب (' + esc(order.stationName || 'غير محدد') + ')' : '🏠 المنزل'}</span></p>${order.promoCode || order.couponCode ? `<p><strong>كود البرومو:</strong> ${esc(order.promoCode || order.couponCode)} — <strong>التخفيض:</strong> ${fmtMoney(promoAmount)}</p>` : ''}${crownAmount > 0 ? `<p style="color:#a16207;font-weight:800"><i class="fas fa-crown"></i> تخفيض التاج / Remise Couronne: ${fmtMoney(crownAmount)}</p>` : ''}${legacyDiscountAmount > 0 ? `<p style="color:#059669;font-weight:800">التخفيض / Remise: ${fmtMoney(legacyDiscountAmount)}</p>` : ''}</div><h4 style="margin-bottom:10px;">${i18n[state.currentLang].products_price}</h4><div style="margin-bottom:20px;">${itemsHtml}</div><div style="display:flex; justify-content:space-between; font-weight:bold; margin-bottom:8px;"><span>${i18n[state.currentLang].products_price}</span><span>${fmtMoney(order.itemsTotal)}</span></div>${promoAmount > 0 ? `<div style="display:flex;justify-content:space-between;font-weight:bold;margin-bottom:8px;color:#059669"><span>تخفيض البرومو</span><span>− ${fmtMoney(promoAmount)}</span></div>` : ''}${crownAmount > 0 ? `<div style="display:flex;justify-content:space-between;font-weight:bold;margin-bottom:8px;color:#a16207"><span><i class="fas fa-crown"></i> تخفيض التاج</span><span>− ${fmtMoney(crownAmount)}</span></div>` : ''}${legacyDiscountAmount > 0 ? `<div style="display:flex;justify-content:space-between;font-weight:bold;margin-bottom:8px;color:#059669"><span>التخفيض / Remise</span><span>− ${fmtMoney(legacyDiscountAmount)}</span></div>` : ''}<div style="display:flex; justify-content:space-between; font-weight:bold; margin-bottom:15px; color:var(--primary);"><span>${i18n[state.currentLang].delivery_cost}</span><span>${fmtMoney(order.deliveryPrice)}</span></div><div style="display:flex; justify-content:space-between; font-weight:900; font-size:1.3rem; border-top:2px solid var(--border); padding-top:15px;"><span>${i18n[state.currentLang].total_price}</span><span>${fmtMoney(order.total)}</span></div>${debt > 0 ? `<div style="display:flex; justify-content:space-between; font-weight:bold; font-size:1.1rem; margin-top:10px; color:var(--danger);"><span>${i18n[state.currentLang].remaining_debt}:</span><span>${fmtMoney(debt)}</span></div>` : ''}${actionButtons}`;
     
     openModal('m-order-details');
+    if (isVip) loadOrderPaymentHistory(order.id);
                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     }
 window.viewOrderDetails = viewOrderDetails;
 
@@ -3453,17 +3455,43 @@ async function makeDeliveryFree(orderId) {
 window.makeDeliveryFree = makeDeliveryFree;
 
 
-function calcDebt(orderId, totalAmount) { const paid = Number(document.getElementById(`paid-amount-${orderId}`).value) || 0; const debt = totalAmount - paid; document.getElementById(`debt-display-${orderId}`).textContent = fmtMoney(debt > 0 ? debt : 0); }
+function calcDebt(orderId, currentDebt) {
+    const amount = Number(document.getElementById(`paid-amount-${orderId}`)?.value) || 0;
+    const remaining = Math.max(0, Number(currentDebt) - amount);
+    const display = document.getElementById(`debt-display-${orderId}`);
+    if (display) display.textContent = fmtMoney(remaining);
+}
 window.calcDebt = calcDebt;
+
+async function loadOrderPaymentHistory(orderId) {
+    const target = document.getElementById(`order-payment-history-${orderId}`);
+    if (!target) return;
+    try {
+        const result = await callAdminWorker('adminListOrderPayments', { id: orderId });
+        const payments = Array.isArray(result.payments) ? result.payments : [];
+        target.innerHTML = payments.length
+            ? `<strong>سجل الدفعات</strong>` + payments.map(p => `<div style="display:flex;justify-content:space-between;border-top:1px solid var(--border);padding:6px 0;"><span>${new Date(p.created_at).toLocaleString(state.currentLang === 'fr' ? 'fr-FR' : 'ar-DZ')}</span><strong>${fmtMoney(p.amount)}</strong></div>`).join('')
+            : '<strong>سجل الدفعات:</strong><div>لا توجد دفعات مسجلة بعد.</div>';
+    } catch (error) {
+        target.textContent = 'تعذر تحميل سجل الدفعات.';
+        console.error('Payment history load failed:', error);
+    }
+}
+window.loadOrderPaymentHistory = loadOrderPaymentHistory;
 
 async function saveOrderDebt(orderId) {
     const order = state.orders.find(x => String(x.id) === String(orderId)); if (!order) return;
-    const paidAmount = Number(document.getElementById('paid-amount-' + orderId)?.value);
-    if (!Number.isFinite(paidAmount) || paidAmount < 0 || paidAmount > Number(order.total)) return toast(i18n[state.currentLang].save_failed, 'error');
+    const amount = Number(document.getElementById('paid-amount-' + orderId)?.value);
+    const remaining = getOrderRemainingDebt(order);
+    if (!Number.isFinite(amount) || amount <= 0 || amount > remaining) return toast('أدخل مبلغ دفعة صحيحاً لا يتجاوز الدين المتبقي.', 'error');
     try {
-        await callAdminWorker('adminSetOrderPaid', { id: orderId, paidAmount });
-        order.paidAmount = paidAmount; save(K.orders, state.orders);
-        toast('✅ ' + i18n[state.currentLang].saved); closeModal('m-order-details'); renderAdminOrdersList();
+        const result = await callAdminWorker('adminRecordOrderPayment', { id: orderId, amount });
+        order.paidAmount = Number(result.paidAmount);
+        save(K.orders, state.orders);
+        toast('✅ تم حفظ الدفعة');
+        viewOrderDetails(orderId);
+        renderAdminOrdersList();
+        renderAdminDebts();
     } catch (error) { toast(error.message || i18n[state.currentLang].save_failed, 'error'); }
 }
 window.saveOrderDebt = saveOrderDebt;
