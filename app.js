@@ -3470,7 +3470,7 @@ async function loadOrderPaymentHistory(orderId) {
         const result = await callAdminWorker('adminListOrderPayments', { id: orderId });
         const payments = Array.isArray(result.payments) ? result.payments : [];
         target.innerHTML = payments.length
-            ? `<strong>سجل الدفعات</strong>` + payments.map(p => `<div style="display:flex;justify-content:space-between;border-top:1px solid var(--border);padding:6px 0;"><span>${new Date(p.created_at).toLocaleString(state.currentLang === 'fr' ? 'fr-FR' : 'ar-DZ')}</span><strong>${fmtMoney(p.amount)}</strong></div>`).join('')
+            ? `<strong>سجل الدفعات</strong>` + payments.map(p => `<div style="display:flex;justify-content:space-between;border-top:1px solid var(--border);padding:6px 0;"><span>${p.source === 'legacy_balance' ? 'رصيد مدفوع سابق قبل تفعيل السجل' : new Date(p.created_at).toLocaleString(state.currentLang === 'fr' ? 'fr-FR' : 'ar-DZ')}</span><strong>${fmtMoney(p.amount)}</strong></div>`).join('')
             : '<strong>سجل الدفعات:</strong><div>لا توجد دفعات مسجلة بعد.</div>';
     } catch (error) {
         target.textContent = 'تعذر تحميل سجل الدفعات.';
