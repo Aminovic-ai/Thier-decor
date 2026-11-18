@@ -1414,6 +1414,23 @@ async function adminMutation(action, body, env) {
       await patchRow(env, "orders", id, { trackingNumber });
       return json({ success: true });
     }
+    case "adminRecordOrderPayment": {
+      const id = positiveId(body.id, "معرّف الطلبية");
+      const amount = Number(body.amount);
+      if (!Number.isFinite(amount) || amount <= 0) return fail("مبلغ الدفعة غير صالح.");
+      const result = await dbRequest(env, "rpc/td_record_order_payment", {
+        method: "POST",
+        body: JSON.stringify({ p_order_id: id, p_amount: amount })
+      });
+      const payment = Array.isArray(result) ? result[0] : result;
+      if (!payment || payment.success !== true) return fail("تعذر تسجيل الدفعة.", 409);
+      return json({ success: true, paidAmount: Number(payment.paidAmount), remainingDebt: Number(payment.remainingDebt), paymentId: payment.paymentId });
+    }
+    case "adminListOrderPayments": {
+      const id = positiveId(body.id, "معرّف الطلبية");
+      const rows = await dbRequest(env, "td_order_payments?select=id,amount,created_at,source&order_id=eq." + encodeURIComponent(id) + "&order=created_at.desc&limit=100");
+      return json({ success: true, payments: Array.isArray(rows) ? rows : [] });
+    }
     case "adminSetOrderPaid": {
       const id = positiveId(body.id, "معرّف الطلبية");
       const rows = await dbRequest(env, "orders?select=id,total&id=eq." + encodeURIComponent(id) + "&limit=1");
@@ -2073,6 +2090,8 @@ async function handleRequest(request, env) {
         case "adminUpdateSettings":
         case "adminUpdateOrderTracking":
         case "adminSetOrderPaid":
+        case "adminRecordOrderPayment":
+        case "adminListOrderPayments":
         case "adminSetOrderFreeDelivery":
         case "adminSetRequestStatus":
         case "adminDeleteRequest":
