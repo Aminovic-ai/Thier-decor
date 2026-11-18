@@ -1650,8 +1650,7 @@ async function adminRefreshAll() {
 }
 window.adminRefreshAll = adminRefreshAll;
 
-// Fallback catalog refresh if Realtime is disconnected. Only run while this page is visible;
-// Realtime remains the preferred instant update path.
+// Scheduled catalog refresh through the Worker. The browser does not use Supabase Realtime.
 let catalogFallbackTimer = null;
 let lastAdminPollAt = 0;
 function startCatalogFallbackRefresh() {
@@ -1667,7 +1666,7 @@ function startCatalogFallbackRefresh() {
         }
         if (now - lastProductsFetchAt < PRODUCT_CACHE_TTL_MS) return;
         // Reuse the same role-aware loader: guests must never fall back to a full
-        // products SELECT when Realtime is unavailable.
+        // products SELECT when a Worker refresh is unavailable.
         loadOrdersListener({ forceProducts: true })
             .catch(err => console.warn('Catalog fallback refresh failed:', err));
     }, 60000);
