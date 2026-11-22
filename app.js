@@ -1560,7 +1560,12 @@ async function loadOrdersListener(options = {}) {
             }
         }
 
-        renderShop(); renderCategories(); renderMyOrders(); renderAdminOrdersList(); renderAdminHome(); updateAdminBadges();
+        renderShop(); renderCategories(); renderMyOrders();
+        // Do not replace the order cards while the administrator is interacting
+        // with a native status selector; mobile browsers close it if its DOM node is removed.
+        const orderStatusSelectorActive = document.activeElement?.matches('#a-orders-list select');
+        if (!orderStatusSelectorActive) renderAdminOrdersList();
+        renderAdminHome(); updateAdminBadges();
         renderPromoBanner(); updateStoreBranding(); renderSliderAd();
     } catch (error) {
         console.error('Supabase refresh failed:', error);
