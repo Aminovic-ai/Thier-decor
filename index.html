@@ -24,7 +24,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&family=Tajawal:wght@400;700;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="style.css?v=41">
-    <link rel="stylesheet" href="custom.css?v=60">
+    <link rel="stylesheet" href="custom.css?v=61">
     <style>
         #guest-register-cta{margin:18px auto 22px;padding:clamp(18px,3vw,28px);max-width:1180px;border:1px solid #bfdbfe;border-radius:18px;background:linear-gradient(120deg,#eff6ff 0%,#f8fbff 55%,#e0f2fe 100%);box-shadow:0 8px 24px rgba(37,99,235,.09);display:flex;align-items:center;justify-content:space-between;gap:18px}
         #guest-register-cta .guest-cta-copy{min-width:0}
@@ -225,6 +225,22 @@
                         <div class="pos-heading-icon"><i class="fas fa-store"></i></div>
                         <div><span class="pos-eyebrow">THIER DÉCOR · POINT DE VENTE</span><h2 data-pos-i18n="heading">البيع من المحل</h2><p data-pos-i18n="intro">اختر المنتجات، راجع السلة، ثم أكّد عملية البيع</p></div>
                     </div>
+                    <section class="pos-today-overview" aria-label="ملخص مبيعات اليوم">
+                        <div class="pos-today-overview-heading">
+                            <div><span class="pos-today-overview-kicker">THIER DÉCOR · DAILY OVERVIEW</span><h3 data-pos-i18n="todaySummary">ملخص أداء اليوم</h3></div>
+                            <button type="button" class="pos-today-refresh" onclick="refreshPOSSales({summaryOnly:true})" aria-label="تحديث ملخص اليوم"><i class="fas fa-sync-alt"></i><span data-pos-i18n="refresh">تحديث</span></button>
+                        </div>
+                        <div class="pos-today-kpis">
+                            <article class="pos-today-kpi pos-today-kpi-sales">
+                                <span class="pos-today-kpi-icon"><i class="fas fa-cash-register"></i></span>
+                                <div><small data-pos-i18n="today">مبيعات اليوم</small><strong data-pos-summary="today-sales">—</strong><span class="pos-today-kpi-foot" data-pos-summary="today-count">—</span></div>
+                            </article>
+                            <article class="pos-today-kpi pos-today-kpi-profit">
+                                <span class="pos-today-kpi-icon"><i class="fas fa-chart-line"></i></span>
+                                <div><small data-pos-i18n="todayProfit">ربح اليوم</small><strong data-pos-summary="today-profit">—</strong><span class="pos-today-kpi-foot" data-pos-i18n="profitBasis">بعد تكلفة المنتجات والتخفيضات</span></div>
+                            </article>
+                        </div>
+                    </section>
                     <section class="admin-card pos-customer-panel" aria-label="معلومات العميل">
                         <div class="pos-customer-fields">
                             <div class="pos-customer-fields-heading"><i class="fas fa-user-circle"></i><strong data-pos-i18n="customerPanel">معلومات العميل للفاتورة</strong><small data-pos-i18n="optional">اختياري — اترك الحقول فارغة إذا كان البيع دون بيانات عميل</small></div>
@@ -587,7 +603,7 @@
     
     
     <script src="https://cdn.jsdelivr.net/npm/crypto-js@4.1.1/crypto-js.min.js"></script>
-    <script src="app.js?v=79"></script>
+    <script src="app.js?v=80"></script>
     <script src="featured-products.js?v=3"></script>
     <script src="analytics-notifications.js"></script>
     <script>

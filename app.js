@@ -2846,7 +2846,7 @@ const posTranslations = {
   total:'الإجمالي', recover:'استعادة الفواتير المعلّقة', submit:'تأكيد البيع وطباعة الفاتورة',
   stockNote:'يتم خصم المخزون عند تأكيد البيع فقط.', history:'سجل الفواتير وتقارير الأرباح',
   historyNote:'ملخص مبيعات هذا النظام فقط.', refresh:'تحديث',
-  today:'مبيعات اليوم', week:'مبيعات آخر 7 أيام', month:'مبيعات هذا الشهر', profit:'الربح التقديري',
+  today:'مبيعات اليوم', todayProfit:'ربح اليوم', profitBasis:'بعد تكلفة المنتجات والتخفيضات', todaySummary:'ملخص أداء اليوم', todayInvoices:'عدد فواتير اليوم', week:'مبيعات آخر 7 أيام', month:'مبيعات هذا الشهر', profit:'الربح التقديري',
   invoice:'الفاتورة', customer:'العميل', date:'التاريخ', paymentMethod:'الدفع', amount:'الإجمالي',
   noInvoices:'لا توجد فواتير مبيعات بعد.', loadInvoices:'اضغط تحديث لعرض آخر الفواتير.',
   loading:'جارٍ تحميل الفواتير...', loadError:'تعذر تحميل الفواتير:',
@@ -2876,7 +2876,7 @@ const posTranslations = {
   total:'Total', recover:'Récupérer les factures en attente', submit:'Confirmer la vente et imprimer la facture',
   stockNote:'Le stock est déduit uniquement après confirmation de la vente.',
   history:'Historique des factures et bénéfices', historyNote:'Résumé des ventes de ce système uniquement.',
-  refresh:'Actualiser', today:'Ventes du jour', week:'Ventes des 7 derniers jours',
+  refresh:'Actualiser', todaySummary:'Résumé du jour', todayInvoices:'Factures du jour', todayProfit:'Bénéfice du jour', profitBasis:'Après coût des produits et remises', today:'Ventes du jour', week:'Ventes des 7 derniers jours',
   month:'Ventes du mois', profit:'Bénéfice estimé', invoice:'Facture', customer:'Client',
   date:'Date', paymentMethod:'Paiement', amount:'Total', noInvoices:'Aucune facture pour le moment.',
   loadInvoices:'Cliquez sur Actualiser pour afficher les dernières factures.',
@@ -3012,6 +3012,7 @@ async function submitPOSSale(){
    console.warn('POS sale saved, but product refresh failed:',refreshError);
   }
   toast(posText('saved')+' '+result.sale.invoice_no);
+  refreshPOSSales({ summaryOnly: true }).catch(error => console.warn('POS daily summary refresh failed:', error));
  }catch(e){
   if(invoiceWindow&&!invoiceWindow.closed)invoiceWindow.close();
   toast(posText('saveError')+' '+(e.message||'')+(posPendingSalePayload?posText('pendingRetry'):''),'error');
@@ -3064,7 +3065,7 @@ async function refreshPOSSales(options={}){
  if(target&&!append)target.innerHTML='<p style="text-align:center;padding:18px;">'+posText('loading')+'</p>';
  posSalesLoading=true;
  try{
-  const result=await callAdminWorker('adminListPOSSales',{limit:50,offset:posSalesOffset,search:posSalesSearch});
+  const result=await callAdminWorker('adminListPOSSales',{limit:options.summaryOnly?1:50,offset:options.summaryOnly?0:posSalesOffset,search:options.summaryOnly?'':posSalesSearch});
   const summary=result.summary||{};
   const money=value=>fmtMoney(Number(value||0));
   for(const [period,label] of [['today','day'],['week','week'],['month','month']]){
@@ -3073,10 +3074,17 @@ async function refreshPOSSales(options={}){
    const profit=document.getElementById('pos-'+label+'-profit');
    if(sales)sales.textContent=money(row.sales);
    if(profit)profit.textContent=posText('profit')+': '+money(row.profit)+' · '+Number(row.count||0)+' '+posText('dayInvoice');
+   if(period==='today'){
+    document.querySelectorAll('[data-pos-summary="today-sales"]').forEach(el=>el.textContent=money(row.sales));
+    document.querySelectorAll('[data-pos-summary="today-profit"]').forEach(el=>el.textContent=money(row.profit));
+    document.querySelectorAll('[data-pos-summary="today-count"]').forEach(el=>el.textContent=Number(row.count||0)+' '+posText('dayInvoice'));
+   }
   }
   const rows=Array.isArray(result.sales)?result.sales:[];
-  renderPOSSalesRows(rows,append);
-  posSalesOffset+=rows.length;
+  if(!options.summaryOnly){
+   renderPOSSalesRows(rows,append);
+   posSalesOffset+=rows.length;
+  }
   const more=document.getElementById('pos-load-more');
   if(more)more.style.display=result.hasMore?'inline-flex':'none';
   const count=document.getElementById('pos-sales-count');
@@ -3176,6 +3184,7 @@ function adminGo(sec, btnElement) {
     if (sec === 'pos') {
         setPOSView('sale');
         applyPOSTranslations();
+        refreshPOSSales({ summaryOnly: true }).catch(error => console.warn('POS daily summary refresh failed:', error));
         renderPOSProducts();
         renderPOSCart();
         // Always refresh the canonical catalog from the original store database
