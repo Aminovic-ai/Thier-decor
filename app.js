@@ -1386,8 +1386,41 @@ function updateProductRequestButton() {
 window.updateProductRequestButton = updateProductRequestButton;
 
 // Product stock is refreshed explicitly after POS sales and manual admin refreshes.
-// A longer background TTL reduces repeat catalog reads without delaying those updates.
+// Persist only public product projections so a page reload within the TTL does not
+// repeat the same full catalog read from Supabase through the Worker.
 const PRODUCT_CACHE_TTL_MS = 5 * 60 * 1000;
+const PUBLIC_CATALOG_CACHE_KEYS = {
+    featured: 'td_public_featured_catalog_v1',
+    customer: 'td_customer_catalog_v1'
+};
+
+function readPublicCatalogCache(mode, now = Date.now()) {
+    const key = PUBLIC_CATALOG_CACHE_KEYS[mode];
+    if (!key) return null;
+    try {
+        const cached = JSON.parse(localStorage.getItem(key) || 'null');
+        const savedAt = Number(cached?.savedAt);
+        if (!Array.isArray(cached?.products) || !Number.isFinite(savedAt) ||
+            savedAt <= 0 || now - savedAt < 0 || now - savedAt >= PRODUCT_CACHE_TTL_MS) return null;
+        return { products: sanitizePublicCatalogFallback(cached.products), savedAt };
+    } catch (_) {
+        return null;
+    }
+}
+
+function writePublicCatalogCache(mode, products) {
+    const key = PUBLIC_CATALOG_CACHE_KEYS[mode];
+    if (!key || !Array.isArray(products)) return;
+    try {
+        localStorage.setItem(key, JSON.stringify({
+            savedAt: Date.now(),
+            products: sanitizePublicCatalogFallback(products)
+        }));
+    } catch (error) {
+        // The persistent cache is an optimization only; quota failures never block the live catalog.
+        console.warn('Public catalog cache save failed:', error);
+    }
+}
 // Store branding and delivery settings change rarely; admins can force-refresh after edits.
 const SETTINGS_CACHE_TTL_MS = 15 * 60 * 1000;
 // Admin-only datasets are refreshed on demand and periodically, not on every poll.
@@ -1414,7 +1447,17 @@ async function loadOrdersListener(options = {}) {
         const isAdminCatalogUser = isFirebaseAdmin || (state.session && state.session.role === 'admin');
         const isCustomerCatalogUser = Boolean(state.session && state.session.role === 'customer' && !isFirebaseAdmin);
         const catalogMode = isAdminCatalogUser ? 'admin' : (isCustomerCatalogUser ? 'customer' : 'featured');
-        const shouldFetchProducts = options.forceProducts || lastCatalogMode !== catalogMode || !state.products.length || (now - lastProductsFetchAt) >= PRODUCT_CACHE_TTL_MS;
+        if (!options.forceProducts && (lastCatalogMode !== catalogMode || !lastProductsFetchAt) &&
+            (catalogMode === 'customer' || catalogMode === 'featured')) {
+            const cachedCatalog = readPublicCatalogCache(catalogMode, now);
+            if (cachedCatalog) {
+                state.products = cachedCatalog.products;
+                lastCatalogMode = catalogMode;
+                lastProductsFetchAt = cachedCatalog.savedAt;
+                catalogLoading = false;
+            }
+        }
+        const shouldFetchProducts = options.forceProducts || lastCatalogMode !== catalogMode || !lastProductsFetchAt || (now - lastProductsFetchAt) >= PRODUCT_CACHE_TTL_MS;
         const shouldFetchSettings = options.forceSettings || !state.settings || (now - lastSettingsFetchAt) >= SETTINGS_CACHE_TTL_MS;
 
         const settingsTask = (async () => {
@@ -1454,6 +1497,9 @@ async function loadOrdersListener(options = {}) {
                     save(K.products, products);
                     lastProductsFetchAt = Date.now();
                     lastCatalogMode = catalogMode;
+                    if (catalogMode === 'customer' || catalogMode === 'featured') {
+                        writePublicCatalogCache(catalogMode, products);
+                    }
                     catalogLoading = false;
                 } else {
                     throw new Error('Invalid catalog response');
