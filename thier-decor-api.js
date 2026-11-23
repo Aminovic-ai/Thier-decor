@@ -1055,8 +1055,8 @@ async function cachedPublicCatalog(request, env) {
   if (paginated) {
     const rawLimit = requestUrl.searchParams.get("limit");
     const rawOffset = requestUrl.searchParams.get("offset");
-    if ((rawLimit !== null && !/^\\d+$/.test(rawLimit)) ||
-        (rawOffset !== null && !/^\\d+$/.test(rawOffset))) {
+    if ((rawLimit !== null && !/^\d+$/.test(rawLimit)) ||
+        (rawOffset !== null && !/^\d+$/.test(rawOffset))) {
       return fail("Invalid public catalog pagination.", 400);
     }
     pageLimit = rawLimit === null ? 40 : Number(rawLimit);
