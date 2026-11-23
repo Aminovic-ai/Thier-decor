@@ -1544,70 +1544,7 @@ async function loadOrdersListener(options = {}) {
             }
         })();
 
-async function ensureFullCustomerCatalog() {
-    if (!(state.session && state.session.role === 'customer') || customerCatalogFullyLoaded) return true;
-    if (customerCatalogLoadPromise) return customerCatalogLoadPromise;
-    customerCatalogLoadPromise = (async () => {
-        while (customerCatalogLoadingMore) await new Promise(resolve => setTimeout(resolve, 40));
-        while (customerCatalogHasMore) {
-            const requestedOffset = customerCatalogNextOffset;
-            const page = await fetchPublicCustomerCatalogPageViaWorker(requestedOffset);
-            if (page.pagination.nextOffset <= requestedOffset || page.pagination.nextOffset > 50000) {
-                throw new Error(state.currentLang === 'fr' ? 'Pagination du catalogue invalide.' : 'تسلسل صفحات المنتجات غير صالح.');
-            }
-            lastProductsFetchAt = Date.now();
-            const known = new Set(state.products.map(product => String(product.id)));
-            for (const product of page.products) {
-                if (!known.has(String(product.id))) state.products.push(product);
-            }
-            customerCatalogHasMore = page.pagination.hasMore;
-            customerCatalogNextOffset = page.pagination.nextOffset;
-            if (!page.products.length && customerCatalogHasMore) {
-                throw new Error(state.currentLang === 'fr' ? 'Le catalogue n’a pas avancé. Réessayez.' : 'لم تتقدم صفحات المنتجات. حاول مجدداً.');
-            }
-        }
-        customerCatalogFullyLoaded = true;
-        lastProductsFetchAt = Date.now();
-        writePublicCatalogCache('customer', state.products, true);
-        save(K.products, state.products);
-        return true;
-    })().finally(() => { customerCatalogLoadPromise = null; });
-    return customerCatalogLoadPromise;
-}
-async function loadMoreCustomerProducts() {
-    if (!(state.session && state.session.role === 'customer') || !customerCatalogHasMore || customerCatalogLoadingMore || customerCatalogLoadPromise) return;
-    customerCatalogLoadingMore = true;
-    renderShop();
-    try {
-        const requestedOffset = customerCatalogNextOffset;
-        const page = await fetchPublicCustomerCatalogPageViaWorker(requestedOffset);
-        if (page.pagination.nextOffset <= requestedOffset || page.pagination.nextOffset > 50000) {
-            throw new Error(state.currentLang === 'fr' ? 'Pagination du catalogue invalide.' : 'تسلسل صفحات المنتجات غير صالح.');
-        }
-        lastProductsFetchAt = Date.now();
-        const known = new Set(state.products.map(product => String(product.id)));
-        for (const product of page.products) {
-            if (!known.has(String(product.id))) state.products.push(product);
-        }
-        customerCatalogHasMore = page.pagination.hasMore;
-        customerCatalogNextOffset = page.pagination.nextOffset;
-        customerCatalogFullyLoaded = !customerCatalogHasMore;
-        if (customerCatalogFullyLoaded) {
-            lastProductsFetchAt = Date.now();
-            writePublicCatalogCache('customer', state.products, true);
-        }
-        save(K.products, state.products);
-        renderCategories();
-        renderShop();
-    } catch (error) {
-        console.error('Customer catalog page failed:', error);
-        toast(error.message || (state.currentLang === 'fr' ? 'Chargement impossible.' : 'تعذر تحميل المزيد من المنتجات.'), 'error');
-    } finally {
-        customerCatalogLoadingMore = false;
-        renderShop();
-    }
-}
-window.loadMoreCustomerProducts = loadMoreCustomerProducts;
+
 
         // Render the catalog immediately when products arrive. Do not make the
         // storefront wait for the independent public-settings Worker request.
@@ -1721,6 +1658,72 @@ window.loadMoreCustomerProducts = loadMoreCustomerProducts;
     return true;
 }
 window.loadOrdersListener = loadOrdersListener;
+
+async function ensureFullCustomerCatalog() {
+    if (!(state.session && state.session.role === 'customer') || customerCatalogFullyLoaded) return true;
+    if (customerCatalogLoadPromise) return customerCatalogLoadPromise;
+    customerCatalogLoadPromise = (async () => {
+        while (customerCatalogLoadingMore) await new Promise(resolve => setTimeout(resolve, 40));
+        while (customerCatalogHasMore) {
+            const requestedOffset = customerCatalogNextOffset;
+            const page = await fetchPublicCustomerCatalogPageViaWorker(requestedOffset);
+            if (page.pagination.nextOffset <= requestedOffset || page.pagination.nextOffset > 50000) {
+                throw new Error(state.currentLang === 'fr' ? 'Pagination du catalogue invalide.' : 'تسلسل صفحات المنتجات غير صالح.');
+            }
+            lastProductsFetchAt = Date.now();
+            const known = new Set(state.products.map(product => String(product.id)));
+            for (const product of page.products) {
+                if (!known.has(String(product.id))) state.products.push(product);
+            }
+            customerCatalogHasMore = page.pagination.hasMore;
+            customerCatalogNextOffset = page.pagination.nextOffset;
+            if (!page.products.length && customerCatalogHasMore) {
+                throw new Error(state.currentLang === 'fr' ? 'Le catalogue n’a pas avancé. Réessayez.' : 'لم تتقدم صفحات المنتجات. حاول مجدداً.');
+            }
+        }
+        customerCatalogFullyLoaded = true;
+        lastProductsFetchAt = Date.now();
+        writePublicCatalogCache('customer', state.products, true);
+        save(K.products, state.products);
+        return true;
+    })().finally(() => { customerCatalogLoadPromise = null; });
+    return customerCatalogLoadPromise;
+}
+async function loadMoreCustomerProducts() {
+    if (!(state.session && state.session.role === 'customer') || !customerCatalogHasMore || customerCatalogLoadingMore || customerCatalogLoadPromise) return;
+    customerCatalogLoadingMore = true;
+    renderShop();
+    try {
+        const requestedOffset = customerCatalogNextOffset;
+        const page = await fetchPublicCustomerCatalogPageViaWorker(requestedOffset);
+        if (page.pagination.nextOffset <= requestedOffset || page.pagination.nextOffset > 50000) {
+            throw new Error(state.currentLang === 'fr' ? 'Pagination du catalogue invalide.' : 'تسلسل صفحات المنتجات غير صالح.');
+        }
+        lastProductsFetchAt = Date.now();
+        const known = new Set(state.products.map(product => String(product.id)));
+        for (const product of page.products) {
+            if (!known.has(String(product.id))) state.products.push(product);
+        }
+        customerCatalogHasMore = page.pagination.hasMore;
+        customerCatalogNextOffset = page.pagination.nextOffset;
+        customerCatalogFullyLoaded = !customerCatalogHasMore;
+        if (customerCatalogFullyLoaded) {
+            lastProductsFetchAt = Date.now();
+            writePublicCatalogCache('customer', state.products, true);
+        }
+        save(K.products, state.products);
+        renderCategories();
+        renderShop();
+    } catch (error) {
+        console.error('Customer catalog page failed:', error);
+        toast(error.message || (state.currentLang === 'fr' ? 'Chargement impossible.' : 'تعذر تحميل المزيد من المنتجات.'), 'error');
+    } finally {
+        customerCatalogLoadingMore = false;
+        renderShop();
+    }
+}
+window.loadMoreCustomerProducts = loadMoreCustomerProducts;
+
 let adminLiveRefreshTimer = null;
 
 function setupRealtimeListeners() {
