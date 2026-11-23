@@ -1385,10 +1385,13 @@ function updateProductRequestButton() {
 }
 window.updateProductRequestButton = updateProductRequestButton;
 
-const PRODUCT_CACHE_TTL_MS = 3 * 60 * 1000;
-const SETTINGS_CACHE_TTL_MS = 5 * 60 * 1000;
-// Admin-only tables change less often than orders; avoid re-reading every table on each refresh.
-const ADMIN_DATA_CACHE_TTL_MS = 5 * 60 * 1000;
+// Product stock is refreshed explicitly after POS sales and manual admin refreshes.
+// A longer background TTL reduces repeat catalog reads without delaying those updates.
+const PRODUCT_CACHE_TTL_MS = 5 * 60 * 1000;
+// Store branding and delivery settings change rarely; admins can force-refresh after edits.
+const SETTINGS_CACHE_TTL_MS = 15 * 60 * 1000;
+// Admin-only datasets are refreshed on demand and periodically, not on every poll.
+const ADMIN_DATA_CACHE_TTL_MS = 10 * 60 * 1000;
 let lastAdminDataFetchAt = 0;
 let lastProductsFetchAt = 0;
 let lastCatalogMode = null;
