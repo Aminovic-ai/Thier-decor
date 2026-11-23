@@ -122,7 +122,13 @@ test("public endpoints reject arbitrary query variants without contacting Supaba
       "https://api.example/public/catalog?ids=1,2",
       "https://api.example/public/catalog?x=1",
       "https://api.example/public/catalog?all=2",
-      "https://api.example/public/catalog?all=1&all=1"
+      "https://api.example/public/catalog?all=1&all=1",
+      "https://api.example/public/catalog?limit=40",
+      "https://api.example/public/catalog?all=1&limit=0",
+      "https://api.example/public/catalog?all=1&limit=101",
+      "https://api.example/public/catalog?all=1&offset=-1",
+      "https://api.example/public/catalog?all=1&offset=50001",
+      "https://api.example/public/catalog?all=1&limit=forty"
     ]) {
       const response = await worker.fetch(new Request(url, { headers: { Origin: origin } }), env);
       assert.equal(response.status, 400, url);
@@ -183,6 +189,37 @@ test("full catalog requires a valid customer session and is always private no-st
   });
 });
 
+
+test("customer catalog pagination is bounded, ordered, private, and excludes private columns", async () => {
+  const calls = [];
+  await withFetch(async input => {
+    const url = new URL(String(input));
+    calls.push(url);
+    return new Response(JSON.stringify([
+      { id: 41, name: "Produit 41", price: 100, qty: 2, image_urls: [] },
+      { id: 42, name: "Produit 42", price: 120, qty: 1, image_urls: [] },
+      { id: 43, name: "Produit 43", price: 90, qty: 3, image_urls: [] }
+    ]), { status: 200 });
+  }, async () => {
+    const token = await customerToken();
+    const response = await worker.fetch(new Request(
+      "https://api.example/public/catalog?all=1&limit=2&offset=40",
+      { headers: { Origin: origin, Authorization: "Bearer " + token } }
+    ), env);
+    assert.equal(response.status, 200);
+    assert.match(response.headers.get("Cache-Control") || "", /private/);
+    assert.match(response.headers.get("Cache-Control") || "", /no-store/);
+    const body = await response.json();
+    assert.deepEqual(body.products.map(product => product.id), [41, 42]);
+    assert.deepEqual(body.pagination, { limit: 2, offset: 40, hasMore: true, nextOffset: 42 });
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].searchParams.get("limit"), "3");
+    assert.equal(calls[0].searchParams.get("offset"), "40");
+    assert.equal(calls[0].searchParams.get("order"), "id.asc");
+    assert.ok(!calls[0].searchParams.get("select").split(",").includes("cost"));
+    assert.ok(!calls[0].searchParams.get("select").split(",").includes("images"));
+  });
+});
 
 test("admin product endpoint rejects requests without Firebase admin authentication", async () => {
   await withFetch(async () => {

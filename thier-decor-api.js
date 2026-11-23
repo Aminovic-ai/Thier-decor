@@ -1040,15 +1040,33 @@ async function cachedPublicStorefront(request, env) {
 async function cachedPublicCatalog(request, env) {
   const requestUrl = new URL(request.url);
   const allowedParams = [...requestUrl.searchParams.keys()];
-  if (requestUrl.searchParams.size > 1 ||
-      allowedParams.some(key => key !== "all") ||
+  if (new Set(allowedParams).size !== allowedParams.length ||
+      allowedParams.some(key => !["all", "limit", "offset"].includes(key)) ||
       (requestUrl.searchParams.has("all") && requestUrl.searchParams.get("all") !== "1")) {
     return fail("Invalid public catalog query.", 400);
   }
   const allProducts = requestUrl.searchParams.get("all") === "1";
-  // The only cacheable catalog URLs are the fixed featured URL and the
-  // authenticated all=1 URL. Featured IDs are read server-side, never from
-  // browser-controlled query parameters.
+  const paginated = requestUrl.searchParams.has("limit") || requestUrl.searchParams.has("offset");
+  if ((!allProducts && paginated) || (!allProducts && requestUrl.searchParams.size > 0)) {
+    return fail("Invalid public catalog query.", 400);
+  }
+  let pageLimit = 40;
+  let pageOffset = 0;
+  if (paginated) {
+    const rawLimit = requestUrl.searchParams.get("limit");
+    const rawOffset = requestUrl.searchParams.get("offset");
+    if ((rawLimit !== null && !/^\d+$/.test(rawLimit)) ||
+        (rawOffset !== null && !/^\d+$/.test(rawOffset))) {
+      return fail("Invalid public catalog pagination.", 400);
+    }
+    pageLimit = rawLimit === null ? 40 : Number(rawLimit);
+    pageOffset = rawOffset === null ? 0 : Number(rawOffset);
+    if (!Number.isSafeInteger(pageLimit) || pageLimit < 1 || pageLimit > 100 ||
+        !Number.isSafeInteger(pageOffset) || pageOffset < 0 || pageOffset > 50000) {
+      return fail("Invalid public catalog pagination.", 400);
+    }
+  }
+  // Featured IDs are read server-side, never from browser-controlled query parameters.
 
   // Only fields required by the public storefront; never send cost or legacy
   // Base64 image data to visitors. Product images come from the R2 image_urls.
@@ -1058,6 +1076,22 @@ async function cachedPublicCatalog(request, env) {
     // Workers Cache bypass this request; never share one customer's response.
     const session = await requireCustomer(request, env);
     if (!session) return fail("يرجى تسجيل الدخول لعرض كامل المنتجات.", 401);
+    if (paginated) {
+      const query = "products?select=" + columns + "&qty=gt.0&order=id.asc&limit=" + (pageLimit + 1) + "&offset=" + pageOffset;
+      const products = await dbRequest(env, query);
+      const fetchedRows = Array.isArray(products) ? products : [];
+      const rows = fetchedRows.slice(0, pageLimit);
+      return privateCatalogJson({
+        success: true,
+        products: rows,
+        pagination: {
+          limit: pageLimit,
+          offset: pageOffset,
+          hasMore: fetchedRows.length > pageLimit,
+          nextOffset: pageOffset + rows.length
+        }
+      });
+    }
     const products = await dbRequestPaged(env, "products?select=" + columns + "&qty=gt.0&order=id.asc", 500, 50000);
     return privateCatalogJson({ success: true, products: Array.isArray(products) ? products : [] });
   }
