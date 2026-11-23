@@ -1443,7 +1443,7 @@ const SETTINGS_CACHE_TTL_MS = 15 * 60 * 1000;
 const ADMIN_DATA_CACHE_TTL_MS = 10 * 60 * 1000;
 // Private orders stay in this admin session's memory; never use a shared/CDN cache.
 // Three minutes reduces duplicate list reads while keeping the dashboard reasonably fresh.
-const ADMIN_ORDERS_CACHE_TTL_MS = 3 * 60 * 1000;
+const ADMIN_ORDERS_CACHE_TTL_MS = 90 * 1000;
 let lastAdminDataFetchAt = 0;
 let lastAdminOrdersFetchAt = 0;
 function invalidateAdminOrdersCache() { lastAdminOrdersFetchAt = 0; }
