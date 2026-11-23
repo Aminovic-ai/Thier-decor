@@ -197,7 +197,8 @@ test("customer catalog pagination is bounded, ordered, private, and excludes pri
     calls.push(url);
     return new Response(JSON.stringify([
       { id: 41, name: "Produit 41", price: 100, qty: 2, image_urls: [] },
-      { id: 42, name: "Produit 42", price: 120, qty: 1, image_urls: [] }
+      { id: 42, name: "Produit 42", price: 120, qty: 1, image_urls: [] },
+      { id: 43, name: "Produit 43", price: 90, qty: 3, image_urls: [] }
     ]), { status: 200 });
   }, async () => {
     const token = await customerToken();
@@ -212,7 +213,7 @@ test("customer catalog pagination is bounded, ordered, private, and excludes pri
     assert.deepEqual(body.products.map(product => product.id), [41, 42]);
     assert.deepEqual(body.pagination, { limit: 2, offset: 40, hasMore: true, nextOffset: 42 });
     assert.equal(calls.length, 1);
-    assert.equal(calls[0].searchParams.get("limit"), "2");
+    assert.equal(calls[0].searchParams.get("limit"), "3");
     assert.equal(calls[0].searchParams.get("offset"), "40");
     assert.equal(calls[0].searchParams.get("order"), "id.asc");
     assert.ok(!calls[0].searchParams.get("select").split(",").includes("cost"));

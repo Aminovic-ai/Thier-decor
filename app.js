@@ -131,10 +131,14 @@ async function fetchPublicSettingsViaWorker({ includeFeaturedCatalog = false } =
     return result.settings;
 }
 
-async function fetchPublicCatalogViaWorker({ all = false } = {}) {
+async function fetchPublicCatalogViaWorker({ all = false, limit = null, offset = null, page = false } = {}) {
     ensureApiConfigured();
     const endpoint = new URL(TD_ADMIN_API_URL.replace(/\/+$/, '') + '/public/catalog');
     if (all) endpoint.searchParams.set('all', '1');
+    if (page) {
+        endpoint.searchParams.set('limit', String(limit ?? 40));
+        endpoint.searchParams.set('offset', String(offset ?? 0));
+    }
     const headers = { 'Accept': 'application/json' };
     if (all) {
         const token = state.session?.role === 'customer' ? state.session.customerToken : null;
@@ -151,6 +155,13 @@ async function fetchPublicCatalogViaWorker({ all = false } = {}) {
     catch (_) { throw new Error(state.currentLang === 'fr' ? 'Réponse du catalogue invalide.' : 'ردّ قائمة المنتجات غير صالح.'); }
     if (!response.ok || result?.success !== true || !Array.isArray(result.products)) {
         throw new Error(result?.error || (state.currentLang === 'fr' ? 'Impossible de charger le catalogue.' : 'تعذر جلب قائمة المنتجات.'));
+    }
+    if (page) {
+        if (!result.pagination || !Number.isSafeInteger(Number(result.pagination.nextOffset)) ||
+            typeof result.pagination.hasMore !== 'boolean') {
+            throw new Error(state.currentLang === 'fr' ? 'Pagination du catalogue invalide.' : 'بيانات تقسيم المنتجات غير صالحة.');
+        }
+        return { products: result.products, pagination: result.pagination };
     }
     return result.products;
 }
@@ -170,6 +181,9 @@ async function fetchAdminProductsViaWorker() {
     return result.products;
 }
 
+function fetchPublicCustomerCatalogPageViaWorker(offset = 0) {
+    return fetchPublicCatalogViaWorker({ all: true, limit: 40, offset, page: true });
+}
 function fetchPublicCustomerCatalogViaWorker() {
     return fetchPublicCatalogViaWorker({ all: true });
 }
@@ -1401,19 +1415,21 @@ function readPublicCatalogCache(mode, now = Date.now()) {
         const cached = JSON.parse(localStorage.getItem(key) || 'null');
         const savedAt = Number(cached?.savedAt);
         if (!Array.isArray(cached?.products) || !Number.isFinite(savedAt) ||
-            savedAt <= 0 || now - savedAt < 0 || now - savedAt >= PRODUCT_CACHE_TTL_MS) return null;
+            savedAt <= 0 || now - savedAt < 0 || now - savedAt >= PRODUCT_CACHE_TTL_MS ||
+            (mode === 'customer' && cached.complete !== true)) return null;
         return { products: sanitizePublicCatalogFallback(cached.products), savedAt };
     } catch (_) {
         return null;
     }
 }
 
-function writePublicCatalogCache(mode, products) {
+function writePublicCatalogCache(mode, products, complete = true) {
     const key = PUBLIC_CATALOG_CACHE_KEYS[mode];
-    if (!key || !Array.isArray(products)) return;
+    if (!key || !Array.isArray(products) || (mode === 'customer' && !complete)) return;
     try {
         localStorage.setItem(key, JSON.stringify({
             savedAt: Date.now(),
+            complete: mode === 'customer' ? complete : true,
             products: sanitizePublicCatalogFallback(products)
         }));
     } catch (error) {
@@ -1431,6 +1447,11 @@ let lastCatalogMode = null;
 let lastSettingsFetchAt = 0;
 let catalogLoading = true;
 let loadRefreshInProgress = false;
+let customerCatalogHasMore = false;
+let customerCatalogNextOffset = 0;
+let customerCatalogFullyLoaded = false;
+let customerCatalogLoadingMore = false;
+let customerCatalogLoadPromise = null;
 
 async function loadOrdersListener(options = {}) {
     // All storefront and private-data reads are routed through the authenticated Worker.
@@ -1484,9 +1505,11 @@ async function loadOrdersListener(options = {}) {
                     // Product management and POS still need the private cost field.
                     products = await fetchAdminProductsViaWorker();
                 } else if (isCustomerCatalogUser) {
-                    // Customers still browse the full catalog, but through the same
-                    // public edge-cached projection (without private cost/Base64 fields).
-                    products = await fetchPublicCustomerCatalogViaWorker();
+                    const firstPage = await fetchPublicCustomerCatalogPageViaWorker(0);
+                    products = firstPage.products;
+                    customerCatalogHasMore = firstPage.pagination.hasMore;
+                    customerCatalogNextOffset = firstPage.pagination.nextOffset;
+                    customerCatalogFullyLoaded = !customerCatalogHasMore;
                 } else {
                     // Guests receive only the server-selected featured catalog, not the full catalog.
                     await settingsTask;
@@ -1497,8 +1520,10 @@ async function loadOrdersListener(options = {}) {
                     save(K.products, products);
                     lastProductsFetchAt = Date.now();
                     lastCatalogMode = catalogMode;
-                    if (catalogMode === 'customer' || catalogMode === 'featured') {
+                    if (catalogMode === 'featured') {
                         writePublicCatalogCache(catalogMode, products);
+                    } else if (catalogMode === 'customer' && customerCatalogFullyLoaded) {
+                        writePublicCatalogCache(catalogMode, products, true);
                     }
                     catalogLoading = false;
                 } else {
@@ -1518,6 +1543,71 @@ async function loadOrdersListener(options = {}) {
                 }
             }
         })();
+
+async function ensureFullCustomerCatalog() {
+    if (!(state.session && state.session.role === 'customer') || customerCatalogFullyLoaded) return true;
+    if (customerCatalogLoadPromise) return customerCatalogLoadPromise;
+    customerCatalogLoadPromise = (async () => {
+        while (customerCatalogLoadingMore) await new Promise(resolve => setTimeout(resolve, 40));
+        while (customerCatalogHasMore) {
+            const requestedOffset = customerCatalogNextOffset;
+            const page = await fetchPublicCustomerCatalogPageViaWorker(requestedOffset);
+            if (page.pagination.nextOffset <= requestedOffset || page.pagination.nextOffset > 50000) {
+                throw new Error(state.currentLang === 'fr' ? 'Pagination du catalogue invalide.' : 'تسلسل صفحات المنتجات غير صالح.');
+            }
+            lastProductsFetchAt = Date.now();
+            const known = new Set(state.products.map(product => String(product.id)));
+            for (const product of page.products) {
+                if (!known.has(String(product.id))) state.products.push(product);
+            }
+            customerCatalogHasMore = page.pagination.hasMore;
+            customerCatalogNextOffset = page.pagination.nextOffset;
+            if (!page.products.length && customerCatalogHasMore) {
+                throw new Error(state.currentLang === 'fr' ? 'Le catalogue n’a pas avancé. Réessayez.' : 'لم تتقدم صفحات المنتجات. حاول مجدداً.');
+            }
+        }
+        customerCatalogFullyLoaded = true;
+        lastProductsFetchAt = Date.now();
+        writePublicCatalogCache('customer', state.products, true);
+        save(K.products, state.products);
+        return true;
+    })().finally(() => { customerCatalogLoadPromise = null; });
+    return customerCatalogLoadPromise;
+}
+async function loadMoreCustomerProducts() {
+    if (!(state.session && state.session.role === 'customer') || !customerCatalogHasMore || customerCatalogLoadingMore || customerCatalogLoadPromise) return;
+    customerCatalogLoadingMore = true;
+    renderShop();
+    try {
+        const requestedOffset = customerCatalogNextOffset;
+        const page = await fetchPublicCustomerCatalogPageViaWorker(requestedOffset);
+        if (page.pagination.nextOffset <= requestedOffset || page.pagination.nextOffset > 50000) {
+            throw new Error(state.currentLang === 'fr' ? 'Pagination du catalogue invalide.' : 'تسلسل صفحات المنتجات غير صالح.');
+        }
+        lastProductsFetchAt = Date.now();
+        const known = new Set(state.products.map(product => String(product.id)));
+        for (const product of page.products) {
+            if (!known.has(String(product.id))) state.products.push(product);
+        }
+        customerCatalogHasMore = page.pagination.hasMore;
+        customerCatalogNextOffset = page.pagination.nextOffset;
+        customerCatalogFullyLoaded = !customerCatalogHasMore;
+        if (customerCatalogFullyLoaded) {
+            lastProductsFetchAt = Date.now();
+            writePublicCatalogCache('customer', state.products, true);
+        }
+        save(K.products, state.products);
+        renderCategories();
+        renderShop();
+    } catch (error) {
+        console.error('Customer catalog page failed:', error);
+        toast(error.message || (state.currentLang === 'fr' ? 'Chargement impossible.' : 'تعذر تحميل المزيد من المنتجات.'), 'error');
+    } finally {
+        customerCatalogLoadingMore = false;
+        renderShop();
+    }
+}
+window.loadMoreCustomerProducts = loadMoreCustomerProducts;
 
         // Render the catalog immediately when products arrive. Do not make the
         // storefront wait for the independent public-settings Worker request.
@@ -1996,11 +2086,19 @@ function renderCategories() {
         const active = isAll ? currentCategory === 'all' : normalizeStoreCategory(cat) === normalizeStoreCategory(currentCategory);
         return `<button type="button" class="category-item category-text-item ${active ? 'active' : ''}" data-store-category="${esc(cat)}" aria-pressed="${active ? 'true' : 'false'}"><span class="category-label">${esc(label)}</span></button>`;
     }).join('');
+    if (state.session && state.session.role === 'customer' && customerCatalogHasMore) {
+        const label = state.currentLang === 'fr' ? 'Charger toutes les catégories' : 'تحميل بقية الأصناف';
+        c.insertAdjacentHTML('beforeend', '<button type="button" class="category-item category-text-item" onclick="ensureFullCustomerCatalog().then(renderCategories).then(renderShop).catch(error=>toast(error.message, \'error\'))">' + label + '</button>');
+    }
 }
 window.renderCategories = renderCategories;
 
-function filterByCategory(cat) {
+async function filterByCategory(cat) {
     currentCategory = cat;
+    if (state.session && state.session.role === 'customer') {
+        try { await ensureFullCustomerCatalog(); }
+        catch (error) { toast(error.message || 'تعذر تحميل منتجات الصنف بالكامل.', 'error'); return; }
+    }
     renderCategories();
     const search = document.getElementById('shop-search-input') || document.querySelector('#screen-shop .header-search input');
     if (search) search.value = '';
@@ -2046,7 +2144,11 @@ function updateShopSectionHeading() {
         description.textContent = state.currentLang === 'fr' ? 'Découvrez les produits de cette catégorie' : 'اكتشف منتجات هذا الصنف';
     }
 }
-function sortShopProducts(val) {
+async function sortShopProducts(val) {
+    if (state.session && state.session.role === 'customer') {
+        try { await ensureFullCustomerCatalog(); }
+        catch (error) { toast(error.message || 'تعذر تحميل المنتجات للترتيب.', 'error'); return; }
+    }
     let list = getCurrentShopProducts().slice();
     if (val === 'price-asc') list.sort((a,b) => effectiveProductPrice(a) - effectiveProductPrice(b));
     else if (val === 'price-desc') list.sort((a,b) => effectiveProductPrice(b) - effectiveProductPrice(a));
@@ -2092,7 +2194,11 @@ function getProductVariants(productId) {
     return state.products.filter(product => Number(product.qty) > 0 && !product.isPack && getProductVariantKey(product) === key);
 }
 window.getProductVariants = getProductVariants;
-function addProductFromCard(productId) {
+async function addProductFromCard(productId) {
+    if (state.session && state.session.role === 'customer') {
+        try { await ensureFullCustomerCatalog(); }
+        catch (error) { toast(error.message || 'تعذر تحميل أشكال المنتج.', 'error'); return; }
+    }
     const variants = getProductVariants(productId);
     if (variants.length > 1) return showProductView(productId);
     return addToCart(productId);
@@ -2139,7 +2245,13 @@ async function uploadProductImageToR2(dataUrl) {
 
 function renderShopHTML(list) {
     const c = document.getElementById('s-products'); if (!c) return;
-    if (list.length === 0) { c.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:40px;">${i18n[state.currentLang].no_products}</div>`; return; }
+    if (list.length === 0) {
+        c.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:40px;">${i18n[state.currentLang].no_products}</div>`;
+        if (state.session && state.session.role === 'customer' && customerCatalogHasMore) {
+            c.insertAdjacentHTML('beforeend', '<div style="grid-column:1/-1;text-align:center;padding:18px;"><button type="button" class="btn-primary" onclick="loadMoreCustomerProducts()">' + (state.currentLang === 'fr' ? 'Charger plus de produits' : 'تحميل المزيد من المنتجات') + '</button></div>');
+        }
+        return;
+    }
 
     const visibleIds = new Set(list.map(product => String(product.id)));
     const seenGroups = new Set();
@@ -2184,6 +2296,13 @@ function renderShopHTML(list) {
             </div>
         </div>`;
     }).join('');
+    if (state.session && state.session.role === 'customer' && customerCatalogHasMore) {
+        const label = customerCatalogLoadingMore
+            ? (state.currentLang === 'fr' ? 'Chargement...' : 'جارٍ التحميل...')
+            : (state.currentLang === 'fr' ? 'Charger plus de produits' : 'تحميل المزيد من المنتجات');
+        const disabled = customerCatalogLoadingMore ? 'disabled' : '';
+        c.insertAdjacentHTML('beforeend', '<div style="grid-column:1/-1;text-align:center;padding:18px;"><button id="customer-catalog-load-more" type="button" class="btn-primary" onclick="loadMoreCustomerProducts()" style="min-width:220px;" ' + disabled + '>' + label + '</button></div>');
+    }
 }
 
 function renderNewProducts() {
@@ -2192,13 +2311,17 @@ function renderNewProducts() {
 }
 window.renderNewProducts = renderNewProducts;
 
-function filterShopProducts(q) {
+async function filterShopProducts(q) {
     const c = document.getElementById('s-products'); if (!c) return;
-    // Visitor storefront displays only products explicitly selected as featured by the administrator.
     currentCategory = 'all';
+    if (state.session && state.session.role === 'customer') {
+        try { await ensureFullCustomerCatalog(); }
+        catch (error) { toast(error.message || 'تعذر تحميل المنتجات للبحث.', 'error'); return; }
+    }
     if (!q.trim()) { renderShop(); return; }
     const lq = q.toLocaleLowerCase();
-    const list = getFeaturedProducts().filter(p =>
+    const source = state.session && state.session.role === 'customer' ? state.products : getFeaturedProducts();
+    const list = source.filter(p =>
         String(p.name || '').toLocaleLowerCase().includes(lq) ||
         String(p.category || '').toLocaleLowerCase().includes(lq)
     );
@@ -2227,15 +2350,23 @@ window.toggleWishlist = toggleWishlist;
 
 
 function updateWishlistBadge() { const b = document.getElementById('wishlist-badge'); if (b) { b.textContent = state.wishlist.length; b.style.display = state.wishlist.length > 0 ? 'flex' : 'none'; } }
-function renderWishlist() {
+async function renderWishlist() {
     const c = document.getElementById('s-wishlist-items'); if (!c) return;
+    if (state.session && state.session.role === 'customer') {
+        try { await ensureFullCustomerCatalog(); }
+        catch (error) { toast(error.message || 'تعذر تحميل المفضلة كاملة.', 'error'); return; }
+    }
     const items = state.products.filter(p => state.wishlist.includes(p.id));
     if (items.length === 0) { c.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:40px;">${i18n[state.currentLang].empty_wishlist}</div>`; return; }
     c.innerHTML = items.map(p => { const image = getProductImages(p)[0]; return `<div class="product-card" onclick="showProductView(${p.id})"><div class="product-img">${image ? `<img src="${esc(image)}">` : '📦'}</div><div class="product-info"><h3>${esc(p.name)}</h3><div style="font-weight:900;margin:10px 0;">${fmtMoney(p.price)}</div><button class="btn-primary" style="width:100%;padding:8px;" onclick="event.stopPropagation();addToCart(${p.id})">${i18n[state.currentLang].add_to_cart}</button></div></div>`; }).join('');
 }
 window.updateWishlistBadge = updateWishlistBadge; window.renderWishlist = renderWishlist;
 
-function showProductView(id) {
+async function showProductView(id) {
+    if (state.session && state.session.role === 'customer') {
+        try { await ensureFullCustomerCatalog(); }
+        catch (error) { toast(error.message || 'تعذر تحميل تفاصيل المنتج كاملة.', 'error'); return; }
+    }
     const p = state.products.find(x => String(x.id) === String(id)); if (!p) return;
     const variants = getProductVariants(p.id);
     const variantPicker = variants.length > 1 ? `
@@ -2329,7 +2460,11 @@ function updateCartQtyDirect(id, value) {
 function removeFromCart(id) { state.cart = state.cart.filter(c => c.id !== id); save(K.cart, state.cart); renderCart(); updateCartBadge(); }
 window.updateCartBadge = updateCartBadge; window.updateCartQty = updateCartQty; window.updateCartQtyDirect = updateCartQtyDirect; window.removeFromCart = removeFromCart;
 
-function renderCart() {
+async function renderCart() {
+    if (state.session && state.session.role === 'customer') {
+        try { await ensureFullCustomerCatalog(); }
+        catch (error) { toast(error.message || 'تعذر تحميل منتجات السلة بالكامل.', 'error'); return; }
+    }
     const c = document.getElementById('s-cart-items'); const sum = document.getElementById('s-cart-summary'); if (!c) return;
     if (state.cart.length === 0) { c.innerHTML = `<div style="text-align:center;padding:40px;">${i18n[state.currentLang].cart_empty}</div>`; sum.innerHTML = ''; return; }
     c.innerHTML = state.cart.map(i => {

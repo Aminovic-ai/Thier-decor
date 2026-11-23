@@ -1077,16 +1077,17 @@ async function cachedPublicCatalog(request, env) {
     const session = await requireCustomer(request, env);
     if (!session) return fail("يرجى تسجيل الدخول لعرض كامل المنتجات.", 401);
     if (paginated) {
-      const query = "products?select=" + columns + "&qty=gt.0&order=id.asc&limit=" + pageLimit + "&offset=" + pageOffset;
+      const query = "products?select=" + columns + "&qty=gt.0&order=id.asc&limit=" + (pageLimit + 1) + "&offset=" + pageOffset;
       const products = await dbRequest(env, query);
-      const rows = Array.isArray(products) ? products : [];
+      const fetchedRows = Array.isArray(products) ? products : [];
+      const rows = fetchedRows.slice(0, pageLimit);
       return privateCatalogJson({
         success: true,
         products: rows,
         pagination: {
           limit: pageLimit,
           offset: pageOffset,
-          hasMore: rows.length === pageLimit,
+          hasMore: fetchedRows.length > pageLimit,
           nextOffset: pageOffset + rows.length
         }
       });
