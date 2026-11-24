@@ -1441,7 +1441,12 @@ function writePublicCatalogCache(mode, products, complete = true) {
 const SETTINGS_CACHE_TTL_MS = 15 * 60 * 1000;
 // Admin-only datasets are refreshed on demand and periodically, not on every poll.
 const ADMIN_DATA_CACHE_TTL_MS = 10 * 60 * 1000;
+// Private orders stay in this admin session's memory; never use a shared/CDN cache.
+// Three minutes reduces duplicate list reads while keeping the dashboard reasonably fresh.
+const ADMIN_ORDERS_CACHE_TTL_MS = 90 * 1000;
 let lastAdminDataFetchAt = 0;
+let lastAdminOrdersFetchAt = 0;
+function invalidateAdminOrdersCache() { lastAdminOrdersFetchAt = 0; }
 let lastProductsFetchAt = 0;
 let lastCatalogMode = null;
 let lastSettingsFetchAt = 0;
@@ -1601,14 +1606,20 @@ async function loadOrdersListener(options = {}) {
                 state.messages = [];
             }
         } else if (isFirebaseAdmin) {
-            // Private admin order reads go through Cloudflare; never query the private table from the browser.
-            try {
-                const orders = await fetchAdminOrdersViaWorker();
-                state.orders = orders;
-                save(K.orders, orders);
-            } catch (ordersError) {
-                console.error('Admin Worker orders read failed:', ordersError.message || ordersError);
-                // Keep last cached orders visible if the API is temporarily unavailable; do not treat cache as fresh data.
+            // Private admin orders use a short in-memory session cache only.
+            // Manual refreshes and successful order mutations explicitly bypass it.
+            const shouldRefreshOrders = options.forceOrders || !lastAdminOrdersFetchAt ||
+                (now - lastAdminOrdersFetchAt) >= ADMIN_ORDERS_CACHE_TTL_MS;
+            if (shouldRefreshOrders) {
+                try {
+                    const orders = await fetchAdminOrdersViaWorker();
+                    state.orders = orders;
+                    save(K.orders, orders);
+                    lastAdminOrdersFetchAt = Date.now();
+                } catch (ordersError) {
+                    console.error('Admin Worker orders read failed:', ordersError.message || ordersError);
+                    // Keep the last known orders visible; a failed request never refreshes the cache timestamp.
+                }
             }
         } else {
             // Visitors must never fetch the private orders table.
@@ -1780,7 +1791,7 @@ async function adminRefreshAll() {
     try {
         lastProductsFetchAt = 0;
         lastSettingsFetchAt = 0;
-        const refreshed = await loadOrdersListener({ forceProducts: true, forceSettings: true, forceAdminData: true, forceWait: true });
+        const refreshed = await loadOrdersListener({ forceProducts: true, forceSettings: true, forceAdminData: true, forceOrders: true, forceWait: true });
         if (refreshed !== true) throw new Error('Refresh did not complete');
         const msg = state.currentLang === 'fr' ? 'Mise à jour terminée.' : 'تم التحديث بنجاح.';
         toast('✓ ' + msg);
@@ -3510,6 +3521,7 @@ async function saveTrackingCode(orderId) {
     try {
         await callAdminWorker('adminUpdateOrderTracking', { id: orderId, trackingNumber });
         order.trackingNumber = trackingNumber; save(K.orders, state.orders);
+        invalidateAdminOrdersCache();
         toast('✅ ' + i18n[state.currentLang].tracking_saved_success);
     } catch (error) { toast(error.message || i18n[state.currentLang].save_failed, 'error'); }
 }
@@ -3563,6 +3575,7 @@ async function updateOrderStatus(id, status) {
 
         order.status = nextStatus;
         save(K.orders, state.orders);
+        invalidateAdminOrdersCache();
         toast('✓ ' + i18n[state.currentLang].updated);
     } catch (error) {
         order.status = previousStatus;
@@ -3573,7 +3586,7 @@ async function updateOrderStatus(id, status) {
 
     if (typeof loadOrdersListener === 'function') {
         try {
-            await loadOrdersListener({ forceWait: true, forceProducts: nextStatus === 'cancelled' });
+            await loadOrdersListener({ forceWait: true, forceOrders: true, forceProducts: nextStatus === 'cancelled' });
         } catch (refreshError) {
             console.error('Order refresh failed:', refreshError);
         }
@@ -3595,7 +3608,8 @@ async function deleteOrder(id) {
         await callAdminWorker('adminDeleteOrder', { id });
         state.orders = state.orders.filter(o => String(o.id) !== String(id));
         save(K.orders, state.orders);
-        await loadOrdersListener({ forceProducts: true, forceWait: true });
+        invalidateAdminOrdersCache();
+        await loadOrdersListener({ forceProducts: true, forceOrders: true, forceWait: true });
         renderAdminOrdersList(); renderAdminHome(); renderShop();
         toast('✅ ' + i18n[state.currentLang].deleted);
     } catch (error) {
@@ -3649,7 +3663,9 @@ async function makeDeliveryFree(orderId) {
         await callAdminWorker('adminSetOrderFreeDelivery', { id: orderId });
         order.deliveryPrice = 0;
         order.total = Math.max(0, Number(order.itemsTotal || 0) - Number(order.discount || 0));
-        save(K.orders, state.orders); toast('✅ ' + i18n[state.currentLang].saved);
+        save(K.orders, state.orders);
+        invalidateAdminOrdersCache();
+        toast('✅ ' + i18n[state.currentLang].saved);
         viewOrderDetails(orderId); renderAdminOrdersList();
     } catch (error) { toast(error.message || i18n[state.currentLang].save_failed, 'error'); }
 }
@@ -3689,6 +3705,7 @@ async function saveOrderDebt(orderId) {
         const result = await callAdminWorker('adminRecordOrderPayment', { id: orderId, amount });
         order.paidAmount = Number(result.paidAmount);
         save(K.orders, state.orders);
+        invalidateAdminOrdersCache();
         toast('✅ تم حفظ الدفعة');
         viewOrderDetails(orderId);
         renderAdminOrdersList();
@@ -3757,9 +3774,10 @@ async function saveChangesOrder() {
         }
         window.pendingStockDelta.clear(); editingOrderOriginal = null;
         save(K.orders, state.orders);
+        invalidateAdminOrdersCache();
         closeModal('m-edit-order'); toast('✅ ' + i18n[state.currentLang].saved);
         renderAdminOrdersList(); renderAdminHome(); renderShop();
-        await loadOrdersListener({ forceProducts: true, forceWait: true });
+        await loadOrdersListener({ forceProducts: true, forceOrders: true, forceWait: true });
     } catch (error) {
         console.error('Order edit failed:', error);
         if (editingOrderOriginal) {
