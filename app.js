@@ -4325,12 +4325,16 @@ async function saveSettingsToCloud() {
     state.settings.adEndTime = document.getElementById('set-ad-endtime').value;
     state.settings.adImages = [...tempAdImages];
     try {
-        const saved = await callAdminWorker('adminUpdateSettings', { settings: {
+        await callAdminWorker('adminUpdateSettings', { settings: {
             shopName: state.settings.shopName, shopPhone: state.settings.shopPhone, shopAddress: state.settings.shopAddress || '',
             promoText: state.settings.promoText, promoActive: state.settings.promoActive, adActive: state.settings.adActive,
             adText: state.settings.adText, adEndTime: state.settings.adEndTime, adImages: state.settings.adImages
         }});
-        if (typeof saved?.verified?.adActive !== 'boolean' || saved.verified.adActive !== state.settings.adActive) {
+        // Read back directly through the existing no-store POST action. This
+        // verifies the database value without depending on the public CDN cache
+        // or requiring a Worker deployment just for a confirmation response.
+        const persisted = await callAdminWorker('publicSettings');
+        if (typeof persisted?.settings?.adActive !== 'boolean' || persisted.settings.adActive !== state.settings.adActive) {
             throw new Error(state.currentLang === 'fr'
                 ? "Le serveur n'a pas confirmé l'état d'activation des annonces image. Vérifiez puis réessayez."
                 : 'لم يؤكد الخادم حالة تفعيل إشهار الصور. لم نعتبر الحفظ ناجحًا؛ تحقق من التفعيل ثم أعد المحاولة.');
