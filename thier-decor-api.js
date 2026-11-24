@@ -1438,16 +1438,9 @@ async function adminMutation(action, body, env) {
           seenCodes.add(code);
         }
       }
-      // Return the persisted activation flag so the client never shows a
-      // success toast for image ads unless PostgREST confirms the stored value.
-      // Do not return adImages here: they may contain large base64 payloads.
-      const rows = await dbRequest(env, "settings?id=eq.1&select=id,adActive", {
-        method: "PATCH",
-        headers: { "Prefer": "return=representation" },
-        body: JSON.stringify(patch)
-      });
+      const rows = await dbRequest(env, "settings?id=eq.1&select=id", { method: "PATCH", headers: { "Prefer": "return=representation" }, body: JSON.stringify(patch) });
       if (!Array.isArray(rows) || !rows.length) return fail("لم يؤكد الخادم حفظ الإعدادات.", 409);
-      return json({ success: true, verified: { adActive: rows[0].adActive === true } });
+      return json({ success: true });
     }
     case "adminUpdateOrderTracking": {
       const id = positiveId(body.id, "معرّف الطلبية");
