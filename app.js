@@ -4330,7 +4330,22 @@ async function saveSettingsToCloud() {
             promoText: state.settings.promoText, promoActive: state.settings.promoActive, adActive: state.settings.adActive,
             adText: state.settings.adText, adEndTime: state.settings.adEndTime, adImages: state.settings.adImages
         }});
+        // Read back directly through the existing no-store POST action. This
+        // verifies the database value without depending on the public CDN cache
+        // or requiring a Worker deployment just for a confirmation response.
+        const persisted = await callAdminWorker('publicSettings');
+        if (typeof persisted?.settings?.adActive !== 'boolean' || persisted.settings.adActive !== state.settings.adActive) {
+            throw new Error(state.currentLang === 'fr'
+                ? "Le serveur n'a pas confirmé l'état d'activation des annonces image. Vérifiez puis réessayez."
+                : 'لم يؤكد الخادم حالة تفعيل إشهار الصور. لم نعتبر الحفظ ناجحًا؛ تحقق من التفعيل ثم أعد المحاولة.');
+        }
         save(K.settings, state.settings); updateStoreBranding(); renderPromoBanner(); renderSliderAd();
+        if (state.settings.adImages.length > 0 && !state.settings.adActive) {
+            toast(state.currentLang === 'fr'
+                ? "Paramètres et images enregistrés, mais la publicité image reste désactivée. Activez « Activer la publicité image » pour l'afficher aux visiteurs."
+                : 'تم حفظ الصور والإعدادات، لكن إشهار الصور ما زال متوقفًا ولن يظهر للزوار. فعّل خيار «تفعيل إشهار الصور» لإظهاره.');
+            return;
+        }
         toast('✅ ' + i18n[state.currentLang].saved); setTimeout(() => adminGo('dashboard'), 1000);
     } catch (error) { console.error('Settings save failed:', error); toast('❌ ' + (error.message || ''), 'error'); }
 }
