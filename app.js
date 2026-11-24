@@ -4336,6 +4336,12 @@ async function saveSettingsToCloud() {
                 : 'لم يؤكد الخادم حالة تفعيل إشهار الصور. لم نعتبر الحفظ ناجحًا؛ تحقق من التفعيل ثم أعد المحاولة.');
         }
         save(K.settings, state.settings); updateStoreBranding(); renderPromoBanner(); renderSliderAd();
+        if (state.settings.adImages.length > 0 && !state.settings.adActive) {
+            toast(state.currentLang === 'fr'
+                ? "Paramètres et images enregistrés, mais la publicité image reste désactivée. Activez « Activer la publicité image » pour l'afficher aux visiteurs."
+                : 'تم حفظ الصور والإعدادات، لكن إشهار الصور ما زال متوقفًا ولن يظهر للزوار. فعّل خيار «تفعيل إشهار الصور» لإظهاره.');
+            return;
+        }
         toast('✅ ' + i18n[state.currentLang].saved); setTimeout(() => adminGo('dashboard'), 1000);
     } catch (error) { console.error('Settings save failed:', error); toast('❌ ' + (error.message || ''), 'error'); }
 }
